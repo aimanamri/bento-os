@@ -416,7 +416,10 @@ wanted to edit placeholders **directly in place** in the prompt text rather
 than via a toggle + separate input list. See § 4's "Prompt variable engine"
 above for the current (and only) behavior. If reproducing this project from
 the brief alone, build the version described in this doc, not the literal
-brief text — this doc supersedes it here.
+brief text — this doc supersedes it here. A revised brief that matches the
+current build exists at [../PROJECT-BRIEF-updated.md](../PROJECT-BRIEF-updated.md);
+the original [../PROJECT-BRIEF.md](../PROJECT-BRIEF.md) is kept as-is for
+history.
 
 ### 8.3 Editable Modified time
 
