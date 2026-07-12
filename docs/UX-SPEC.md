@@ -104,10 +104,46 @@ plain hover tooltip — no separate tooltip widget is used.
 - Live search box filters as-you-type (input debounced 200 ms → FTS query).
   Scope: titles, tags, summary, body, **and dynamic field names/values**
   (§ "Metadata panel" below). Zero-hit state per EDGE-CASES § 6.6.
+- **Group by** toggle (3-way segmented control: Flat / Label / Year, same
+  pattern as the narrow-viewport Write/Preview toggle) sits between the
+  search box and the entry list:
+  - **Flat** — a single ordered list, most recently modified first (the
+    only mode that existed before this feature).
+  - **Label** — collapsible `<details>` sections per Label, alphabetical
+    with `Uncategorized` forced last; entries carrying a Sub-label render
+    under a smaller nested sub-heading inside their Label's section rather
+    than as their own top-level group (avoids colliding same-named
+    sub-labels that belong to different Labels).
+  - **Year** — collapsible sections by year (derived from `updated_at`),
+    newest year first.
+  - Grouping and the tag filter below both apply client-side, on top of
+    whatever the entry list currently holds — including an active search —
+    so they compose with search rather than replacing it.
+- **Tag filter pills** directly below the Group-by toggle, reusing the
+  Prompt Library's pill component and interaction (multi-select OR, an
+  "All" pill that's always present and shows pressed when no filter is
+  active). Capped to the **top 6 tags by how many entries use them** —
+  unlike the Prompt Library's uncapped version, since an unbounded tag
+  vocabulary would keep pushing the entry list further down a narrow,
+  vertical-space-constrained sidebar. A less-common tag not shown as a
+  pill is still reachable by typing it into the search box, which already
+  indexes tags. The row itself is hidden entirely (no reserved space) when
+  no entry has any tag; if it's non-empty it wraps but is height-capped
+  with its own internal scroll as a safety net. An already-active filter
+  tag is never hidden by the cap, even if other tags overtake its
+  frequency ranking.
 - Entry rows: title (1-line ellipsis), label›sublabel breadcrumb chip,
   relative date, dirty dot when the open entry is that row. Active row uses
   the accent tint.
-- Label/sub-label groups collapsible; `Uncategorized` always sorts last.
+- **Sidebar Hide/Show**: a separate icon toggle in the entry header
+  (wide viewports only — narrow viewports already have the overlay drawer
+  for this) reclaims the sidebar's width for the editor/preview/metadata
+  area. Deliberately independent of Focus Mode, which hides the sidebar
+  *and* the metadata panel together for distraction-free writing sessions
+  — this is a lighter, faster, more-often-reached-for toggle (e.g. useful
+  while just reading a note). The two compose: the sidebar stays hidden if
+  either is active, and is visible only when both are off. Persists across
+  reloads.
 - Footer: "💡 Guide" link → Guide modal (markdown usage, syntax cheatsheet
   content in prose, the documented quirks from EDGE-CASES §§ 5.4, 6.2, 7.6).
 
