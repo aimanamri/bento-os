@@ -1,0 +1,287 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Bento token system (UX-SPEC §1). RGB triplets so Tailwind can
+   compose alpha. Dark is the design target; light is a full variant. ── */
+@layer base {
+  :root {
+    --c-surface: 243 245 247;
+    --c-panel: 255 255 255;
+    --c-panel-2: 234 238 242;
+    --c-ink: 27 34 40;
+    --c-ink-muted: 90 102 114;
+    --c-edge: 213 220 227;
+    --c-accent: 37 99 235;
+    --c-ok: 22 137 84;
+    --c-info: 37 99 235;
+    --c-warn: 158 106 22;
+    --c-danger: 200 52 44;
+    --glass-tint: 255 255 255;
+  }
+  .dark {
+    --c-surface: 15 18 22;
+    --c-panel: 23 27 33;
+    --c-panel-2: 30 36 44;
+    --c-ink: 231 235 239;
+    --c-ink-muted: 152 162 173;
+    --c-edge: 42 50 60;
+    --c-accent: 96 165 250;
+    --c-ok: 52 199 123;
+    --c-info: 88 166 255;
+    --c-warn: 227 179 65;
+    --c-danger: 240 98 93;
+    --glass-tint: 23 27 33;
+  }
+
+  /* Drive native controls (date picker, scrollbars) to match the theme */
+  :root { color-scheme: light; }
+  .dark { color-scheme: dark; }
+
+  html, body { height: 100%; }
+  body {
+    @apply bg-surface text-ink font-sans antialiased;
+    overscroll-behavior: none;
+  }
+
+  /* Visible focus everywhere; never outline:none without replacement */
+  :focus-visible {
+    outline: 2px solid rgb(var(--c-accent));
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  ::selection { background: rgb(var(--c-accent) / 0.30); }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  /* Desktop wallpaper behind the window — gives the glass something to blur */
+  .wallpaper {
+    position: fixed; inset: 0; z-index: -1;
+    background:
+      radial-gradient(50rem 35rem at 15% 10%, rgb(var(--c-accent) / 0.16), transparent 60%),
+      radial-gradient(40rem 30rem at 85% 85%, rgb(var(--c-ok) / 0.10), transparent 60%),
+      rgb(var(--c-surface));
+  }
+
+  /* Glass is reserved for chrome: frame bars, dock, ribbon, menus (UX-SPEC §1) */
+  .glass {
+    background: rgb(var(--glass-tint) / 0.72);
+    border-color: rgb(var(--c-edge) / 0.8);
+  }
+  @supports (backdrop-filter: blur(1px)) {
+    .glass { backdrop-filter: blur(14px) saturate(1.4); }
+  }
+
+  .btn {
+    @apply inline-flex items-center gap-1.5 rounded-md border border-edge bg-panel-2
+      px-3 py-1.5 text-sm font-medium cursor-pointer select-none
+      transition-colors duration-150 hover:bg-edge/60 active:scale-[0.98];
+    touch-action: manipulation;
+  }
+  .btn-primary {
+    @apply border-transparent bg-accent text-surface hover:bg-accent/85;
+  }
+  .btn-danger { @apply border-transparent bg-danger text-surface hover:bg-danger/85; }
+  .btn-ghost { @apply border-transparent bg-transparent hover:bg-panel-2; }
+  .btn[disabled], .btn[aria-disabled="true"] { @apply opacity-40 pointer-events-none; }
+
+  .icon-btn {
+    @apply btn px-2 py-1.5;
+  }
+  .icon { width: 1.05rem; height: 1.05rem; flex: none; stroke-width: 1.8; }
+
+  .input {
+    @apply w-full rounded-md border border-edge bg-panel px-2.5 py-1.5 text-sm
+      placeholder:text-ink-muted/70 focus:border-accent;
+  }
+
+  .pill {
+    @apply inline-flex items-center rounded-full border border-edge bg-panel-2 px-3 py-1
+      text-xs font-medium cursor-pointer select-none transition-colors duration-150
+      hover:border-accent/60;
+    touch-action: manipulation;
+  }
+  .pill[aria-pressed="true"] {
+    @apply bg-accent text-surface border-accent;
+  }
+
+  .tag-chip {
+    @apply inline-flex items-center gap-1 rounded-full bg-accent/15 text-accent
+      px-2 py-0.5 text-xs font-medium;
+  }
+
+  /* Traffic lights: 44px hit areas around 13px dots (UX-SPEC §2) */
+  .tl {
+    @apply relative flex items-center justify-center cursor-pointer;
+    width: 28px; height: 28px; margin: -6px 0;
+    touch-action: manipulation;
+  }
+  .tl::after {
+    content: ""; width: 13px; height: 13px; border-radius: 9999px;
+    background: var(--tl-color); border: 1px solid rgb(0 0 0 / 0.15);
+    transition: filter 150ms;
+  }
+  .tl:hover::after, .tl:focus-visible::after { filter: brightness(0.85); }
+  .tl > svg {
+    position: absolute; width: 9px; height: 9px; z-index: 1;
+    stroke: rgb(0 0 0 / 0.55); stroke-width: 2.5; opacity: 0;
+    transition: opacity 120ms; pointer-events: none;
+  }
+  .tl:hover > svg, .tl:focus-visible > svg { opacity: 1; }
+  .tl[aria-pressed="true"]::after { box-shadow: 0 0 0 2px rgb(var(--c-accent) / 0.6); }
+
+  /* Sidebar entry rows */
+  .entry-row {
+    @apply w-full text-left rounded-md px-2.5 py-2 cursor-pointer border border-transparent
+      transition-colors duration-150 hover:bg-panel-2;
+  }
+  .entry-row[aria-current="true"] {
+    @apply bg-accent/15 border-accent/30;
+  }
+
+  /* Dialogs (native <dialog> for focus trap + Esc) */
+  dialog {
+    @apply rounded-frame border border-edge bg-panel text-ink p-0 shadow-lift;
+    max-width: min(34rem, calc(100vw - 2rem));
+  }
+  dialog::backdrop { background: rgb(0 0 0 / 0.55); }
+  dialog.modal-wide { max-width: min(46rem, calc(100vw - 2rem)); }
+
+  .toast {
+    @apply flex items-center gap-2 rounded-md border border-edge bg-panel px-3.5 py-2.5
+      text-sm shadow-lift;
+  }
+  .toast[data-kind="ok"] { border-color: rgb(var(--c-ok) / 0.5); }
+  .toast[data-kind="err"] { border-color: rgb(var(--c-danger) / 0.6); }
+
+  .banner {
+    @apply flex items-center gap-2 border-b border-warn-hue/40 bg-warn-hue/10 px-4 py-2 text-sm;
+  }
+
+  /* Focus mode: collapse sidebar + metadata (UX-SPEC §2, yellow light) */
+  .collapse-x {
+    transition: width 300ms ease, opacity 300ms ease;
+    overflow: hidden;
+  }
+  [data-focusmode="true"] .collapse-x { width: 0 !important; opacity: 0; visibility: hidden; }
+
+  /* Dock */
+  #dock:empty { display: none; }
+  .dock-pill {
+    @apply btn text-xs;
+    animation: dock-in 300ms ease;
+  }
+  @keyframes dock-in { from { transform: translateY(8px) scale(0.9); opacity: 0; } }
+
+  .kbd {
+    @apply rounded border border-edge bg-panel-2 px-1 font-mono text-[11px] text-ink-muted;
+  }
+}
+
+/* ── Rendered markdown (the preview lane) ── */
+.md-preview { font-size: 0.925rem; line-height: 1.7; overflow-wrap: break-word; }
+.md-preview > :first-child { margin-top: 0; }
+.md-preview h1, .md-preview h2, .md-preview h3, .md-preview h4 {
+  font-weight: 650; line-height: 1.25; margin: 1.6em 0 0.5em; text-wrap: balance;
+}
+.md-preview h1 { font-size: 1.5rem; border-bottom: 1px solid rgb(var(--c-edge)); padding-bottom: .35rem; }
+.md-preview h2 { font-size: 1.25rem; }
+.md-preview h3 { font-size: 1.05rem; }
+.md-preview p, .md-preview ul, .md-preview ol, .md-preview table { margin: 0.7em 0; }
+.md-preview ul { list-style: disc; padding-left: 1.4em; }
+.md-preview ol { list-style: decimal; padding-left: 1.4em; }
+.md-preview li { margin: 0.25em 0; }
+.md-preview a { color: rgb(var(--c-accent)); text-decoration: underline; text-underline-offset: 2px; }
+.md-preview code {
+  font-family: theme('fontFamily.mono'); font-size: 0.85em;
+  background: rgb(var(--c-panel-2)); border: 1px solid rgb(var(--c-edge) / 0.7);
+  border-radius: 4px; padding: 0.1em 0.35em;
+}
+.md-preview pre {
+  background: rgb(var(--c-panel-2)); border: 1px solid rgb(var(--c-edge));
+  border-radius: 8px; padding: 0.9rem 1.1rem; overflow-x: auto; margin: 0.9em 0;
+}
+.md-preview pre code { background: none; border: none; padding: 0; font-size: 0.83rem; }
+.md-preview blockquote {
+  border-left: 3px solid rgb(var(--c-edge)); margin: 0.8em 0; padding: 0.1em 1em;
+  color: rgb(var(--c-ink-muted));
+}
+.md-preview table { border-collapse: collapse; display: block; overflow-x: auto; max-width: 100%; }
+.md-preview th, .md-preview td { border: 1px solid rgb(var(--c-edge)); padding: 0.4rem 0.7rem; }
+.md-preview th { background: rgb(var(--c-panel-2)); }
+.md-preview hr { border: none; border-top: 1px solid rgb(var(--c-edge)); margin: 1.5em 0; }
+.md-preview img { max-width: 100%; border-radius: 8px; }
+.md-preview input[type="checkbox"] { accent-color: rgb(var(--c-accent)); margin-right: 0.4em; cursor: default; }
+
+/* Alert component blocks (ribbon injectors target these) */
+.md-preview blockquote.alert { border-radius: 8px; border: 1px solid; padding: 0.6em 1em; color: rgb(var(--c-ink)); }
+.md-preview blockquote.alert-success { border-color: rgb(var(--c-ok) / 0.5); background: rgb(var(--c-ok) / 0.10); border-left: 3px solid rgb(var(--c-ok)); }
+.md-preview blockquote.alert-info { border-color: rgb(var(--c-info) / 0.5); background: rgb(var(--c-info) / 0.10); border-left: 3px solid rgb(var(--c-info)); }
+.md-preview blockquote.alert-warning { border-color: rgb(var(--c-warn) / 0.5); background: rgb(var(--c-warn) / 0.10); border-left: 3px solid rgb(var(--c-warn)); }
+
+/* Localized render-failure chips (EDGE-CASES §4.1–4.2) */
+.render-error {
+  display: block; border: 1px solid rgb(var(--c-danger) / 0.5);
+  background: rgb(var(--c-danger) / 0.08); border-radius: 8px;
+  padding: 0.6rem 0.9rem; margin: 0.9em 0; font-size: 0.8rem;
+}
+.render-error .render-error-label {
+  display: flex; align-items: center; gap: 0.4rem;
+  font-weight: 600; color: rgb(var(--c-danger)); margin-bottom: 0.35rem;
+}
+.render-error pre { margin: 0; background: none; border: none; padding: 0; white-space: pre-wrap; }
+.katex-error { color: rgb(var(--c-danger)) !important; }
+.katex-display { overflow-x: auto; overflow-y: hidden; padding: 0.2em 0; }
+.mermaid-block { margin: 0.9em 0; text-align: center; overflow-x: auto; }
+.mermaid-block svg { max-width: 100%; height: auto; }
+
+/* Variable fill-in slots on prompt cards — directly editable in place */
+.var-slot {
+  cursor: text; border-radius: 3px; padding: 0 3px; margin: 0 1px;
+  outline: none; box-decoration-break: clone; -webkit-box-decoration-break: clone;
+  transition: background-color 120ms, box-shadow 120ms;
+}
+.var-slot:hover { box-shadow: 0 0 0 1px rgb(var(--c-edge)); }
+.var-slot:focus {
+  background: rgb(var(--c-accent) / 0.18);
+  box-shadow: 0 0 0 1px rgb(var(--c-accent) / 0.7);
+}
+.var-filled, .var-slot.var-filled {
+  color: rgb(var(--c-accent)); font-weight: 600; background: rgb(var(--c-accent) / 0.10);
+  border-radius: 3px; padding: 0 3px;
+}
+.var-empty, .var-slot.var-empty {
+  color: rgb(var(--c-warn)); background: rgb(var(--c-warn) / 0.12);
+  border-radius: 3px; padding: 0 3px;
+}
+
+/* Card flip ("Why this works") */
+.flip-scene { perspective: 1400px; }
+.flip-inner {
+  position: relative; transition: transform 350ms ease; transform-style: preserve-3d;
+}
+.flip-scene[data-flipped="true"] .flip-inner { transform: rotateY(180deg); }
+.flip-front, .flip-back { backface-visibility: hidden; }
+.flip-back { position: absolute; inset: 0; transform: rotateY(180deg); overflow-y: auto; }
+@media (prefers-reduced-motion: reduce) {
+  .flip-inner { transition: none; }
+  .flip-scene[data-flipped="true"] .flip-front { visibility: hidden; }
+}
+
+/* Collapsible Summary section above the body editor */
+#lb-summary-wrap > summary { list-style: none; }
+#lb-summary-wrap > summary::-webkit-details-marker { display: none; }
+#lb-summary-wrap[open] .summary-chevron { transform: rotate(90deg); }
+
+.sr-only-live {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap;
+}

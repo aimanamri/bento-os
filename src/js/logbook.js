@@ -1,0 +1,943 @@
+// Docs LogBook — sidebar, editor/preview, guards, autosave, multi-device
+// sync. Every behavior here traces to a row in docs/EDGE-CASES.md.
+
+import { api, ApiError } from './api.js';
+import { emit, on } from './bus.js';
+import { toast, confirmModal, showBanner, clearBanner, announce, relativeTime, formatStamp } from './ui.js';
+import { renderInto, renderMarkdown } from './render.js';
+import { initRibbon, GUIDE_MD } from './ribbon.js';
+import { copyText } from './clipboard.js';
+
+const DRAFT_KEY = 'bento.draft.v1';
+
+const el = {
+  sidebar: document.getElementById('lb-sidebar'),
+  list: document.getElementById('lb-list'),
+  search: document.getElementById('lb-search'),
+  newBtn: document.getElementById('lb-new'),
+  importBtn: document.getElementById('lb-import'),
+  fileInput: document.getElementById('lb-file'),
+  guideBtn: document.getElementById('lb-guide'),
+  title: document.getElementById('lb-title'),
+  editor: document.getElementById('lb-editor'),
+  preview: document.getElementById('lb-preview'),
+  previewPane: document.getElementById('lb-preview-pane'),
+  editorPane: document.getElementById('lb-editor-pane'),
+  divider: document.getElementById('lb-divider'),
+  saveBtn: document.getElementById('lb-save'),
+  closeBtn: document.getElementById('lb-close'),
+  deleteBtn: document.getElementById('lb-delete'),
+  editedHint: document.getElementById('lb-edited-hint'),
+  viewToggle: document.getElementById('lb-viewtoggle'),
+  drawerOpen: document.getElementById('lb-drawer-open'),
+  metaToggle: document.getElementById('lb-meta-toggle'),
+  metaPanel: document.getElementById('lb-meta'),
+  summary: document.getElementById('meta-summary'),
+  summaryWrap: document.getElementById('lb-summary-wrap'),
+  label: document.getElementById('meta-label'),
+  labelOptions: document.getElementById('label-options'),
+  sublabel: document.getElementById('meta-sublabel'),
+  tags: document.getElementById('meta-tags'),
+  tagChips: document.getElementById('meta-tag-chips'),
+  fields: document.getElementById('meta-fields'),
+  fieldAddName: document.getElementById('field-add-name'),
+  fieldAddValue: document.getElementById('field-add-value'),
+  fieldAddBtn: document.getElementById('field-add-btn'),
+  fieldAddError: document.getElementById('field-add-error'),
+  fieldNameOptions: document.getElementById('field-name-options'),
+  created: document.getElementById('meta-created'),
+  modified: document.getElementById('meta-modified'),
+  urls: document.getElementById('meta-urls'),
+  urlItems: document.getElementById('meta-url-items'),
+};
+
+const state = {
+  list: [],
+  current: null, // full entry from server, or null for a new unsaved entry
+  fields: new Map(), // user-defined metadata: name -> value (insertion-ordered)
+  modifiedEdited: false, // true once the user hand-edits the Modified field
+  dirty: false,
+  lsAvailable: true,
+  quotaWarned: false,
+  lastFocusSync: 0,
+  saving: false,
+};
+
+/* ── dirty tracking ─────────────────────────────────────────── */
+
+function setDirty(v) {
+  if (state.dirty === v) return;
+  state.dirty = v;
+  el.editedHint.classList.toggle('hidden', !v);
+  emit('entry:dirty', { isDirty: v });
+  // beforeunload registered only while dirty — keeps bfcache healthy (§1.3)
+  if (v) window.addEventListener('beforeunload', onBeforeUnload);
+  else window.removeEventListener('beforeunload', onBeforeUnload);
+}
+function onBeforeUnload(e) {
+  e.preventDefault();
+  e.returnValue = '';
+}
+
+/* ── form <-> data ──────────────────────────────────────────── */
+
+// UNIX ms <-> the <input type="datetime-local"> value string (local time,
+// second precision). The concurrency token (state.current.updated_at) is
+// always read from state at full ms precision — never reconstructed from
+// this field — so displaying it at second precision can't corrupt it.
+function toLocalInputValue(ms) {
+  const d = new Date(ms);
+  if (!Number.isFinite(d.getTime())) return '';
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+function parseLocalInputValue(str) {
+  if (!str) return null;
+  const ms = new Date(str).getTime(); // parsed as local time
+  return Number.isFinite(ms) ? ms : null;
+}
+
+function normalizeTagsClient(str) {
+  const seen = new Set();
+  const out = [];
+  for (const raw of String(str).split(',')) {
+    const t = raw.trim();
+    if (!t) continue;
+    const k = t.toLowerCase();
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(t);
+  }
+  return out;
+}
+
+function collectForm() {
+  return {
+    title: el.title.value,
+    body_md: el.editor.value,
+    summary: el.summary.value,
+    label: el.label.value.trim() || 'Uncategorized',
+    sublabel: el.sublabel.value.trim() || null,
+    tags: normalizeTagsClient(el.tags.value),
+    fields: Object.fromEntries(state.fields),
+    urls: el.urls.value.split(',').map((s) => s.trim()).filter(Boolean),
+  };
+}
+
+function fillForm(data) {
+  el.title.value = data.title || '';
+  el.editor.value = data.body_md || '';
+  el.summary.value = data.summary || '';
+  el.label.value = !data.label || data.label === 'Uncategorized' ? '' : data.label;
+  el.sublabel.value = data.sublabel || '';
+  el.tags.value = (data.tags || []).join(', ');
+  state.fields = new Map(Object.entries(data.fields || {}));
+  el.urls.value = (data.urls || []).join(', ');
+
+  // Modified field: a draft snapshot carries the raw input string + edit
+  // flag; a server entry carries updated_at (ms). A brand-new entry has
+  // neither → default to now.
+  if (data._modified !== undefined) {
+    el.modified.value = data._modified;
+    state.modifiedEdited = !!data._modifiedEdited;
+  } else {
+    el.modified.value = toLocalInputValue(data.updated_at ?? Date.now());
+    state.modifiedEdited = false;
+  }
+
+  renderFieldRows();
+  syncMetaWidgets();
+  renderCreated();
+  schedulePreview(0);
+}
+
+// Created is read-only (immutable). Called from fillForm and after a save.
+function renderCreated() {
+  if (state.current) {
+    el.created.textContent = formatStamp(state.current.created_at);
+    el.created.title = `UNIX ms: ${state.current.created_at}`;
+  } else {
+    el.created.textContent = '— (set on first save)';
+    el.created.title = '';
+  }
+  el.deleteBtn.classList.toggle('hidden', !state.current);
+}
+
+// After a successful save, resync both timestamps to the stored values and
+// clear the manual-edit flag.
+function syncTimestampsFromCurrent() {
+  renderCreated();
+  el.modified.value = toLocalInputValue(state.current.updated_at);
+  state.modifiedEdited = false;
+}
+
+// Tag chips, URL validity markers, sublabel gating (EDGE-CASES §6.1/6.3/6.4)
+function syncMetaWidgets() {
+  el.tagChips.textContent = '';
+  for (const t of normalizeTagsClient(el.tags.value)) {
+    const chip = document.createElement('span');
+    chip.className = 'tag-chip';
+    chip.textContent = t;
+    el.tagChips.appendChild(chip);
+  }
+
+  const hasLabel = el.label.value.trim().length > 0;
+  el.sublabel.disabled = !hasLabel;
+  el.sublabel.placeholder = hasLabel ? 'optional' : 'needs a label first';
+  if (!hasLabel) el.sublabel.value = '';
+
+  el.urlItems.textContent = '';
+  for (const item of el.urls.value.split(',').map((s) => s.trim()).filter(Boolean)) {
+    const row = document.createElement('span');
+    if (/^https?:\/\/\S+$/i.test(item)) {
+      const a = document.createElement('a');
+      a.href = item;
+      a.textContent = item;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.className = 'text-accent underline break-all';
+      row.appendChild(a);
+    } else {
+      row.className = 'text-ink-muted break-all';
+      row.textContent = `⚠ ${item}`;
+      row.title = 'Not a valid http(s) URL — kept as a note';
+    }
+    el.urlItems.appendChild(row);
+  }
+}
+
+/* ── user-defined metadata fields (TiddlyWiki-style rows) ───── */
+
+function fieldError(msg) {
+  el.fieldAddError.textContent = msg || '';
+  el.fieldAddError.classList.toggle('hidden', !msg);
+}
+
+function renderFieldRows() {
+  el.fields.textContent = '';
+  if (state.fields.size === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'text-[11px] text-ink-muted/70';
+    empty.textContent = 'No fields yet — add one below (e.g. os_platform, is_valid).';
+    el.fields.appendChild(empty);
+  }
+  for (const [name, value] of state.fields) {
+    const row = document.createElement('div');
+    row.className = 'flex items-center gap-1.5';
+
+    const nameEl = document.createElement('span');
+    nameEl.className = 'w-24 flex-none truncate text-right text-xs text-ink-muted';
+    nameEl.textContent = `${name}:`;
+    nameEl.title = name;
+
+    const valueEl = document.createElement('input');
+    valueEl.className = 'input !py-1 min-w-0 flex-1 text-xs';
+    valueEl.value = value;
+    valueEl.maxLength = 2000;
+    valueEl.setAttribute('aria-label', `Value for field ${name}`);
+    valueEl.addEventListener('input', () => {
+      state.fields.set(name, valueEl.value);
+      setDirty(true);
+    });
+
+    const del = document.createElement('button');
+    del.className = 'icon-btn btn-ghost !p-1 text-ink-muted hover:text-danger';
+    del.setAttribute('aria-label', `Remove field ${name}`);
+    del.title = `Remove ${name}`;
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('class', 'icon !h-3.5 !w-3.5');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('fill', 'none');
+    svg.setAttribute('stroke', 'currentColor');
+    svg.setAttribute('stroke-linecap', 'round');
+    svg.setAttribute('stroke-linejoin', 'round');
+    svg.setAttribute('aria-hidden', 'true');
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', 'M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6');
+    svg.appendChild(path);
+    del.appendChild(svg);
+    del.addEventListener('click', () => {
+      state.fields.delete(name);
+      setDirty(true);
+      renderFieldRows();
+    });
+
+    row.append(nameEl, valueEl, del);
+    el.fields.appendChild(row);
+  }
+  refreshFieldNameSuggestions();
+}
+
+// Suggest field names already used on other entries (the ▾ affordance in
+// the reference design) — minus the ones this entry already has.
+function refreshFieldNameSuggestions() {
+  const used = new Set([...state.fields.keys()].map((n) => n.toLowerCase()));
+  const names = new Map(); // lower -> display
+  for (const row of state.list) {
+    for (const n of Object.keys(row.fields || {})) {
+      const key = n.toLowerCase();
+      if (!used.has(key) && !names.has(key)) names.set(key, n);
+    }
+  }
+  el.fieldNameOptions.textContent = '';
+  for (const [, display] of [...names.entries()].sort()) {
+    const opt = document.createElement('option');
+    opt.value = display;
+    el.fieldNameOptions.appendChild(opt);
+  }
+}
+
+function addField() {
+  const name = el.fieldAddName.value.trim();
+  const value = el.fieldAddValue.value.trim();
+  if (!name) {
+    fieldError('Give the field a name.');
+    el.fieldAddName.focus();
+    return;
+  }
+  const exists = [...state.fields.keys()].some((n) => n.toLowerCase() === name.toLowerCase());
+  if (exists) {
+    fieldError(`A field named “${name}” already exists on this entry.`);
+    el.fieldAddName.focus();
+    return;
+  }
+  fieldError('');
+  state.fields.set(name, value);
+  setDirty(true);
+  el.fieldAddName.value = '';
+  el.fieldAddValue.value = '';
+  renderFieldRows();
+  el.fieldAddName.focus();
+}
+
+/* ── preview rendering (adaptive debounce, §4.4) ────────────── */
+
+let previewTimer = null;
+let lastRenderMs = 0;
+function schedulePreview(delay = null) {
+  clearTimeout(previewTimer);
+  const wait = delay !== null ? delay : lastRenderMs > 600 ? 1200 : 300;
+  previewTimer = setTimeout(async () => {
+    const t0 = performance.now();
+    try {
+      await renderInto(el.preview, el.editor.value);
+    } catch (e) {
+      el.preview.textContent = 'Preview failed to render.';
+    }
+    lastRenderMs = performance.now() - t0;
+  }, wait);
+}
+
+/* ── sidebar list ───────────────────────────────────────────── */
+
+async function loadList(q = el.search.value) {
+  const params = new URLSearchParams();
+  if (q && q.trim()) params.set('q', q.trim());
+  const data = await api(`/api/entries?${params}`);
+  state.list = data.entries;
+  renderList();
+  return state.list;
+}
+
+function renderList() {
+  el.list.textContent = '';
+  if (state.list.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'flex flex-col items-start gap-2 px-3 py-6 text-xs text-ink-muted';
+    const msg = document.createElement('span');
+    msg.textContent = el.search.value.trim()
+      ? `No entries match “${el.search.value.trim()}”.`
+      : 'No entries yet — create your first one.';
+    empty.appendChild(msg);
+    if (el.search.value.trim()) {
+      const clear = document.createElement('button');
+      clear.className = 'btn text-xs';
+      clear.textContent = 'Clear search';
+      clear.addEventListener('click', () => {
+        el.search.value = '';
+        loadList();
+      });
+      empty.appendChild(clear);
+    }
+    el.list.appendChild(empty);
+    return;
+  }
+
+  const labels = new Set();
+  for (const row of state.list) {
+    labels.add(row.label);
+    const btn = document.createElement('button');
+    btn.className = 'entry-row';
+    btn.setAttribute('role', 'listitem');
+    if (state.current && state.current.id === row.id) btn.setAttribute('aria-current', 'true');
+
+    const title = document.createElement('div');
+    title.className = 'truncate text-sm font-medium';
+    title.textContent = row.title;
+    title.title = row.title;
+
+    const meta = document.createElement('div');
+    meta.className = 'mt-0.5 flex items-center gap-1.5 text-[11px] text-ink-muted';
+    const crumb = document.createElement('span');
+    crumb.className = 'truncate';
+    crumb.textContent = row.sublabel ? `${row.label} › ${row.sublabel}` : row.label;
+    const when = document.createElement('span');
+    when.className = 'ml-auto whitespace-nowrap';
+    when.textContent = relativeTime(row.updated_at);
+    when.title = formatStamp(row.updated_at);
+    meta.append(crumb, when);
+
+    btn.append(title, meta);
+    btn.addEventListener('click', () => guardThen(() => openEntry(row.id)));
+    el.list.appendChild(btn);
+  }
+
+  el.labelOptions.textContent = '';
+  for (const l of [...labels].sort()) {
+    const opt = document.createElement('option');
+    opt.value = l;
+    el.labelOptions.appendChild(opt);
+  }
+  refreshFieldNameSuggestions();
+}
+
+/* ── open / new / close / delete ────────────────────────────── */
+
+async function openEntry(id) {
+  try {
+    const { entry } = await api(`/api/entries/${id}`);
+    state.current = entry;
+    fillForm(entry);
+    setDirty(false);
+    clearBanner();
+    renderList();
+  } catch (e) {
+    if (e.code === 'NOT_FOUND') {
+      toast('That entry no longer exists', 'err');
+      await loadList();
+    } else {
+      toast(e.message, 'err');
+    }
+  }
+}
+
+function newEntry() {
+  state.current = null;
+  fillForm({});
+  setDirty(false);
+  clearBanner();
+  renderList();
+  el.title.focus();
+}
+
+/** Unsaved-changes guard: Save / Discard / Cancel — three explicit choices (§1.2). */
+async function guardThen(fn) {
+  if (!state.dirty) return fn();
+  const choice = await confirmModal({
+    title: 'Unsaved changes',
+    body: 'This entry has edits that haven’t been saved.',
+    actions: [
+      { label: 'Save', value: 'save', style: 'primary' },
+      { label: 'Discard changes', value: 'discard', style: 'danger' },
+      { label: 'Cancel', value: 'cancel' },
+    ],
+  });
+  if (choice === 'save') {
+    const ok = await save();
+    if (ok) return fn();
+  } else if (choice === 'discard') {
+    clearDraft();
+    setDirty(false);
+    return fn();
+  }
+}
+
+/* ── save (guards, conflicts, 404) ──────────────────────────── */
+
+async function save() {
+  if (state.saving) return false;
+
+  // Blank guard (§1.1): block, explain, focus the offending field
+  const data = collectForm();
+  if (!data.title.trim() || !data.body_md.trim()) {
+    const missingTitle = !data.title.trim();
+    await confirmModal({
+      title: 'Entry needs a title and details',
+      body: missingTitle
+        ? 'Give the entry a title before saving.'
+        : 'Write some details before saving.',
+      actions: [{ label: 'Got it', value: 'ok', style: 'primary' }],
+    });
+    (missingTitle ? el.title : el.editor).focus();
+    return false;
+  }
+
+  // Manually-edited modified time is sent as updated_at; otherwise omit it so
+  // the server auto-bumps to now (and keeps full ms precision). The
+  // concurrency token stays state.current.updated_at, read at full precision.
+  const payload = { ...data };
+  if (state.modifiedEdited) {
+    const ms = parseLocalInputValue(el.modified.value);
+    if (ms != null) payload.updated_at = ms;
+  }
+
+  state.saving = true;
+  const spinnerTimer = setTimeout(() => {
+    el.saveBtn.querySelector('.save-label').textContent = 'Saving…';
+  }, 150);
+
+  try {
+    let resp;
+    if (state.current) {
+      resp = await api(`/api/entries/${state.current.id}`, {
+        method: 'PUT',
+        body: { ...payload, expected_updated_at: state.current.updated_at },
+      });
+    } else {
+      resp = await api('/api/entries', { method: 'POST', body: payload });
+    }
+    state.current = resp.entry;
+    setDirty(false);
+    clearDraft();
+    syncTimestampsFromCurrent();
+    await loadList();
+    emit('entry:saved', { id: resp.entry.id, updated_at: resp.entry.updated_at });
+    flashSaved();
+    return true;
+  } catch (e) {
+    if (e.status === 409) return handleConflict(e, data);
+    if (e.code === 'NOT_FOUND') return handleDeletedElsewhere(data);
+    if (e.code === 'NETWORK') {
+      toast("Couldn't reach Bento host — your draft is safe locally", 'err', 6000);
+      writeDraft(); // §3.5: dirty state + draft retained
+      return false;
+    }
+    toast(e.message, 'err');
+    return false;
+  } finally {
+    clearTimeout(spinnerTimer);
+    state.saving = false;
+  }
+}
+
+function flashSaved() {
+  const label = el.saveBtn.querySelector('.save-label');
+  label.textContent = '✓ Saved';
+  announce('Entry saved');
+  setTimeout(() => (label.textContent = 'Save Entry'), 1200);
+}
+
+/** 409: saved on another device (§3.3). Overwrite is never the default. */
+async function handleConflict(err, data) {
+  const server = err.payload?.entry;
+  const choice = await confirmModal({
+    title: 'Saved on another device',
+    body: `This entry changed on the server at ${server ? formatStamp(server.updated_at) : 'an unknown time'}. Your version and theirs now differ.`,
+    actions: [
+      { label: 'Cancel', value: 'cancel', style: 'primary' },
+      { label: 'Copy mine & load theirs', value: 'copyload' },
+      { label: 'Overwrite theirs', value: 'overwrite', style: 'danger' },
+    ],
+  });
+  if (choice === 'overwrite' && server) {
+    state.current = server;
+    return save();
+  }
+  if (choice === 'copyload' && server) {
+    await copyText(data.body_md);
+    toast('Your version copied to clipboard');
+    state.current = server;
+    fillForm(server);
+    setDirty(false);
+    clearDraft();
+    renderList();
+  }
+  return false;
+}
+
+/** Entry deleted on another device while open here (§6.9). */
+async function handleDeletedElsewhere(data) {
+  const choice = await confirmModal({
+    title: 'Entry was deleted elsewhere',
+    body: 'This entry no longer exists on the server.',
+    actions: [
+      { label: 'Save as new entry', value: 'saveNew', style: 'primary' },
+      { label: 'Discard', value: 'discard', style: 'danger' },
+    ],
+  });
+  if (choice === 'saveNew') {
+    state.current = null;
+    return save();
+  }
+  if (choice === 'discard') {
+    clearDraft();
+    newEntry();
+    await loadList();
+  }
+  return false;
+}
+
+async function deleteEntry() {
+  if (!state.current) return;
+  const choice = await confirmModal({
+    title: 'Delete this entry?',
+    body: `“${state.current.title}” will be permanently deleted.`,
+    actions: [
+      { label: 'Cancel', value: 'cancel', style: 'primary' },
+      { label: 'Delete', value: 'delete', style: 'danger' },
+    ],
+  });
+  if (choice !== 'delete') return;
+  try {
+    await api(`/api/entries/${state.current.id}`, { method: 'DELETE' });
+    toast('Entry deleted', 'ok');
+    clearDraft();
+    setDirty(false);
+    newEntry();
+    await loadList();
+  } catch (e) {
+    toast(e.message, 'err');
+  }
+}
+
+/* ── autosave drafts (§2) ───────────────────────────────────── */
+
+function probeLocalStorage() {
+  try {
+    localStorage.setItem('bento.probe', '1');
+    localStorage.removeItem('bento.probe');
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function writeDraft() {
+  if (!state.lsAvailable) return;
+  try {
+    // Snapshot the raw Modified field + its edit flag alongside the form so
+    // a restored draft keeps a hand-edited modified time.
+    const data = { ...collectForm(), _modified: el.modified.value, _modifiedEdited: state.modifiedEdited };
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({ v: 1, entryId: state.current?.id ?? null, savedAt: Date.now(), data })
+    );
+  } catch (e) {
+    if (!state.quotaWarned) {
+      state.quotaWarned = true;
+      toast('Auto-backup paused — note too large for browser storage', 'err', 6000);
+    }
+  }
+}
+
+function readDraft() {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (!raw) return null;
+    const draft = JSON.parse(raw);
+    if (draft?.v !== 1 || !draft.data) return clearDraft(), null; // §2.8: unknown format → discard
+    return draft;
+  } catch (e) {
+    return null;
+  }
+}
+
+function clearDraft() {
+  try {
+    localStorage.removeItem(DRAFT_KEY);
+  } catch (e) { /* nothing to clear */ }
+}
+
+async function offerDraftRestore() {
+  const draft = readDraft();
+  if (!draft) return false;
+
+  let server = null;
+  if (draft.entryId) {
+    try {
+      server = (await api(`/api/entries/${draft.entryId}`)).entry;
+    } catch (e) { /* deleted since — treat as new-entry draft */ }
+  }
+
+  const serverNewer = server && server.updated_at > draft.savedAt;
+  const choice = await confirmModal({
+    title: 'Restore unsaved draft?',
+    body: serverNewer
+      ? `A draft from ${formatStamp(draft.savedAt)} was found, but this entry was saved more recently (${formatStamp(server.updated_at)}) — possibly on another device.`
+      : `An unsaved draft from ${formatStamp(draft.savedAt)} was found${draft.entryId ? '' : ' for a new entry'}.`,
+    actions: serverNewer
+      ? [
+          { label: 'Keep newer version', value: 'server', style: 'primary' },
+          { label: 'Restore draft anyway', value: 'restore' },
+        ]
+      : [
+          { label: 'Restore draft', value: 'restore', style: 'primary' },
+          { label: 'Discard draft', value: 'discard', style: 'danger' },
+        ],
+  });
+
+  if (choice === 'restore') {
+    state.current = server;
+    fillForm(draft.data);
+    setDirty(true);
+    clearDraft(); // will be re-written by the next autosave tick
+    return true;
+  }
+  clearDraft(); // §2.4: declined → never re-prompt
+  if (server) {
+    state.current = server;
+    fillForm(server);
+    setDirty(false);
+    return true;
+  }
+  return false;
+}
+
+/* ── focus sync across devices (§3.1–3.2) ───────────────────── */
+
+async function onWindowFocus() {
+  if (Date.now() - state.lastFocusSync < 30000) return;
+  state.lastFocusSync = Date.now();
+  try {
+    if (!state.dirty) {
+      await loadList();
+      if (state.current) {
+        const { entry } = await api(`/api/entries/${state.current.id}`).catch(() => ({ entry: null }));
+        if (entry && entry.updated_at !== state.current.updated_at) {
+          state.current = entry;
+          fillForm(entry);
+          toast('Entry refreshed from another device');
+        }
+      }
+    } else {
+      // Never clobber a dirty editor — metadata-only compare + banner
+      const data = await api('/api/entries');
+      state.list = data.entries;
+      renderList();
+      const row = state.current && state.list.find((r) => r.id === state.current.id);
+      if (row && row.updated_at > state.current.updated_at) {
+        showBanner({
+          id: 'newer-version',
+          message: 'This entry was updated on another device.',
+          actions: [
+            {
+              label: 'Review',
+              onClick: async (dismiss) => {
+                dismiss();
+                const fresh = (await api(`/api/entries/${state.current.id}`)).entry;
+                await handleConflict({ payload: { entry: fresh } }, collectForm());
+              },
+            },
+            { label: 'Keep mine', onClick: (dismiss) => dismiss() },
+          ],
+        });
+      }
+    }
+  } catch (e) { /* offline — the health indicator covers this */ }
+}
+
+/* ── import (§7) ────────────────────────────────────────────── */
+
+async function importFile(file) {
+  if (!file) return;
+  if (file.size > 2 * 1024 * 1024) {
+    await confirmModal({
+      title: 'File too large',
+      body: 'Markdown imports are limited to 2 MB.',
+      actions: [{ label: 'Got it', value: 'ok', style: 'primary' }],
+    });
+    return;
+  }
+  const content = await file.text();
+  try {
+    const { entry } = await api('/api/import', {
+      method: 'POST',
+      body: { filename: file.name, content },
+    });
+    toast(`Imported “${entry.title}”`, 'ok');
+    state.current = entry;
+    fillForm(entry);
+    setDirty(false);
+    await loadList();
+  } catch (e) {
+    await confirmModal({
+      title: 'Import failed',
+      body: e.message,
+      actions: [{ label: 'Got it', value: 'ok', style: 'primary' }],
+    });
+  }
+}
+
+/* ── layout: divider drag, narrow toggle, drawer ────────────── */
+
+function initSplitDivider() {
+  let dragging = false;
+  el.divider.addEventListener('mousedown', (e) => {
+    dragging = true;
+    e.preventDefault();
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  });
+  document.addEventListener('mousemove', (e) => {
+    if (!dragging) return;
+    const split = document.getElementById('lb-split').getBoundingClientRect();
+    const pct = Math.min(80, Math.max(20, ((e.clientX - split.left) / split.width) * 100));
+    el.editorPane.style.flexBasis = pct + '%';
+    el.editorPane.style.flexGrow = '0';
+    el.previewPane.style.flexGrow = '1';
+  });
+  document.addEventListener('mouseup', () => {
+    if (!dragging) return;
+    dragging = false;
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  });
+  el.divider.addEventListener('dblclick', () => {
+    el.editorPane.style.flexBasis = '';
+    el.editorPane.style.flexGrow = '';
+    el.previewPane.style.flexGrow = '';
+  });
+}
+
+function initNarrowToggle() {
+  el.viewToggle.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-pane]');
+    if (!btn) return;
+    const pane = btn.dataset.pane;
+    for (const b of el.viewToggle.querySelectorAll('[data-pane]')) {
+      b.dataset.active = String(b === btn);
+    }
+    el.editorPane.classList.toggle('max-lg:hidden', pane !== 'editor');
+    el.previewPane.classList.toggle('max-lg:hidden', pane !== 'preview');
+    if (pane === 'preview') schedulePreview(0);
+  });
+}
+
+function initDrawer() {
+  let scrim = null;
+  const open = () => {
+    el.sidebar.classList.remove('max-lg:hidden');
+    el.sidebar.classList.add('fixed', 'inset-y-0', 'left-0', 'z-40', 'w-72', 'shadow-lift', 'bg-panel');
+    scrim = document.createElement('div');
+    scrim.className = 'fixed inset-0 z-30 bg-black/50';
+    scrim.addEventListener('click', close);
+    document.body.appendChild(scrim);
+    el.search.focus();
+  };
+  const close = () => {
+    el.sidebar.classList.add('max-lg:hidden');
+    el.sidebar.classList.remove('fixed', 'inset-y-0', 'left-0', 'z-40', 'w-72', 'shadow-lift', 'bg-panel');
+    scrim?.remove();
+    scrim = null;
+    el.drawerOpen.focus();
+  };
+  el.drawerOpen.addEventListener('click', open);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && scrim) close();
+  });
+  // Selecting an entry on mobile closes the drawer
+  el.list.addEventListener('click', () => {
+    if (scrim) close();
+  });
+}
+
+/* ── init ───────────────────────────────────────────────────── */
+
+export async function initLogbook() {
+  initRibbon();
+  initSplitDivider();
+  initNarrowToggle();
+  initDrawer();
+
+  state.lsAvailable = probeLocalStorage();
+  if (!state.lsAvailable) toast('Browser storage unavailable — autosave is off this session', 'err', 6000);
+
+  // Editing marks dirty; editor input also reschedules the preview
+  el.editor.addEventListener('input', () => {
+    setDirty(true);
+    schedulePreview();
+  });
+  for (const input of [el.title, el.summary, el.label, el.sublabel, el.tags, el.urls]) {
+    input.addEventListener('input', () => {
+      setDirty(true);
+      syncMetaWidgets();
+    });
+  }
+
+  // Editing the Modified time marks it a manual override (sent verbatim on
+  // save instead of auto-bumping to now).
+  el.modified.addEventListener('input', () => {
+    state.modifiedEdited = true;
+    setDirty(true);
+  });
+
+  // Dynamic metadata fields: add via button or Enter from either input
+  el.fieldAddBtn.addEventListener('click', addField);
+  for (const input of [el.fieldAddName, el.fieldAddValue]) {
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        addField();
+      }
+    });
+    input.addEventListener('input', () => fieldError(''));
+  }
+
+  let searchTimer = null;
+  el.search.addEventListener('input', () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => loadList().catch(() => {}), 200);
+  });
+
+  el.newBtn.addEventListener('click', () => guardThen(newEntry));
+  el.closeBtn.addEventListener('click', () => guardThen(newEntry));
+  el.saveBtn.addEventListener('click', save);
+  el.deleteBtn.addEventListener('click', deleteEntry);
+
+  el.importBtn.addEventListener('click', () => guardThen(() => el.fileInput.click())); // §7.7
+  el.fileInput.addEventListener('change', () => {
+    importFile(el.fileInput.files[0]);
+    el.fileInput.value = '';
+  });
+
+  el.guideBtn.addEventListener('click', async () => {
+    const dlg = document.getElementById('dlg-guide');
+    await renderInto(document.getElementById('guide-body'), GUIDE_MD);
+    dlg.showModal();
+  });
+
+  el.metaToggle.addEventListener('click', () => {
+    const hidden = el.metaPanel.classList.toggle('max-xl:hidden');
+    el.metaPanel.classList.toggle('max-xl:block', !hidden);
+    el.metaToggle.setAttribute('aria-pressed', String(!hidden));
+  });
+
+  // ⌘S / Ctrl+S saves while the LogBook is visible (§ ribbon tooltips)
+  document.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
+      if (!document.getElementById('view-logbook').hidden) {
+        e.preventDefault();
+        save();
+      }
+    }
+  });
+
+  window.addEventListener('focus', onWindowFocus);
+  setInterval(() => {
+    if (state.dirty) writeDraft(); // §2.1: skip the write when clean
+  }, 10000);
+
+  on('theme:changed', () => schedulePreview(0)); // mermaid re-themes
+
+  // Boot: list, then draft restore, else open the most recent entry
+  try {
+    await loadList();
+    const restored = await offerDraftRestore();
+    if (!restored) {
+      if (state.list.length > 0) await openEntry(state.list[0].id);
+      else newEntry();
+    }
+  } catch (e) {
+    toast("Couldn't reach the Bento host — check that the server is running", 'err', 8000);
+  }
+}
