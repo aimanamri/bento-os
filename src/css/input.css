@@ -285,3 +285,24 @@
   position: absolute; width: 1px; height: 1px; overflow: hidden;
   clip: rect(0 0 0 0); white-space: nowrap;
 }
+
+/* ── Reading vs Editor mode (LogBook) ──
+   Reading mode strips the editing chrome (Summary, Body header, ribbon,
+   editor pane, divider) and shows the rendered preview full-height at a
+   comfortable reading measure. Unlayered so it beats Tailwind's responsive
+   `max-lg:hidden` on the preview pane. */
+#lb-workspace[data-mode="read"] #lb-summary-wrap,
+#lb-workspace[data-mode="read"] #lb-body-header,
+#lb-workspace[data-mode="read"] #lb-ribbon,
+#lb-workspace[data-mode="read"] #lb-editor-pane,
+#lb-workspace[data-mode="read"] #lb-divider {
+  display: none !important;
+}
+#lb-workspace[data-mode="read"] #lb-preview-pane {
+  display: block;
+}
+#lb-workspace[data-mode="read"] #lb-preview {
+  max-width: 46rem;
+  margin-inline: auto;
+  padding: 1.5rem 1.25rem 4rem;
+}
