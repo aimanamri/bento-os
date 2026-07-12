@@ -12,8 +12,11 @@ const DRAFT_KEY = 'bento.draft.v1';
 
 const el = {
   sidebar: document.getElementById('lb-sidebar'),
+  sidebarToggle: document.getElementById('lb-sidebar-toggle'),
   list: document.getElementById('lb-list'),
   search: document.getElementById('lb-search'),
+  groupToggle: document.getElementById('lb-grouptoggle'),
+  tagPills: document.getElementById('lb-tagpills'),
   newBtn: document.getElementById('lb-new'),
   importBtn: document.getElementById('lb-import'),
   fileInput: document.getElementById('lb-file'),
@@ -56,6 +59,8 @@ const el = {
 const state = {
   list: [],
   current: null, // full entry from server, or null for a new unsaved entry
+  groupMode: 'flat', // 'flat' | 'label' | 'year' — sidebar organization
+  activeTags: new Set(), // lowercased tag names currently filtering the sidebar (OR semantics)
   fields: new Map(), // user-defined metadata: name -> value (insertion-ordered)
   modifiedEdited: false, // true once the user hand-edits the Modified field
   dirty: false,
@@ -357,59 +362,144 @@ async function loadList(q = el.search.value) {
   return state.list;
 }
 
-function renderList() {
-  el.list.textContent = '';
-  if (state.list.length === 0) {
-    const empty = document.createElement('div');
-    empty.className = 'flex flex-col items-start gap-2 px-3 py-6 text-xs text-ink-muted';
-    const msg = document.createElement('span');
-    msg.textContent = el.search.value.trim()
-      ? `No entries match “${el.search.value.trim()}”.`
-      : 'No entries yet — create your first one.';
-    empty.appendChild(msg);
-    if (el.search.value.trim()) {
-      const clear = document.createElement('button');
-      clear.className = 'btn text-xs';
-      clear.textContent = 'Clear search';
-      clear.addEventListener('click', () => {
-        el.search.value = '';
-        loadList();
-      });
-      empty.appendChild(clear);
+/** One entry row — extracted so both flat and grouped rendering share it. */
+function renderEntryRow(row) {
+  const btn = document.createElement('button');
+  btn.className = 'entry-row';
+  btn.setAttribute('role', 'listitem');
+  if (state.current && state.current.id === row.id) btn.setAttribute('aria-current', 'true');
+
+  const title = document.createElement('div');
+  title.className = 'truncate text-sm font-medium';
+  title.textContent = row.title;
+  title.title = row.title;
+
+  const meta = document.createElement('div');
+  meta.className = 'mt-0.5 flex items-center gap-1.5 text-[11px] text-ink-muted';
+  const crumb = document.createElement('span');
+  crumb.className = 'truncate';
+  crumb.textContent = row.sublabel ? `${row.label} › ${row.sublabel}` : row.label;
+  const when = document.createElement('span');
+  when.className = 'ml-auto whitespace-nowrap';
+  when.textContent = relativeTime(row.updated_at);
+  when.title = formatStamp(row.updated_at);
+  meta.append(crumb, when);
+
+  btn.append(title, meta);
+  btn.addEventListener('click', () => guardThen(() => openEntry(row.id)));
+  return btn;
+}
+
+/**
+ * Bucket a (already search/tag-filtered) list per the active group mode.
+ * Returns [{ key, heading, entries }]. 'flat' returns a single bucket.
+ */
+function groupEntries(list, mode) {
+  if (mode === 'flat') return [{ key: null, heading: null, entries: list }];
+
+  if (mode === 'year') {
+    const byYear = new Map();
+    for (const row of list) {
+      const year = String(new Date(row.updated_at).getFullYear());
+      if (!byYear.has(year)) byYear.set(year, []);
+      byYear.get(year).push(row);
     }
-    el.list.appendChild(empty);
-    return;
+    return [...byYear.entries()]
+      .sort((a, b) => b[0].localeCompare(a[0])) // newest year first
+      .map(([year, entries]) => ({ key: year, heading: year, entries }));
   }
 
-  const labels = new Set();
-  for (const row of state.list) {
-    labels.add(row.label);
+  // label — Uncategorized always last, everything else alphabetical
+  const byLabel = new Map();
+  for (const row of list) {
+    if (!byLabel.has(row.label)) byLabel.set(row.label, []);
+    byLabel.get(row.label).push(row);
+  }
+  const labels = [...byLabel.keys()].sort((a, b) => {
+    if (a === 'Uncategorized') return 1;
+    if (b === 'Uncategorized') return -1;
+    return a.localeCompare(b);
+  });
+  return labels.map((label) => ({ key: label, heading: label, entries: byLabel.get(label) }));
+}
+
+/** One collapsible group section (Label or Year mode). */
+function renderGroupSection(group, mode) {
+  const details = document.createElement('details');
+  details.open = true;
+  details.className = 'group-details';
+
+  const summary = document.createElement('summary');
+  summary.className =
+    'flex cursor-pointer select-none items-center gap-1.5 px-2 py-1.5 text-xs font-semibold uppercase tracking-wider text-ink-muted hover:text-ink';
+  const chevron = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  chevron.setAttribute('class', 'group-chevron icon !h-3 !w-3 transition-transform');
+  chevron.setAttribute('viewBox', '0 0 24 24');
+  chevron.setAttribute('fill', 'none');
+  chevron.setAttribute('stroke', 'currentColor');
+  chevron.setAttribute('stroke-linecap', 'round');
+  chevron.setAttribute('stroke-linejoin', 'round');
+  chevron.setAttribute('aria-hidden', 'true');
+  const chevronPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  chevronPath.setAttribute('d', 'm9 18 6-6-6-6');
+  chevron.appendChild(chevronPath);
+  const headingEl = document.createElement('span');
+  headingEl.className = 'truncate';
+  headingEl.textContent = group.heading;
+  const count = document.createElement('span');
+  count.className = 'ml-auto text-[10px] font-normal normal-case text-ink-muted/70';
+  count.textContent = String(group.entries.length);
+  summary.append(chevron, headingEl, count);
+  details.appendChild(summary);
+
+  const body = document.createElement('div');
+  body.className = 'flex flex-col gap-0.5 pb-1';
+
+  if (mode === 'label') {
+    // Sub-labels nest under their Label rather than becoming their own
+    // top-level group (a flat "group by sub-label" would wrongly collide
+    // sub-labels that share a name across different Labels).
+    const noSub = group.entries.filter((r) => !r.sublabel);
+    const bySub = new Map();
+    for (const row of group.entries) {
+      if (!row.sublabel) continue;
+      if (!bySub.has(row.sublabel)) bySub.set(row.sublabel, []);
+      bySub.get(row.sublabel).push(row);
+    }
+    for (const row of noSub) body.appendChild(renderEntryRow(row));
+    for (const [sublabel, rows] of [...bySub.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+      const subHead = document.createElement('div');
+      subHead.className = 'mt-1 truncate px-2 text-[10px] font-medium uppercase tracking-wide text-ink-muted/70';
+      subHead.textContent = sublabel;
+      body.appendChild(subHead);
+      for (const row of rows) body.appendChild(renderEntryRow(row));
+    }
+  } else {
+    for (const row of group.entries) body.appendChild(renderEntryRow(row));
+  }
+
+  details.appendChild(body);
+  return details;
+}
+
+function renderEmptyState(message, action) {
+  const empty = document.createElement('div');
+  empty.className = 'flex flex-col items-start gap-2 px-3 py-6 text-xs text-ink-muted';
+  const msg = document.createElement('span');
+  msg.textContent = message;
+  empty.appendChild(msg);
+  if (action) {
     const btn = document.createElement('button');
-    btn.className = 'entry-row';
-    btn.setAttribute('role', 'listitem');
-    if (state.current && state.current.id === row.id) btn.setAttribute('aria-current', 'true');
-
-    const title = document.createElement('div');
-    title.className = 'truncate text-sm font-medium';
-    title.textContent = row.title;
-    title.title = row.title;
-
-    const meta = document.createElement('div');
-    meta.className = 'mt-0.5 flex items-center gap-1.5 text-[11px] text-ink-muted';
-    const crumb = document.createElement('span');
-    crumb.className = 'truncate';
-    crumb.textContent = row.sublabel ? `${row.label} › ${row.sublabel}` : row.label;
-    const when = document.createElement('span');
-    when.className = 'ml-auto whitespace-nowrap';
-    when.textContent = relativeTime(row.updated_at);
-    when.title = formatStamp(row.updated_at);
-    meta.append(crumb, when);
-
-    btn.append(title, meta);
-    btn.addEventListener('click', () => guardThen(() => openEntry(row.id)));
-    el.list.appendChild(btn);
+    btn.className = 'btn text-xs';
+    btn.textContent = action.label;
+    btn.addEventListener('click', action.onClick);
+    empty.appendChild(btn);
   }
+  el.list.appendChild(empty);
+}
 
+function refreshLabelOptionsAndFieldSuggestions() {
+  const labels = new Set(state.list.map((r) => r.label));
   el.labelOptions.textContent = '';
   for (const l of [...labels].sort()) {
     const opt = document.createElement('option');
@@ -417,6 +507,156 @@ function renderList() {
     el.labelOptions.appendChild(opt);
   }
   refreshFieldNameSuggestions();
+}
+
+function renderList() {
+  el.list.textContent = '';
+
+  if (state.list.length === 0) {
+    renderEmptyState(
+      el.search.value.trim()
+        ? `No entries match “${el.search.value.trim()}”.`
+        : 'No entries yet — create your first one.',
+      el.search.value.trim()
+        ? { label: 'Clear search', onClick: () => { el.search.value = ''; loadList(); } }
+        : null
+    );
+    renderTagPills();
+    refreshLabelOptionsAndFieldSuggestions();
+    return;
+  }
+
+  const filtered =
+    state.activeTags.size === 0
+      ? state.list
+      : state.list.filter((row) => row.tags.some((t) => state.activeTags.has(t.toLowerCase())));
+
+  if (filtered.length === 0) {
+    renderEmptyState(`No entries match the selected tag${state.activeTags.size > 1 ? 's' : ''}.`, {
+      label: 'Clear tag filter',
+      onClick: () => {
+        state.activeTags.clear();
+        saveSidebarPrefs();
+        renderList();
+      },
+    });
+    renderTagPills();
+    refreshLabelOptionsAndFieldSuggestions();
+    return;
+  }
+
+  const groups = groupEntries(filtered, state.groupMode);
+  if (state.groupMode === 'flat') {
+    for (const row of groups[0].entries) el.list.appendChild(renderEntryRow(row));
+  } else {
+    for (const group of groups) el.list.appendChild(renderGroupSection(group, state.groupMode));
+  }
+
+  renderTagPills();
+  refreshLabelOptionsAndFieldSuggestions();
+}
+
+/** Top-6-by-usage tag filter pills; hidden entirely when nothing has tags. */
+function renderTagPills() {
+  const counts = new Map(); // lowercase -> { display, count }
+  for (const row of state.list) {
+    for (const t of row.tags) {
+      const key = t.toLowerCase();
+      const entry = counts.get(key) || { display: t, count: 0 };
+      entry.count++;
+      counts.set(key, entry);
+    }
+  }
+  // Drop active filters for tags that no longer exist anywhere.
+  for (const key of [...state.activeTags]) if (!counts.has(key)) state.activeTags.delete(key);
+
+  el.tagPills.textContent = '';
+  if (counts.size === 0) {
+    el.tagPills.classList.add('hidden');
+    el.tagPills.classList.remove('flex');
+    return;
+  }
+  el.tagPills.classList.remove('hidden');
+  el.tagPills.classList.add('flex');
+
+  const TOP_N = 6;
+  const byFrequency = [...counts.entries()].sort((a, b) => b[1].count - a[1].count);
+  const topKeys = new Set(byFrequency.slice(0, TOP_N).map(([k]) => k));
+  // Never silently drop a filter the user already has active, even if it
+  // falls outside the visible top-N once other tags overtake it.
+  for (const key of state.activeTags) if (counts.has(key)) topKeys.add(key);
+
+  const visible = [...topKeys]
+    .map((k) => [k, counts.get(k)])
+    .sort((a, b) => a[1].display.localeCompare(b[1].display));
+
+  const all = document.createElement('button');
+  all.className = 'pill';
+  all.textContent = 'All';
+  all.setAttribute('aria-pressed', String(state.activeTags.size === 0));
+  all.addEventListener('click', () => {
+    state.activeTags.clear();
+    saveSidebarPrefs();
+    renderList();
+  });
+  el.tagPills.appendChild(all);
+
+  for (const [key, { display }] of visible) {
+    const pill = document.createElement('button');
+    pill.className = 'pill';
+    pill.textContent = display;
+    pill.setAttribute('aria-pressed', String(state.activeTags.has(key)));
+    pill.addEventListener('click', () => {
+      state.activeTags.has(key) ? state.activeTags.delete(key) : state.activeTags.add(key);
+      saveSidebarPrefs();
+      renderList();
+    });
+    el.tagPills.appendChild(pill);
+  }
+}
+
+/* ── sidebar organization prefs (group mode, tag filter, hidden state) ── */
+
+function loadSidebarPrefs() {
+  if (!state.lsAvailable) return;
+  try {
+    const mode = localStorage.getItem('bento.sidebarGroup');
+    if (mode === 'label' || mode === 'year') state.groupMode = mode;
+    const tagsRaw = localStorage.getItem('bento.sidebarTags');
+    if (tagsRaw) {
+      const arr = JSON.parse(tagsRaw);
+      if (Array.isArray(arr)) state.activeTags = new Set(arr.filter((t) => typeof t === 'string'));
+    }
+  } catch (e) {
+    // malformed prefs — ignore, defaults already set
+  }
+}
+
+function saveSidebarPrefs() {
+  if (!state.lsAvailable) return;
+  try {
+    localStorage.setItem('bento.sidebarGroup', state.groupMode);
+    localStorage.setItem('bento.sidebarTags', JSON.stringify([...state.activeTags]));
+  } catch (e) {
+    // best-effort — not worth surfacing a toast for a preference write
+  }
+}
+
+function syncGroupToggleUI() {
+  for (const b of el.groupToggle.querySelectorAll('[data-group]')) {
+    b.dataset.active = String(b.dataset.group === state.groupMode);
+  }
+}
+
+/** Shared by boot (from localStorage) and the click handler. */
+function applySidebarHidden(hidden) {
+  el.sidebar.dataset.hidden = String(hidden);
+  el.sidebarToggle.querySelector('.sidebar-icon-shown').classList.toggle('hidden', hidden);
+  el.sidebarToggle.querySelector('.sidebar-icon-hidden').classList.toggle('hidden', !hidden);
+  const label = hidden ? 'Show sidebar' : 'Hide sidebar';
+  el.sidebarToggle.title = label;
+  el.sidebarToggle.setAttribute('aria-label', label);
+  el.sidebarToggle.setAttribute('aria-pressed', String(hidden));
 }
 
 /* ── open / new / close / delete ────────────────────────────── */
@@ -875,6 +1115,16 @@ export async function initLogbook() {
   state.lsAvailable = probeLocalStorage();
   if (!state.lsAvailable) toast('Browser storage unavailable — autosave is off this session', 'err', 6000);
 
+  loadSidebarPrefs();
+  syncGroupToggleUI();
+  if (state.lsAvailable) {
+    try {
+      if (localStorage.getItem('bento.sidebarHidden') === 'true') applySidebarHidden(true);
+    } catch (e) {
+      // ignore — sidebar just stays visible
+    }
+  }
+
   // Editing marks dirty; editor input also reschedules the preview
   el.editor.addEventListener('input', () => {
     setDirty(true);
@@ -940,6 +1190,29 @@ export async function initLogbook() {
     const toEdit = el.workspace.dataset.mode !== 'edit';
     setMode(toEdit ? 'edit' : 'read');
     if (toEdit) el.editor.focus();
+  });
+
+  // Sidebar organization: Group by Flat/Label/Year
+  el.groupToggle.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-group]');
+    if (!btn || btn.dataset.group === state.groupMode) return;
+    state.groupMode = btn.dataset.group;
+    syncGroupToggleUI();
+    saveSidebarPrefs();
+    renderList();
+  });
+
+  // Sidebar Hide/Show — independent of Focus Mode
+  el.sidebarToggle.addEventListener('click', () => {
+    const hidden = el.sidebar.dataset.hidden !== 'true';
+    applySidebarHidden(hidden);
+    if (state.lsAvailable) {
+      try {
+        localStorage.setItem('bento.sidebarHidden', String(hidden));
+      } catch (e) {
+        // best-effort
+      }
+    }
   });
 
   // ⌘S / Ctrl+S saves while the LogBook is visible (§ ribbon tooltips)

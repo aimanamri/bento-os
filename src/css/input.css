@@ -171,7 +171,15 @@
     transition: width 300ms ease, opacity 300ms ease;
     overflow: hidden;
   }
-  [data-focusmode="true"] .collapse-x { width: 0 !important; opacity: 0; visibility: hidden; }
+  /* border-width is reset here too — width:0 alone leaves a 1px hairline
+     from border-r/border-l visible at the collapsed edge (border-box
+     sizing doesn't fold border into an explicit width:0). */
+  [data-focusmode="true"] .collapse-x { width: 0 !important; border-width: 0 !important; opacity: 0; visibility: hidden; }
+
+  /* Manual sidebar Hide/Show — independent trigger, composes with Focus
+     Mode above (either condition hides it; #lb-sidebar already carries
+     .collapse-x's transition/overflow). */
+  #lb-sidebar[data-hidden="true"] { width: 0 !important; border-width: 0 !important; opacity: 0; visibility: hidden; }
 
   /* Dock */
   #dock:empty { display: none; }
@@ -280,6 +288,11 @@
 #lb-summary-wrap > summary { list-style: none; }
 #lb-summary-wrap > summary::-webkit-details-marker { display: none; }
 #lb-summary-wrap[open] .summary-chevron { transform: rotate(90deg); }
+
+/* Sidebar grouped-list sections (Group by Label/Year) */
+.group-details > summary { list-style: none; }
+.group-details > summary::-webkit-details-marker { display: none; }
+.group-details[open] .group-chevron { transform: rotate(90deg); }
 
 .sr-only-live {
   position: absolute; width: 1px; height: 1px; overflow: hidden;
