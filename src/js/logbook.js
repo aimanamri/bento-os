@@ -28,6 +28,8 @@ const el = {
   closeBtn: document.getElementById('lb-close'),
   deleteBtn: document.getElementById('lb-delete'),
   editedHint: document.getElementById('lb-edited-hint'),
+  workspace: document.getElementById('lb-workspace'),
+  modeToggle: document.getElementById('lb-mode-toggle'),
   viewToggle: document.getElementById('lb-viewtoggle'),
   drawerOpen: document.getElementById('lb-drawer-open'),
   metaToggle: document.getElementById('lb-meta-toggle'),
@@ -149,6 +151,22 @@ function fillForm(data) {
   syncMetaWidgets();
   renderCreated();
   schedulePreview(0);
+}
+
+/* ── Reading vs Editor mode ─────────────────────────────────── */
+
+// Opening an entry lands in Reading mode (rendered preview only); the toggle
+// or "New Entry" switches to Editor mode. Icon + hover label reflect the
+// current mode.
+function setMode(mode) {
+  el.workspace.dataset.mode = mode;
+  const reading = mode === 'read';
+  el.modeToggle.querySelector('.mode-icon-read').classList.toggle('hidden', !reading);
+  el.modeToggle.querySelector('.mode-icon-edit').classList.toggle('hidden', reading);
+  el.modeToggle.title = reading ? 'Reading mode — click to edit' : 'Editor mode — click to read';
+  el.modeToggle.setAttribute('aria-label', reading ? 'Reading mode (switch to editor)' : 'Editor mode (switch to reading)');
+  el.modeToggle.setAttribute('aria-pressed', String(reading));
+  if (reading) schedulePreview(0); // make sure the preview reflects current content
 }
 
 // Created is read-only (immutable). Called from fillForm and after a save.
@@ -410,6 +428,7 @@ async function openEntry(id) {
     fillForm(entry);
     setDirty(false);
     clearBanner();
+    setMode('read'); // open existing notes to read, not edit
     renderList();
   } catch (e) {
     if (e.code === 'NOT_FOUND') {
@@ -426,6 +445,7 @@ function newEntry() {
   fillForm({});
   setDirty(false);
   clearBanner();
+  setMode('edit'); // a fresh note starts in the editor
   renderList();
   el.title.focus();
 }
@@ -680,6 +700,7 @@ async function offerDraftRestore() {
     state.current = server;
     fillForm(draft.data);
     setDirty(true);
+    setMode('edit'); // restored unsaved edits → drop into the editor
     clearDraft(); // will be re-written by the next autosave tick
     return true;
   }
@@ -688,6 +709,7 @@ async function offerDraftRestore() {
     state.current = server;
     fillForm(server);
     setDirty(false);
+    setMode('read');
     return true;
   }
   return false;
@@ -758,6 +780,7 @@ async function importFile(file) {
     state.current = entry;
     fillForm(entry);
     setDirty(false);
+    setMode('read'); // review the imported note; toggle to edit if needed
     await loadList();
   } catch (e) {
     await confirmModal({
@@ -910,6 +933,13 @@ export async function initLogbook() {
     const hidden = el.metaPanel.classList.toggle('max-xl:hidden');
     el.metaPanel.classList.toggle('max-xl:block', !hidden);
     el.metaToggle.setAttribute('aria-pressed', String(!hidden));
+  });
+
+  // Reading / Editor mode toggle
+  el.modeToggle.addEventListener('click', () => {
+    const toEdit = el.workspace.dataset.mode !== 'edit';
+    setMode(toEdit ? 'edit' : 'read');
+    if (toEdit) el.editor.focus();
   });
 
   // ⌘S / Ctrl+S saves while the LogBook is visible (§ ribbon tooltips)
