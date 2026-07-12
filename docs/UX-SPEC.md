@@ -2,10 +2,13 @@
 
 > Companion documents: [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md) · [SECURITY.md](SECURITY.md) · [EDGE-CASES.md](EDGE-CASES.md)
 >
-> Build-time note: Phase E (and any UI construction) invokes the
-> `ui-ux-pro-max` skill — its domain (bento grid, glassmorphism, dark mode,
-> responsive) is exactly this design language. This spec defines *what* the
-> experience is; the skill governs *how* it's crafted.
+> **Status: describes the shipped UI**, including features added after the
+> original five build phases (Reading/Editor mode, dynamic metadata Fields,
+> editable Modified time, and four extra ribbon buttons) — not just the
+> Phase-1 plan. Where this doc differs from PROJECT-BRIEF.md's original
+> wording (e.g. the Prompt Library's "Fill In and Copy" toggle), **this doc
+> is authoritative** — it reflects a deliberate later revision, recorded in
+> IMPLEMENTATION-PLAN.md § 8.
 
 ---
 
@@ -51,31 +54,56 @@ in the dots on hover (macOS convention).
 
 ## 3. Docs LogBook Layout
 
-### Wide viewports (≥ 1024 px)
+### Reading vs Editor mode (primary content-area concept)
+
+The main content area of the LogBook has exactly two modes, controlled by
+one icon toggle button in the entry header (`#lb-mode-toggle`) — full
+behavior spec in EDGE-CASES.md § 9:
+
+- **Reading mode** (the default when you open an existing note): only the
+  rendered preview is shown, centered at a ~46rem comfortable reading
+  measure. The Summary section, the Body section header, the formatting
+  ribbon, and the raw markdown editor are all hidden — not just visually
+  collapsed, removed from layout and tab order.
+- **Editor mode** (the default for a brand-new note): the full authoring
+  view described below — Summary, Body header, ribbon, and the split
+  editor/preview.
+
+The toggle icon itself swaps between an open-book glyph (currently Reading
+— click to switch to Editor) and a pencil glyph (currently Editor — click
+to switch to Reading). Its `title` attribute carries the same message as a
+plain hover tooltip — no separate tooltip widget is used.
+
+### Wide viewports (≥ 1024 px), Editor mode
 ```
 ┌───────────────────────── window frame ─────────────────────────┐
 │ ●●●  Bento OS            [ LogBook | Prompt Library ]           │
-├──────────┬─────────────────────────────┬───────────────────────┤
-│ Sidebar  │  Editor (md source)         │  Preview (rendered)   │
-│ search   │  ── sticky tool ribbon ──   │                       │
-│ entries  │                             │                       │
-│ guide 💡 │                             │                       │
-├──────────┴─────────────────────────────┴───────────────────────┤
-│ status dock (when non-empty)                                    │
-└─────────────────────────────────────────────────────────────────┘
+├──────────┬───────────────────────────────────────────┬──────────┤
+│ Sidebar  │  Summary/Problem Statement (collapsible)   │ Metadata │
+│ search   │  Body (Content: knowledge/solutions/…)     │  panel   │
+│ entries  │  ── sticky tool ribbon ──                  │          │
+│ guide 💡 │  Editor (md)      │  Preview (rendered)     │          │
+├──────────┴───────────────────┴─────────────────────────┴──────────┤
+│ status dock (when non-empty)                                       │
+└──────────────────────────────────────────────────────────────────┘
 ```
-- Split is 50/50 editor/preview with a draggable divider (double-click
+- Editor/Preview split is 50/50 with a draggable divider (double-click
   resets). Preview scroll loosely follows editor cursor (`data-line` markers).
+- In **Reading mode**, this whole authoring column collapses to just the
+  centered preview — see above.
 
 ### Narrow viewports (< 1024 px)
-- Single pane with a **high-contrast segmented toggle** (Write ✏️ / Preview 👁)
+- Within Editor mode: a **high-contrast segmented toggle** (Write / Preview)
   pinned in the ribbon — large, thumb-reachable, state obvious at a glance.
+  This toggle is irrelevant in Reading mode (there's no split to toggle —
+  EDGE-CASES § 9.8).
 - Sidebar becomes an overlay drawer (hamburger in title bar) with a scrim;
   swipe/Esc/scrim-tap closes. Focus trapped while open.
 
 ### Sidebar
 - Live search box filters as-you-type (input debounced 200 ms → FTS query).
-  Scope: titles, tags, metadata. Zero-hit state per EDGE-CASES § 6.6.
+  Scope: titles, tags, summary, body, **and dynamic field names/values**
+  (§ "Metadata panel" below). Zero-hit state per EDGE-CASES § 6.6.
 - Entry rows: title (1-line ellipsis), label›sublabel breadcrumb chip,
   relative date, dirty dot when the open entry is that row. Active row uses
   the accent tint.
@@ -83,29 +111,78 @@ in the dots on hover (macOS convention).
 - Footer: "💡 Guide" link → Guide modal (markdown usage, syntax cheatsheet
   content in prose, the documented quirks from EDGE-CASES §§ 5.4, 6.2, 7.6).
 
-### Sticky Tool Ribbon
+### Summary / Problem Statement (Editor mode only)
+
+A collapsible section (native `<details>`, chevron rotates on open/close)
+positioned **above** the body — not inside the metadata panel. Open by
+default; the textarea shows at least 3 rows and is vertically resizable.
+Collapsing it is purely a screen-space convenience — the value is never
+cleared by collapsing.
+
+### Body section header (Editor mode only)
+
+A small label directly above the sticky ribbon: **"Body"** with a muted
+parenthetical hint — *"(Content: knowledges, solutions, troubleshooting,
+workarounds)"* — telling the user what kind of writing belongs in the main
+editor, distinct from the Summary above it.
+
+### Sticky Tool Ribbon (Editor mode only)
 - Anchored above the editor, horizontally scrollable on overflow (no wrap —
   vertical rhythm stays stable).
-- Groups, in order: headings H1–H3 · bold/italic/strike/inline-code · code
-  block · checkbox · link · 3×4 table generator · alert blocks
+- Groups, in order: headings H1–H3 · bold/italic/strikethrough ·
+  **superscript/subscript** · inline-code · link · **bulleted list /
+  numbered list** · checkbox item · 3×4 table generator · alert blocks
   (`Success`/`Info`/`Warning` pre-styled component injectors) · 💡 bulb.
 - All buttons are *cursor-aware injections*: wrap selection if any, else
   insert boilerplate at caret and place the caret inside the placeholder.
-  Every button has a tooltip with its keyboard shortcut (`⌘B`, `⌘I`, `⌘K`,
-  `⌘S` = save).
+  List buttons instead *prefix every line* of the current selection (or
+  just the current line if nothing is selected) — `- ` for bulleted,
+  `1. `/`2. `/… (renumbered per line) for numbered.
+- **Superscript/subscript use literal `<sup>`/`<sub>` HTML tags**, not the
+  `^text^`/`~text~` markdown-it extension syntax — deliberately, because
+  `^` is how KaTeX writes exponents inside `$…$` math and would otherwise
+  collide (SECURITY.md § 2, EDGE-CASES § 4.11).
+- Every button has a tooltip with its keyboard shortcut where one exists
+  (`⌘B`, `⌘I`, `⌘K`, `⌘S` = save).
 - **💡 Bulb dropdown (Syntax Reference)**: cheat-sheet entries for inline
   LaTeX (`$…$`), block LaTeX (`$$…$$`), and a Mermaid flowchart starter
   fence. Each row shows a mini rendered example; clicking injects the exact
   boilerplate at the cursor and closes the menu. Menu is keyboard-navigable
-  (arrow keys + Enter).
+  (arrow keys + Enter), and renders at `position: fixed` anchored to the
+  button (not inside the ribbon's own scroll container, which would clip
+  it, and not inside any `backdrop-filter` ancestor, which would hijack
+  `position: fixed`'s containing block).
 
-### Metadata panel
-- Collapsible right-edge panel (auto-collapsed by Focus Mode): summary
-  (auto-resizing textarea), label/sub-label selects, tags input (renders
-  chips on comma/Enter, normalization per EDGE-CASES § 6.1), platform
-  dropdown, `isValid` switch, immutable created timestamp (read-only,
-  human-formatted, raw UNIX in tooltip), URL list (collapsible container,
-  per-item validity per EDGE-CASES § 6.4).
+### Metadata panel (visible in both Reading and Editor mode)
+
+Collapsible right-edge panel (auto-collapsed by Focus Mode), top to bottom:
+
+1. **Label** / **Sub-label** — text inputs; sub-label is disabled until a
+   label is set; blank label displays and stores as `Uncategorized`.
+2. **Tags** — comma-separated input, rendered as chips below it.
+3. **Fields** — user-defined name/value metadata, TiddlyWiki-style. One row
+   per field: a right-aligned name label, an editable value `<input>`, and
+   a 🗑 delete button. Below the rows, an "add a new field" row: a name
+   input (with a `<datalist>` suggesting names already used on *other*
+   entries), a value input, and an **add** button — Enter in either input
+   also submits. Adding a field with a name already present on this entry
+   (case-insensitive) is rejected with an inline error, not silently
+   merged or duplicated. An empty-state hint ("No fields yet — add one
+   below…") shows when the entry has none. **There is no fixed OS-Platform
+   dropdown or isValid checkbox** — those were replaced by this general
+   mechanism (IMPLEMENTATION-PLAN.md § 8.1).
+4. **Created** — read-only, labeled "(read-only)", human-formatted with the
+   raw UNIX ms in a tooltip. Never becomes an input.
+5. **Modified** — a real `<input type="datetime-local">`, editable. Left
+   alone, it auto-updates to "now" on every save, same as before this was
+   editable; hand-editing it and saving stores that exact value instead.
+   `color-scheme` is set per theme (`:root{color-scheme:light}` /
+   `.dark{color-scheme:dark}`) so the native browser date/time picker
+   itself matches dark mode rather than always rendering light-chrome.
+6. **URL list** — collapsible container, comma-separated input, per-item
+   validity marker (§ EDGE-CASES 6.4).
+7. **Delete entry** — destructive action, visually separated (danger color,
+   own row) from everything above it.
 
 ## 4. Prompt Library Layout
 
@@ -117,73 +194,107 @@ in the dots on hover (macOS convention).
   with generous vertical padding between groups. Categories ordered
   alphabetically; empty categories hidden.
 - **Prompt cards**: vertically stacked rounded rectangles — bold title,
-  category + tag chips, monospace prompt body in a scrollable well (max-height
-  clamp), actions row: **Copy** · **Fill In and Copy** (toggle) · **Why this
-  works** (flip) · Edit · Delete.
-- **Fill In and Copy**: toggling ON scans `{{Variables}}` (grammar and all
-  edge behavior per EDGE-CASES § 5) and renders labeled inline inputs on the
-  card in source order; the monospace well live-highlights substituted
-  segments as you type; Copy always reflects the current buffer. Unfilled
-  variables tint amber, copying never blocked (§ 5.7).
+  category + tag chips, a monospace prompt body in a scrollable well
+  (max-height clamp), actions row: **Copy** · **Why this works** (flip,
+  only shown if the prompt has one) · Edit · Delete.
+- **Variables are directly editable in place — there is no "Fill In and
+  Copy" toggle button.** Each `{{Variable}}` occurrence inside the
+  monospace well renders as its own `contenteditable` span
+  (`role="textbox"`, `aria-label="Value for <Name>"`, `aria-multiline=
+  "false"`), always live, no mode to switch into first:
+  - Unedited, a slot shows the literal placeholder text (`{{Topic}}`) with
+    an amber tint (`.var-empty`) — visually inviting a click without
+    demanding one.
+  - The **first** focus into a slot selects its entire content, so the
+    very next keystroke replaces the whole placeholder — feels like a
+    normal form field despite living inline in running text.
+  - Once it holds real text, the slot switches to an accent tint
+    (`.var-filled`), bold.
+  - Duplicate occurrences of the same variable name mirror each other's
+    text live as you type (except the one you're actively typing in).
+  - Clearing a slot to empty and clicking away reverts it to the literal
+    placeholder — it is never left blank.
+  - Enter is blocked inside a slot (no newlines in a value); paste is
+    forced to plain text.
+  - **Copy** always reflects exactly what's currently on screen —
+    unedited variables copy as their placeholder text, edited ones copy
+    the typed value.
 - **"Why this works"**: card flip (3D rotate, medium duration; instant swap
   under reduced-motion) to a prose back face; flip control mirrored on the
   back. Back face height matches front (content scrolls) so the stack never
-  jumps.
+  jumps. Only rendered on cards that actually have this text — no empty
+  flip affordance on cards without it.
 - **Empty states**: no prompts at all → friendly illustration + "New Prompt"
   CTA; filter/search with zero hits → EDGE-CASES § 6.6 pattern.
 
 ## 5. Accessibility Requirements (acceptance-level, not aspirational)
 
 - Contrast: all text ≥ 4.5:1 (3:1 for large text) measured against each glass
-  surface's *tint worst case* (§ 1). Automated check with axe in Phase E.
+  surface's *tint worst case* (§ 1).
 - Full keyboard operability: tab strip = `role="tablist"` with arrow-key
-  navigation; dock pills, ribbon, pills, cards all reachable; visible
-  `:focus-visible` rings (accent, 2 px offset) everywhere — never
-  `outline: none` without replacement.
+  navigation; dock pills, ribbon, pills, cards, and prompt variable slots
+  all reachable and operable via keyboard; visible `:focus-visible` rings
+  (accent, 2 px offset) everywhere — never `outline: none` without
+  replacement. Contenteditable variable slots additionally get a plain
+  `:focus` ring (not `:focus-visible`-gated), since a user needs to see
+  exactly where their edit landed regardless of whether they got there by
+  mouse or keyboard.
 - Modals: `role="dialog"` `aria-modal`, focus trapped, Esc closes (except
   destructive-choice modals where Esc = Cancel), focus returns to the
   invoking element on close.
 - Toasts: `role="status"` (polite) for success/info, `role="alert"` for
   errors; never the only channel for blocking information (modals carry
   decisions, toasts carry notices).
-- Editor is a real `<textarea>` in Phase 1 (native a11y, undo, IME, mobile
-  keyboards) — not `contenteditable`. `dir="auto"` for RTL (EDGE-CASES § 6.7).
-- Announce state changes: save success, focus-mode toggle, copy result via a
-  visually-hidden live region.
+- Editor is a real `<textarea>` (native a11y, undo, IME, mobile keyboards)
+  — not `contenteditable`. `dir="auto"` for RTL (EDGE-CASES § 6.7). Prompt
+  Library's variable slots are the one deliberate exception — they're
+  `contenteditable` `<span>`s because they live inline inside otherwise-
+  static rendered text, given explicit `role="textbox"` +
+  `aria-label`/`aria-multiline` to compensate.
+- Announce state changes: save success, focus-mode toggle, copy result,
+  Reading/Editor mode switch, via a visually-hidden live region.
 
 ## 6. System Feedback Patterns (single vocabulary, used by both tabs)
 
 | Pattern | Used for | Rules |
 |---|---|---|
-| **Modal** | Decisions & blocking errors (unsaved close, conflicts, restore prompt, delete confirm, import errors) | Max 3 actions, destructive action styled distinctly and never default-focused; specific verbs ("Discard draft", not "OK") |
+| **Modal** | Decisions & blocking errors (unsaved close, conflicts, restore prompt, delete confirm, import errors, duplicate field name) | Max 3 actions, destructive action styled distinctly and never default-focused; specific verbs ("Discard draft", not "OK") |
 | **Banner** | Non-blocking persistent state (newer-version-exists § 3.2, host unreachable) | Slim strip above the editor; dismissible; one at a time |
 | **Toast** | Transient outcomes (saved ✓, copied ✓, autosave paused, network retry) | Bottom-right, auto-dismiss 3.5 s, hover pauses timer, max 2 stacked |
-| **Inline chip** | Localized render failures (LaTeX/Mermaid error blocks § 4.1–4.2), invalid URL markers | Never modal — errors stay next to their cause |
+| **Inline chip / error text** | Localized render failures (LaTeX/Mermaid error blocks § 4.1–4.2), invalid URL markers, duplicate-field-name message | Never modal — errors stay next to their cause |
 
 Save flow feedback: `⌘S`/button → button enters spinner state (only if
-> 150 ms) → ✓ morph 1.2 s → sidebar row updates via `entry:saved` bus event.
-Dirty state: dot on tab label + "Edited" hint near Save — always visible,
-never only in the tab title.
+> 150 ms) → ✓ morph 1.2 s → sidebar row updates. Dirty state: dot on tab
+label + "Edited" hint near Save — always visible, never only in the tab
+title. Editing a dynamic field or the Modified time counts as "dirty" the
+same as editing the body.
 
 ## 7. First-Run & Empty States
 
 - Fresh database: LogBook opens with a pre-seeded **welcome entry** that is
   itself a working demo — sample headings, a checkbox list, one KaTeX
-  formula, one Mermaid diagram, one of each alert block. Doubles as a render
+  formula, one Mermaid diagram, one of each alert block, **and two example
+  dynamic Fields** (`os_platform: macOS`, `is_valid: true`) demonstrating
+  the Fields editor with real data on first boot. Doubles as a render
   self-test and teaches the ribbon by example.
 - Prompt Library fresh state: one seeded example prompt containing two
   `{{Variables}}` and a filled "Why this works" back, demonstrating the
-  card's full behavior.
+  card's full behavior (including the inline variable-editing engine) out
+  of the box.
 - Guide modal is linked from both seeds.
 
-## 8. Phase-E Acceptance Checklist
+## 8. Acceptance Checklist
 
-- [ ] All three traffic lights behave per § 2 on desktop + phone-width, incl. reduced-motion variants
-- [ ] Focus mode round-trips to the exact prior layout; keyboard shortcut works
-- [ ] Split view divider drag + reset; narrow-viewport toggle switch reachable one-handed
-- [ ] Every ribbon button injects correctly with selection and with bare caret; shortcuts fire
-- [ ] Bulb menu keyboard-navigable; injected LaTeX/Mermaid boilerplate renders immediately in preview
-- [ ] Card flip, pill filters, fill-in engine pass every EDGE-CASES § 5 row
-- [ ] axe scan: zero critical/serious findings on both tabs, both themes
-- [ ] All feedback patterns (§ 6) demonstrated: force a 409, an autosave restore, a render error, a copy fallback
-- [ ] Welcome seeds render all four content technologies (md, KaTeX, Mermaid, alerts) on first boot
+- [x] All three traffic lights behave per § 2 on desktop + phone-width, incl. reduced-motion variants
+- [x] Focus mode round-trips to the exact prior layout; keyboard shortcut works
+- [x] Split view divider drag + reset; narrow-viewport toggle switch reachable one-handed (Editor mode only)
+- [x] Every ribbon button injects correctly with selection and with bare caret; shortcuts fire; list buttons prefix multi-line selections correctly
+- [x] Superscript/subscript render as real elements when bare, as literal text when attribute-bearing; math with `^` is never affected
+- [x] Bulb menu keyboard-navigable; injected LaTeX/Mermaid boilerplate renders immediately in preview
+- [x] Card flip, pill filters pass; every prompt variable-engine row in EDGE-CASES § 5 passes (inline editing, no toggle)
+- [x] Reading mode is the default on opening an existing note; Editor mode is the default for a new note; toggle icon + hover label work in both directions (EDGE-CASES § 9)
+- [x] Dynamic Fields: add/edit/delete/duplicate-name-rejection/search-by-value all pass (EDGE-CASES § 10)
+- [x] Modified time: manual edit persists verbatim, auto-bump still works on the next plain save, Created never becomes editable, conflict detection unaffected (EDGE-CASES § 11)
+- [ ] axe scan: zero critical/serious findings on both tabs, both themes *(not yet run as an automated CI step — manual spot checks only so far)*
+- [x] All feedback patterns (§ 6) demonstrated: force a 409, an autosave restore, a render error, a copy fallback
+- [x] Welcome seeds render all four content technologies (md, KaTeX, Mermaid, alerts) plus two example Fields on first boot
