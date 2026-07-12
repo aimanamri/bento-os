@@ -261,6 +261,36 @@ function actionBtn(label, onClick, extra = '') {
   return b;
 }
 
+// Icon-only action button. `label` is exposed both as the hover tooltip
+// (native `title`) and the accessible name (`aria-label`) — same pattern as
+// the LogBook's Reading/Editor and sidebar toggles.
+const SVG_NS = 'http://www.w3.org/2000/svg';
+function iconActionBtn(label, paths, onClick, extra = '') {
+  const b = document.createElement('button');
+  b.className = 'icon-btn btn-ghost ' + extra;
+  b.title = label;
+  b.setAttribute('aria-label', label);
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('class', 'icon');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', 'currentColor');
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('stroke-linejoin', 'round');
+  svg.setAttribute('aria-hidden', 'true');
+  for (const d of paths) {
+    const path = document.createElementNS(SVG_NS, 'path');
+    path.setAttribute('d', d);
+    svg.appendChild(path);
+  }
+  b.appendChild(svg);
+  b.addEventListener('click', onClick);
+  return b;
+}
+
+const EDIT_ICON = ['M12 20h9', 'M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z'];
+const DELETE_ICON = ['M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6'];
+
 function renderCard(p) {
   const fillValues = state.fill.get(p.id) || new Map();
   state.fill.set(p.id, fillValues);
@@ -298,10 +328,10 @@ function renderCard(p) {
   head.appendChild(titleWrap);
 
   const editRow = document.createElement('div');
-  editRow.className = 'flex gap-1';
+  editRow.className = 'flex flex-none gap-0.5';
   editRow.append(
-    actionBtn('Edit', () => openDialog(p), 'btn-ghost'),
-    actionBtn('Delete', () => deletePrompt(p), 'btn-ghost !text-danger')
+    iconActionBtn('Edit prompt', EDIT_ICON, () => openDialog(p), 'text-ink-muted'),
+    iconActionBtn('Delete prompt', DELETE_ICON, () => deletePrompt(p), 'text-ink-muted hover:text-danger')
   );
   head.appendChild(editRow);
   front.appendChild(head);
