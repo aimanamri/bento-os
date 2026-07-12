@@ -1,0 +1,29 @@
+# syntax=docker/dockerfile:1
+#
+# Bento OS — development image.
+# Meant to run with the source bind-mounted (see the `dev` profile in
+# docker-compose.yml). `npm run dev` rebuilds assets then starts the server;
+# there is no file watcher, so restart the container to pick up changes.
+FROM node:20-alpine
+ENV NODE_ENV=development
+WORKDIR /app
+
+RUN apk add --no-cache tini \
+ && addgroup -g 1001 -S nodejs \
+ && adduser -S nodejs -u 1001
+
+COPY package*.json ./
+# Full install (incl. devDependencies) — tailwind + client vendor libs are
+# needed to build assets.
+RUN npm ci
+
+COPY . .
+# The anonymous node_modules volume and the data dir must be writable by the
+# unprivileged runtime user.
+RUN mkdir -p /app/data && chown -R nodejs:nodejs /app/data /app/node_modules
+
+USER nodejs
+EXPOSE 3000
+
+ENTRYPOINT ["/sbin/tini", "--"]
+CMD ["npm", "run", "dev"]

@@ -1,0 +1,73 @@
+# Compose Spec — no top-level `version:` key is needed anymore.
+
+services:
+  # ---- Production ----
+  bento:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: bento-os:latest
+    container_name: bento-os-prod
+    # Bind to loopback only; front it with `tailscale serve` for remote access.
+    ports:
+      - "127.0.0.1:8481:3000"
+    environment:
+      - BENTO_PORT=3000
+      - BENTO_HOST=0.0.0.0            # 0.0.0.0 *inside* the container so Docker can forward
+      - NODE_ENV=production
+      - NODE_OPTIONS=--max-old-space-size=384   # cap V8 heap under the 512m limit
+    volumes:
+      - ./data:/app/data             # SQLite db + WAL live here (only writable path)
+    restart: unless-stopped
+    stop_grace_period: 15s           # allow the WAL checkpoint on shutdown
+
+    # --- Security hardening ---
+    read_only: true                  # immutable root fs; app only writes ./data
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true       # block setuid privilege escalation
+    cap_drop:
+      - ALL                          # the server needs no Linux capabilities
+
+    # --- Resource limits (memory / CPU / process caps) ---
+    mem_limit: 512m
+    memswap_limit: 512m              # == mem_limit disables swap
+    cpus: 1.0
+    pids_limit: 256
+
+    # --- Keep logs from filling the disk ---
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:3000/api/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # ---- Development (opt-in) ----
+  # Start with:  docker compose --profile dev up bento-dev
+  # Bind-mounts the source; no hardening/limits so you can iterate freely.
+  bento-dev:
+    profiles: ["dev"]
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    image: bento-os:dev
+    container_name: bento-os-dev
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      - BENTO_PORT=3000
+      - BENTO_HOST=0.0.0.0
+      - NODE_ENV=development
+    volumes:
+      - .:/app                       # live source
+      - /app/node_modules            # keep the image's linux-built node_modules
+      - ./data:/app/data
+    restart: unless-stopped

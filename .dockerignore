@@ -1,0 +1,34 @@
+# Dependencies / build output (reinstalled + regenerated inside the image)
+node_modules/
+dist/
+npm-debug.log
+.npm
+
+# VCS / editor / OS cruft
+.git
+.gitignore
+.gitattributes
+.claude
+.vscode/
+.editorconfig
+.prettierrc
+.eslintrc*
+.DS_Store
+
+# Secrets & local data — never copy into the build context
+*.env
+*.env.local
+backups/
+data/
+
+# Docs, notes, and generated analysis — not needed at build or runtime
+docs/
+*.md
+graphify-out/
+.graphify*
+scratchpad/
+
+# Docker files themselves
+Dockerfile*
+docker-compose*.yml
+.dockerignore

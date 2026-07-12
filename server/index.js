@@ -58,10 +58,11 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = Number(process.env.BENTO_PORT) || 3000;
-// Loopback only — the app is reachable exclusively through `tailscale serve`
-// (SECURITY.md §4). Deliberately not configurable to 0.0.0.0.
-const server = app.listen(PORT, '127.0.0.1', () => {
-  console.log(`Bento OS serving on http://127.0.0.1:${PORT} (schema v${SCHEMA_VERSION})`);
+// In a container, bind to 0.0.0.0 so Docker port forwarding works.
+// Outside a container, default to loopback only (SECURITY.md §4).
+const HOST = process.env.BENTO_HOST || '127.0.0.1';
+const server = app.listen(PORT, HOST, () => {
+  console.log(`Bento OS serving on http://${HOST}:${PORT} (schema v${SCHEMA_VERSION})`);
   console.log('Expose via: tailscale serve --bg https / http://127.0.0.1:' + PORT);
 });
 
