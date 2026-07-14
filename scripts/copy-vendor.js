@@ -1,7 +1,8 @@
 'use strict';
 
-// Vendor the four runtime libraries at their locked versions into dist/.
+// Vendor the runtime libraries at their locked versions into dist/.
 // CSP (`script-src 'self'`) forbids CDNs by design — SECURITY.md §4.
+// supabase-js ships as a self-contained UMD bundle (window.supabase).
 
 const fs = require('fs');
 const path = require('path');
@@ -17,6 +18,7 @@ const files = [
   ['katex/dist/contrib/auto-render.min.js', 'auto-render.min.js'],
   ['katex/dist/katex.min.css', 'katex.min.css'],
   ['mermaid/dist/mermaid.min.js', 'mermaid.min.js'],
+  ['@supabase/supabase-js/dist/umd/supabase.js', 'supabase.js'],
 ];
 
 fs.mkdirSync(out, { recursive: true });

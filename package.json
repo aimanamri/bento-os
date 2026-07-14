@@ -2,7 +2,7 @@
   "name": "bento-os",
   "version": "0.1.0",
   "private": true,
-  "description": "Local-first personal knowledge base and prompt library with a macOS bento-glass UI.",
+  "description": "Personal knowledge base and prompt library with a macOS bento-glass UI, backed by Supabase (PostgreSQL + Auth).",
   "type": "commonjs",
   "scripts": {
     "dev": "npm run build && node server/index.js",
@@ -11,17 +11,27 @@
     "build:css": "tailwindcss -i src/css/input.css -o dist/assets/app.css --minify",
     "build:static": "node scripts/copy-static.js",
     "build:vendor": "node scripts/copy-vendor.js",
+    "setup:admin": "node scripts/setup-supabase-admin.js",
+    "migrate:data": "node scripts/migrate-sqlite-to-supabase.js",
     "audit:deps": "npm audit"
   },
   "dependencies": {
-    "better-sqlite3": "^11.10.0",
+    "@supabase/supabase-js": "^2.110.5",
     "express": "^4.21.2"
+  },
+  "optionalDependencies": {
+    "better-sqlite3": "^11.10.0"
   },
   "devDependencies": {
     "dompurify": "^3.2.6",
     "katex": "^0.16.22",
     "markdown-it": "^14.1.0",
     "mermaid": "^11.6.0",
+    "supabase": "^2.109.1",
     "tailwindcss": "^3.4.17"
+  },
+  "allowScripts": {
+    "better-sqlite3@11.10.0": true,
+    "fsevents@2.3.3": true
   }
 }

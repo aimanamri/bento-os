@@ -1,7 +1,7 @@
-'use strict';
-
-// Shared input normalization. Every rule here mirrors a row in
-// docs/EDGE-CASES.md §6 and must match the client-side normalization.
+// Input normalization, ported from server/validate.js now that writes go
+// straight from the browser to Supabase. Every rule mirrors a row in
+// docs/EDGE-CASES.md §6. The database CHECK constraints and RLS are the
+// authoritative backstop — this layer exists for friendly error messages.
 
 const TITLE_MAX = 300;
 const TAG_MAX = 64;
@@ -10,7 +10,7 @@ const URLS_MAX_COUNT = 64;
 const URL_MAX = 2048;
 const TEXT_MAX = 1024 * 1024; // 1 MB per text field
 
-class ValidationError extends Error {
+export class ValidationError extends Error {
   constructor(message) {
     super(message);
     this.code = 'VALIDATION';
@@ -22,9 +22,7 @@ function reqString(value, field, max = TEXT_MAX) {
   if (typeof value !== 'string' || value.trim().length === 0) {
     throw new ValidationError(`${field} is required`);
   }
-  if (value.length > max) {
-    throw new ValidationError(`${field} exceeds ${max} characters`);
-  }
+  if (value.length > max) throw new ValidationError(`${field} exceeds ${max} characters`);
   return value;
 }
 
@@ -36,7 +34,7 @@ function optString(value, field, max = TEXT_MAX) {
 }
 
 // "a,, b , A ," -> ["a", "b"]  (split, trim, drop empties, ci-dedupe)
-function normalizeTags(value) {
+export function normalizeTags(value) {
   let items;
   if (Array.isArray(value)) items = value;
   else if (typeof value === 'string') items = value.split(',');
@@ -60,7 +58,7 @@ function normalizeTags(value) {
 
 // Invalid items are kept (they may be paths/notes) — validity is a
 // client-side rendering concern (EDGE-CASES §6.4). Only shape is enforced.
-function normalizeUrls(value) {
+export function normalizeUrls(value) {
   let items;
   if (Array.isArray(value)) items = value;
   else if (typeof value === 'string') items = value.split(',');
@@ -82,10 +80,7 @@ const FIELD_NAME_MAX = 64;
 const FIELD_VALUE_MAX = 2000;
 const FIELDS_MAX_COUNT = 64;
 
-// User-defined metadata fields: plain-text name/value pairs (TiddlyWiki
-// style). Names are trimmed and deduped case-insensitively (first wins);
-// values are coerced to trimmed strings. Insertion order is preserved.
-function normalizeFields(value) {
+export function normalizeFields(value) {
   if (value === undefined || value === null) return {};
   if (typeof value !== 'object' || Array.isArray(value)) {
     throw new ValidationError('fields must be an object of name/value pairs');
@@ -107,7 +102,9 @@ function normalizeFields(value) {
   return out;
 }
 
-function normalizeEntry(body) {
+// Tags/fields/urls stay real objects here — Postgres jsonb columns take them
+// directly (the SQLite layer JSON.stringify'd them into TEXT).
+export function normalizeEntry(body) {
   const title = reqString(body.title, 'title', TITLE_MAX).trim();
   const body_md = reqString(body.body_md, 'body_md');
   const summary = optString(body.summary, 'summary', 10000);
@@ -120,39 +117,23 @@ function normalizeEntry(body) {
     summary,
     label,
     sublabel,
-    fields: JSON.stringify(normalizeFields(body.fields)),
-    tags: JSON.stringify(normalizeTags(body.tags)),
-    urls: JSON.stringify(normalizeUrls(body.urls)),
+    fields: normalizeFields(body.fields),
+    tags: normalizeTags(body.tags),
+    urls: normalizeUrls(body.urls),
   };
 }
 
-function normalizePrompt(body) {
+export function normalizePrompt(body) {
   const title = reqString(body.title, 'title', TITLE_MAX).trim();
   const promptBody = reqString(body.body, 'body');
-  const category =
-    optString(body.category, 'category', 64).trim().toUpperCase() || 'GENERAL';
+  const category = optString(body.category, 'category', 64).trim().toUpperCase() || 'GENERAL';
   const why_this_works = optString(body.why_this_works, 'why_this_works', 10000);
-  return {
-    title,
-    body: promptBody,
-    category,
-    why_this_works,
-    tags: JSON.stringify(normalizeTags(body.tags)),
-  };
-}
-
-// FTS5 MATCH takes a query language, not a string — rewrite user input into
-// quoted prefix tokens so every token is a literal (SECURITY.md §3).
-function ftsQuery(q) {
-  const tokens = String(q).split(/\s+/).filter(Boolean).slice(0, 12);
-  if (tokens.length === 0) return null;
-  return tokens.map((t) => `"${t.replace(/"/g, '""')}"*`).join(' ');
+  return { title, body: promptBody, category, why_this_works, tags: normalizeTags(body.tags) };
 }
 
 // Optional user-supplied timestamp (UNIX ms). Modified time is manually
-// editable; created time is not (it never reaches an UPDATE — the DB trigger
-// still guards it). Returns undefined when absent so the route can default.
-function optTimestamp(value, field) {
+// editable; created time is not (the DB trigger guards it).
+export function optTimestamp(value, field) {
   if (value === undefined || value === null || value === '') return undefined;
   if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
     throw new ValidationError(`${field} must be a positive UNIX ms timestamp`);
@@ -160,7 +141,7 @@ function optTimestamp(value, field) {
   return value;
 }
 
-function expectedUpdatedAt(body) {
+export function expectedUpdatedAt(body) {
   const v = body.expected_updated_at;
   if (typeof v !== 'number' || !Number.isFinite(v)) {
     throw new ValidationError('expected_updated_at (number) is required for updates');
@@ -168,12 +149,43 @@ function expectedUpdatedAt(body) {
   return v;
 }
 
-module.exports = {
-  ValidationError,
-  normalizeEntry,
-  normalizePrompt,
-  normalizeTags,
-  ftsQuery,
-  expectedUpdatedAt,
-  optTimestamp,
-};
+// Markdown import (ported from server/routes/import.js). The filename is used
+// only for the fallback title — never as a path.
+const MAX_IMPORT_CONTENT = 2 * 1024 * 1024;
+
+export function parseMarkdownImport(filename, content) {
+  if (typeof content !== 'string' || typeof filename !== 'string') {
+    throw new ValidationError('filename and content are required');
+  }
+  if (content.length > MAX_IMPORT_CONTENT) {
+    throw new ValidationError('Markdown files are limited to 2 MB');
+  }
+  if (!/\.(md|markdown)$/i.test(filename)) {
+    throw new ValidationError('Only .md or .markdown files can be imported');
+  }
+  if (content.includes('\u0000')) {
+    throw new ValidationError('This file is not a markdown text file');
+  }
+  const replacements = (content.match(/�/g) || []).length;
+  if (content.length > 0 && replacements / content.length > 0.05) {
+    throw new ValidationError('This file is not valid UTF-8 text');
+  }
+
+  // Strip BOM, normalize CRLF/CR → LF (EDGE-CASES §7.5)
+  let text = content.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n');
+
+  // Title from the first H1; else filename sans extension (EDGE-CASES §7.1–7.2)
+  let title = null;
+  const h1 = text.match(/^#[ \t]+(.+)$/m);
+  if (h1) {
+    title = h1[1].trim().slice(0, 300);
+    text = (text.slice(0, h1.index) + text.slice(h1.index + h1[0].length)).replace(/^\n+/, '');
+  }
+  if (!title) {
+    title = filename.replace(/\.(md|markdown)$/i, '').trim().slice(0, 300) || 'Imported note';
+  }
+  if (text.trim().length === 0) {
+    throw new ValidationError('The file has no content to import');
+  }
+  return { title, body_md: text };
+}

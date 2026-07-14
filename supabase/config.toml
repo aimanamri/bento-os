@@ -1,0 +1,29 @@
+# Supabase CLI project config (local development via `supabase start`).
+# For a hosted project, mirror the [auth] settings in the Dashboard:
+# Authentication → Sign In / Up → Email → disable "Confirm email".
+
+project_id = "bentoos"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public"]
+max_rows = 1000
+
+[db]
+port = 54322
+major_version = 15
+
+[auth]
+enabled = true
+# Usernames map to synthesized <username>@bentoos.local addresses that can't
+# receive mail — signup must not require confirmation (SUPABASE-MIGRATION §2).
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+enable_confirmations = false
+double_confirm_changes = false
+
+[edge_runtime]
+enabled = true

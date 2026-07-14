@@ -5,6 +5,7 @@ import { api } from './api.js';
 import { emit, on } from './bus.js';
 import { toast, announce } from './ui.js';
 import { setMermaidTheme } from './render.js';
+import { initAuth } from './auth.js';
 import { initLogbook } from './logbook.js';
 import { initPrompts } from './prompts.js';
 import { initFaceCard } from './face-card.js';
@@ -179,10 +180,15 @@ async function healthCheck() {
 
 /* ── boot ───────────────────────────────────────────────────── */
 
-initTheme();
+initTheme(); // login portal is themed too
+
+// Auth gate: nothing loads until the user is signed in and has cleared any
+// forced password change. Every Supabase query below runs under their RLS.
+await initAuth();
+
 initTabs();
 initTrafficLights();
-activateTab('logbook');
+activateTab('logbook'); // normal users land on their LogBook workspace
 healthCheck();
 setInterval(healthCheck, 60000);
 
