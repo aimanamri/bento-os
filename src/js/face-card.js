@@ -34,18 +34,19 @@ export function initFaceCard() {
   const card = document.createElement('div');
   card.className =
     'face-card flex w-64 flex-col items-center gap-3 rounded-card border border-edge bg-panel px-6 py-5 shadow-card';
+  card.dataset.state = 'idle';
 
   const face = document.createElement('div');
-  face.className = 'face-card-emoji select-none text-2xl';
+  face.className = 'face-card-emoji select-none text-2xl font-semibold';
   face.textContent = FACES.idle;
   card.appendChild(face);
 
   const lines = document.createElement('div');
   lines.className = 'flex w-full flex-col items-center gap-2';
   const line1 = document.createElement('div');
-  line1.className = 'h-2 w-3/4 rounded-full bg-panel-2';
+  line1.className = 'h-2 w-3/4 rounded-full bg-edge';
   const line2 = document.createElement('div');
-  line2.className = 'h-2 w-1/2 rounded-full bg-panel-2';
+  line2.className = 'h-2 w-1/2 rounded-full bg-edge';
   lines.append(line1, line2);
   card.appendChild(lines);
 
@@ -62,6 +63,7 @@ export function initFaceCard() {
     if (state === currentState) return;
     currentState = state;
     face.textContent = FACES[state];
+    card.dataset.state = state;
   }
 
   const IDLE_TRANSFORM = 'translate3d(0px, 0px, 0) rotateX(0deg) rotateY(0deg)';
