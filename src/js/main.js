@@ -7,6 +7,7 @@ import { toast, announce } from './ui.js';
 import { setMermaidTheme } from './render.js';
 import { initLogbook } from './logbook.js';
 import { initPrompts } from './prompts.js';
+import { initFaceCard } from './face-card.js';
 
 const frame = document.getElementById('frame');
 const TOOLS = {
@@ -187,3 +188,4 @@ setInterval(healthCheck, 60000);
 
 initLogbook();
 initPrompts();
+initFaceCard();
