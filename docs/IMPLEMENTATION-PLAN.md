@@ -1,33 +1,76 @@
 # Bento OS — Implementation Plan
 
 > Companion documents: [SECURITY.md](SECURITY.md) · [EDGE-CASES.md](EDGE-CASES.md) · [UX-SPEC.md](UX-SPEC.md)
+> Backend specs: [IMPLEMENTATION-SUPABASE.md](IMPLEMENTATION-SUPABASE.md) · [DATABASE-SUPABASE.md](DATABASE-SUPABASE.md) (default) · [IMPLEMENTATION-LOCAL.md](IMPLEMENTATION-LOCAL.md) · [DATABASE-LOCAL.md](DATABASE-LOCAL.md) (testing)
 > Source of truth for requirements: [../PROJECT-BRIEF.md](../PROJECT-BRIEF.md)
 >
 > **Status: this document describes the app as it is currently built**, not
 > just a plan. Phases A–E (original Phase 1 scope) are complete and running;
-> § 8 records what was added afterward. If you're reproducing this project
-> from scratch (including via an AI coding assistant), build directly to
-> this spec — it reflects the real file layout, schema, and behavior, not
-> the aspirational sketch Phase 1 started from.
+> § 8 records what was added afterward, including the move to Supabase.
+
+> ### Backend model (read this first)
+>
+> Bento OS runs on one of two interchangeable backends behind the same
+> frontend. **The default — and the production backend for this project — is
+> Supabase (PostgreSQL + Auth), accessed from the browser via `supabase-js`**
+> under Row-Level Security. The **local single-file SQLite + Express backend
+> is the testing/offline variant** — convenient for a self-contained dev loop
+> with no cloud dependency, and the origin the app grew from.
+>
+> The frontend is backend-agnostic: everything goes through one `api()` layer
+> (§ 3) whose response shapes, error codes, and optimistic-concurrency
+> contract are identical on both. Because of that, most of this document
+> (frontend runtime § 4, render pipeline, prompt engine, UX) applies verbatim
+> to either backend. Where the backend matters — data model, auth, RBAC,
+> deployment — the **default (Supabase)** is stated first and the **testing
+> (SQLite)** details follow, each cross-linked to its dedicated spec:
+>
+> | Concern | Default — Supabase | Testing — local SQLite |
+> |---|---|---|
+> | Implementation | [IMPLEMENTATION-SUPABASE.md](IMPLEMENTATION-SUPABASE.md) | [IMPLEMENTATION-LOCAL.md](IMPLEMENTATION-LOCAL.md) |
+> | Data model | [DATABASE-SUPABASE.md](DATABASE-SUPABASE.md) | [DATABASE-LOCAL.md](DATABASE-LOCAL.md) |
+> | Isolation | RLS (`user_id = auth.uid()`) | route-layer `WHERE user_id = ?` |
+> | Sessions | JWT (supabase-js) | httpOnly-cookie server sessions |
 
 ---
 
 ## 1. Architecture Overview
 
+### Default — Supabase (production)
+
+```
+┌── Static host (Express or any CDN) ──┐        ┌──────── Supabase ────────┐
+│  Browser (SPA, dist/)                │        │  GoTrue  Auth (JWT)      │
+│    ├── HTML / compiled CSS / JS      │──JWT──▶ │  PostgREST  entries/…    │
+│    └── supabase-js  (vendored UMD)   │        │    under Row-Level Sec.  │
+│         └── api() adapter (§3)       │        │  Edge Functions          │
+│              ▲ same contract         │        │    (admin resets, GDPR)  │
+└──────────────┼───────────────────────┘        └──────────────────────────┘
+   Express serves dist/ + CSP headers only; it owns no data.
+```
+
+Per-user isolation is enforced by Postgres **Row-Level Security**
+(`user_id = auth.uid()`); auth, RBAC, and the singleton global admin live in
+Supabase. Full spec: [IMPLEMENTATION-SUPABASE.md](IMPLEMENTATION-SUPABASE.md)
+and [DATABASE-SUPABASE.md](DATABASE-SUPABASE.md).
+
+### Testing — local SQLite + Express (offline dev variant)
+
 ```
 ┌─────────────────────────── Laptop host ───────────────────────────┐
-│                                                                    │
-│  Browser (any tailnet device)                                      │
-│     │  HTTPS via `tailscale serve`                                 │
-│     ▼                                                              │
-│  Express.js  (bound to 127.0.0.1:3000 ONLY)                        │
-│     ├── serves static frontend  (dist/: HTML, compiled CSS, JS)    │
-│     └── REST API  /api/*                                           │
-│           │                                                        │
+│  Browser (any tailnet device)  ──HTTPS via `tailscale serve`──▶    │
+│  Express.js  (127.0.0.1:3000 ONLY)                                 │
+│     ├── serves static frontend  (dist/)                            │
+│     └── REST API  /api/*  (auth, RBAC, per-user scoping in-route)  │
 │           ▼                                                        │
 │  better-sqlite3 → bento.db  (WAL mode, single file)                │
 └────────────────────────────────────────────────────────────────────┘
 ```
+
+A self-contained, no-cloud loop for development and testing. Isolation is a
+route-layer `WHERE user_id = ?` discipline; sessions are server-side in an
+httpOnly cookie. Full spec: [IMPLEMENTATION-LOCAL.md](IMPLEMENTATION-LOCAL.md)
+and [DATABASE-LOCAL.md](DATABASE-LOCAL.md).
 
 **Key decisions**
 
@@ -36,9 +79,10 @@
 | Frontend framework | None (Vanilla ES6+ modules) | Brief mandate; zero framework overhead; ES modules give clean file boundaries |
 | State management | Native `CustomEvent` bus on a shared `EventTarget`, used sparingly | Only for the handful of events that genuinely cross feature boundaries (see § 4); most state changes are direct function calls |
 | Styling | Tailwind CSS via CLI compiler (not CDN) | CDN build is blocked by CSP (`default-src 'self'`) and is dev-only per Tailwind docs; compiled build enforces the design-token system |
-| SQLite driver | `better-sqlite3` | Synchronous API is simplest + fastest for a single-user local app; first-class prepared statements |
+| **Default backend** | **Supabase (PostgreSQL + Auth)** | Managed multi-user data + auth with engine-enforced RLS; the browser talks to it directly via `supabase-js`, so no bespoke API server to run in production |
+| Testing backend | `better-sqlite3` + Express | Single-file, zero-dependency offline loop; synchronous API, first-class prepared statements |
 | Markdown parser | `markdown-it` | Pluggable (needed for the sup/sub inline rule), strict CommonMark, battle-tested |
-| Search | SQLite FTS5 virtual tables | Millisecond full-text search across titles/tags/summary/body/fields without an external engine |
+| Search | Postgres FTS (tsvector + GIN) by default; SQLite FTS5 in the testing backend | Full-text search across titles/tags/summary/body/fields; both are queried through the same `api()` layer |
 
 ### Repository layout (actual, flat — not nested by feature)
 
@@ -87,7 +131,22 @@ nesting — one file per concern, loaded as native ES modules
 
 ---
 
-## 2. Data Model (SQLite, WAL mode)
+## 2. Data Model
+
+> **Default (Supabase/Postgres):** the canonical data model is in
+> [DATABASE-SUPABASE.md](DATABASE-SUPABASE.md) — UUID keys, per-user
+> ownership under RLS, a generated `tsvector` search column, and the
+> `profiles` / `user_roles` RBAC tables. The two content domains (`entries`,
+> `prompts`) carry the same columns described below; the differences are
+> engine-level (UUID vs INTEGER keys, `jsonb` vs JSON-in-TEXT, RLS vs
+> route-layer scoping).
+>
+> The section below documents the **testing backend's SQLite schema**
+> (see also [DATABASE-LOCAL.md](DATABASE-LOCAL.md) for the auth tables). Both
+> backends expose the identical row shapes to the frontend, so § 3–§ 4 read
+> the same either way.
+
+### Testing backend — SQLite (WAL mode)
 
 ### PRAGMAs applied at every connection open (`server/db.js`)
 
@@ -185,9 +244,24 @@ with the general-purpose `fields` model.
 
 ## 3. REST API Contract
 
+> **Default (Supabase):** there is no bespoke REST server in production — the
+> browser talks to Supabase directly through `supabase-js`, and `src/js/api.js`
+> is a thin **adapter** that dispatches the same `api(path, { method, body })`
+> calls to the SDK (PostgREST for data, GoTrue for auth). It preserves the
+> exact response shapes, error codes, 409 optimistic-concurrency payload, and
+> validation limits below, so `logbook.js` / `prompts.js` are unchanged. See
+> [IMPLEMENTATION-SUPABASE.md](IMPLEMENTATION-SUPABASE.md).
+>
+> The contract below is the literal HTTP surface of the **testing backend's**
+> Express API — and, equivalently, the shape the Supabase adapter emulates.
+
 All bodies are JSON. All timestamps are UNIX milliseconds. Every entry/prompt
 write response includes the row's new `updated_at` — the client sends it
 back on the next `PUT` as `expected_updated_at` for stale-write detection.
+Both backends additionally expose authentication + user management; those
+endpoints differ per backend (Supabase Auth + Edge Functions vs the local
+`/api/auth/*` and `/api/users/*` routes) and are documented in the two
+`IMPLEMENTATION-*` specs.
 
 | Method & path | Purpose | Notes |
 |---|---|---|
@@ -363,7 +437,22 @@ each companion doc). What follows in § 8 was built afterward, iteratively,
 in response to direct feature requests — each item there is a completed
 increment, not a plan.
 
-## 6. Deployment (Tailscale)
+## 6. Deployment
+
+### Default — Supabase (production)
+
+1. Provision the Supabase project, push `supabase/migrations/`, deploy the
+   Edge Functions, bootstrap the global admin, and (optionally) migrate any
+   local `bento.db` data across — the full runbook is
+   [IMPLEMENTATION-SUPABASE.md](IMPLEMENTATION-SUPABASE.md) § 2–§ 4.
+2. Serve the static `dist/` from Express (or any static host/CDN). When using
+   Express, set `BENTO_SUPABASE_URL` so the CSP `connect-src` allowlist names
+   the project origin exactly. The host owns no data; all reads/writes go
+   browser → Supabase under RLS.
+3. Config lives in `src/js/supabase-config.js` (project URL + anon key — safe
+   to ship; RLS is the guard). The service-role key is never in `src/`.
+
+### Testing — local SQLite over Tailscale (offline dev)
 
 1. Express listens on `127.0.0.1:3000` — **never** `0.0.0.0`. The app is
    unreachable even on the LAN except through Tailscale.
@@ -375,10 +464,13 @@ increment, not a plan.
 3. No funnel, no port-forward, no public exposure — access list is the tailnet.
 4. `bento.db*` (db + `-wal` + `-shm`) lives in `data/`, outside `dist/`;
    backup guidance in SECURITY.md § 5.
-5. Runtime libraries are **vendored, not CDN-loaded** (CSP forbids it):
-   `scripts/copy-vendor.js` copies `markdown-it`, `dompurify`,
-   `katex` + its `contrib/auto-render` addon, and `mermaid` from
-   `node_modules` into `dist/vendor/` at build time.
+
+### Both
+
+Runtime libraries are **vendored, not CDN-loaded** (CSP forbids it):
+`scripts/copy-vendor.js` copies `markdown-it`, `dompurify`, `katex` + its
+`contrib/auto-render` addon, `mermaid` (and, on the Supabase backend,
+`supabase-js`) from `node_modules` into `dist/vendor/` at build time.
 
 ## 7. Skill Map for the Build
 
@@ -477,3 +569,25 @@ Workflow going forward: every feature/fix gets its own branch off `dev`,
 merged into `dev` first (`--no-ff`, so the merge is a visible event);
 promotion from `dev` to `main` is a separate, deliberate step. `main` holds
 only the Phase 1 initial commit as of this writing.
+
+### 8.8 Supabase became the default backend; multi-user auth + RBAC
+
+The app moved from single-user/no-auth to **multi-user with authentication,
+RBAC, and per-user isolation**, and **Supabase (PostgreSQL + Auth) is now the
+default/production backend** — the browser talks to it directly via
+`supabase-js` under Row-Level Security; Express is reduced to a static host.
+The frontend's `api()` layer became a backend adapter so `logbook.js` /
+`prompts.js` were untouched. The original **local SQLite + Express** stack was
+kept and extended into a full auth backend (server-side sessions, scrypt,
+route-layer scoping) that now serves as the **testing/offline variant**.
+
+Both backends implement the same RBAC model — one global admin
+(`admin`/`bentoos`, forced password change on first login), standard admins
+who reset normal-user passwords, and normal users scoped to their own data —
+and the same GDPR/PDPA hard-delete guarantee. The two are documented in the
+matched set: [IMPLEMENTATION-SUPABASE.md](IMPLEMENTATION-SUPABASE.md) /
+[DATABASE-SUPABASE.md](DATABASE-SUPABASE.md) (default) and
+[IMPLEMENTATION-LOCAL.md](IMPLEMENTATION-LOCAL.md) /
+[DATABASE-LOCAL.md](DATABASE-LOCAL.md) (testing). Branch layout: the Supabase
+variant lives on `main` (and `dev-supabase`); the local-auth variant on
+`dev-local-auth`.
