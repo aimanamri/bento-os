@@ -3,8 +3,9 @@
 const fs = require('fs');
 const path = require('path');
 const Database = require('better-sqlite3');
+const { hashPasswordSync } = require('./password');
 
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 const DATA_DIR = path.join(__dirname, '..', 'data');
 const DB_PATH = process.env.BENTO_DB || path.join(DATA_DIR, 'bento.db');
 const MIGRATIONS_DIR = path.join(__dirname, 'migrations');
@@ -47,12 +48,39 @@ function runMigrations() {
   }
 }
 
+// Bootstrap the singleton global admin (username: admin / password: bentoos,
+// forced to change on first login). Returns the global admin's id. Idempotent:
+// once any global admin exists, this is a no-op. Uses the sync hash because
+// db.js runs synchronously at module load — see server/password.js.
+function ensureGlobalAdmin() {
+  const existing = db.prepare("SELECT id FROM users WHERE role = 'global_admin'").get();
+  if (existing) return existing.id;
+  const now = Date.now();
+  const info = db
+    .prepare(
+      `INSERT INTO users (username, password_hash, role, requires_password_change, created_at, updated_at)
+       VALUES ('admin', ?, 'global_admin', 1, ?, ?)`
+    )
+    .run(hashPasswordSync('bentoos'), now, now);
+  console.log('[db] bootstrapped global admin — username: admin, password: bentoos (change required on first login)');
+  return info.lastInsertRowid;
+}
+
+// Migration 003 adds entries.user_id / prompts.user_id with a sentinel 0.
+// Assign any pre-existing (single-user era) rows to the global admin. The
+// user_id immutability triggers deliberately allow this one-time 0 -> id move.
+function backfillOwnerless(adminId) {
+  db.prepare('UPDATE entries SET user_id = ? WHERE user_id = 0').run(adminId);
+  db.prepare('UPDATE prompts SET user_id = ? WHERE user_id = 0').run(adminId);
+}
+
 // Welcome seeds double as a render self-test: they exercise markdown,
 // KaTeX, Mermaid, and all three alert blocks on first boot (UX-SPEC §7).
-function seed() {
+// Now scoped to the global admin — seeded only when that user has none.
+function seed(ownerId) {
   const now = Date.now();
 
-  const entryCount = db.prepare('SELECT COUNT(*) AS n FROM entries').get().n;
+  const entryCount = db.prepare('SELECT COUNT(*) AS n FROM entries WHERE user_id = ?').get(ownerId).n;
   if (entryCount === 0) {
     const welcomeBody = [
       '# Welcome to Bento OS 🍱',
@@ -100,9 +128,10 @@ function seed() {
     ].join('\n');
 
     db.prepare(
-      `INSERT INTO entries (title, body_md, summary, label, sublabel, tags, fields, urls, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO entries (user_id, title, body_md, summary, label, sublabel, tags, fields, urls, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
+      ownerId,
       'Welcome to Bento OS',
       welcomeBody,
       'A working tour of the LogBook: markdown, checkboxes, code, KaTeX math, Mermaid diagrams, and alert blocks.',
@@ -116,12 +145,13 @@ function seed() {
     );
   }
 
-  const promptCount = db.prepare('SELECT COUNT(*) AS n FROM prompts').get().n;
+  const promptCount = db.prepare('SELECT COUNT(*) AS n FROM prompts WHERE user_id = ?').get(ownerId).n;
   if (promptCount === 0) {
     db.prepare(
-      `INSERT INTO prompts (title, category, body, why_this_works, tags, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO prompts (user_id, title, category, body, why_this_works, tags, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
+      ownerId,
       'Explain a concept at my level',
       'LEARNING',
       'Explain {{Topic}} to someone with {{Experience Level}} experience. Start with a one-sentence summary, then a concrete example, then the three most common misconceptions. Keep it under 400 words.',
@@ -134,7 +164,9 @@ function seed() {
 }
 
 runMigrations();
-seed();
+const globalAdminId = ensureGlobalAdmin();
+backfillOwnerless(globalAdminId);
+seed(globalAdminId);
 
 function checkpointAndClose() {
   try {

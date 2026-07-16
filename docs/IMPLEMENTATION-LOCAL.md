@@ -53,8 +53,10 @@ core + `better-sqlite3`. `cookie` parsing is a ~20-line helper (or the tiny
 
 ```
 server/
-  auth.js            # NEW — hashing (scrypt), session mint/verify/sweep,
-                     #       cookie helpers, rate limiter, RBAC middleware
+  password.js        # NEW — scrypt hash/verify (pure; no db dependency, so
+                     #       db.js can hash the bootstrap admin without a cycle)
+  auth.js            # NEW — session mint/verify/sweep, cookie helpers,
+                     #       rate limiter, RBAC middleware
   db.js              # CHANGED — run migration 003; seed global admin (scrypt)
   validate.js        # CHANGED — username/password normalizers
   migrations/
@@ -76,9 +78,9 @@ scripts/
   reset-user-password.js  # NEW — break-glass CLI (global-admin recovery)
 ```
 
-## 3. Authentication primitives (`server/auth.js`)
+## 3. Authentication primitives (`server/password.js` + `server/auth.js`)
 
-### Password hashing (scrypt)
+### Password hashing (scrypt) — `server/password.js`
 
 ```
 hash(password):  salt = randomBytes(16); dk = scrypt(password, salt, 64, {N:16384,r:8,p:1})
@@ -161,7 +163,7 @@ on the Supabase side). All of `/api/entries`, `/api/prompts`, `/api/import`,
 | `POST /api/users/:id/reset-password` | admin | Target must be role `user`; resets to `bentoos`, sets the flag; rate-limited |
 | `POST /api/users/:id/promote` | global_admin | `user → admin` |
 | `POST /api/users/:id/demote` | global_admin | `admin → user` |
-| `DELETE /api/account` | auth | GDPR self-delete (hard, cascade); global admin rejected |
+| `DELETE /api/users/me` | auth | GDPR self-delete (hard, cascade); global admin rejected |
 
 ### Content (unchanged shape, now scoped)
 

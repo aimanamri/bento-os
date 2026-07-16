@@ -12,10 +12,13 @@ function rowOut(row) {
   return { ...row, tags: JSON.parse(row.tags) };
 }
 
+// Per-user isolation (DATABASE-LOCAL §4): every statement carries a user_id
+// predicate; a miss returns 404, never 403.
 router.get('/', (req, res) => {
+  const userId = req.user.id;
   const { q, tag } = req.query;
-  const conds = [];
-  const params = [];
+  const conds = ['p.user_id = ?'];
+  const params = [userId];
 
   if (typeof tag === 'string' && tag.trim()) {
     conds.push('EXISTS (SELECT 1 FROM json_each(p.tags) jt WHERE lower(jt.value) = lower(?))');
@@ -26,12 +29,12 @@ router.get('/', (req, res) => {
   const match = typeof q === 'string' ? ftsQuery(q) : null;
   if (match) {
     sql = `SELECT p.* FROM prompts_fts f JOIN prompts p ON p.id = f.rowid
-           WHERE prompts_fts MATCH ?${conds.length ? ' AND ' + conds.join(' AND ') : ''}
+           WHERE prompts_fts MATCH ? AND ${conds.join(' AND ')}
            ORDER BY rank`;
     params.unshift(match);
   } else {
     sql = `SELECT p.* FROM prompts p
-           ${conds.length ? 'WHERE ' + conds.join(' AND ') : ''}
+           WHERE ${conds.join(' AND ')}
            ORDER BY p.category ASC, p.title ASC`;
   }
 
@@ -39,7 +42,7 @@ router.get('/', (req, res) => {
 });
 
 router.get('/:id', (req, res) => {
-  const row = db.prepare('SELECT * FROM prompts WHERE id = ?').get(req.params.id);
+  const row = db.prepare('SELECT * FROM prompts WHERE id = ? AND user_id = ?').get(req.params.id, req.user.id);
   if (!row) return sendError(res, 404, 'NOT_FOUND', 'Prompt not found');
   res.json({ prompt: rowOut(row) });
 });
@@ -49,27 +52,28 @@ router.post('/', (req, res) => {
   const now = Date.now();
   const info = db
     .prepare(
-      `INSERT INTO prompts (title, category, body, why_this_works, tags, created_at, updated_at)
-       VALUES (@title, @category, @body, @why_this_works, @tags, @created_at, @updated_at)`
+      `INSERT INTO prompts (user_id, title, category, body, why_this_works, tags, created_at, updated_at)
+       VALUES (@user_id, @title, @category, @body, @why_this_works, @tags, @created_at, @updated_at)`
     )
-    .run({ ...data, created_at: now, updated_at: now });
+    .run({ ...data, user_id: req.user.id, created_at: now, updated_at: now });
   const row = db.prepare('SELECT * FROM prompts WHERE id = ?').get(info.lastInsertRowid);
   res.status(201).json({ prompt: rowOut(row) });
 });
 
 router.put('/:id', (req, res) => {
+  const userId = req.user.id;
   const expected = expectedUpdatedAt(req.body);
   const data = normalizePrompt(req.body);
   const now = Date.now();
 
   const result = db.transaction(() => {
-    const current = db.prepare('SELECT * FROM prompts WHERE id = ?').get(req.params.id);
+    const current = db.prepare('SELECT * FROM prompts WHERE id = ? AND user_id = ?').get(req.params.id, userId);
     if (!current) return { status: 404 };
     if (current.updated_at !== expected) return { status: 409, current };
     db.prepare(
       `UPDATE prompts SET title=@title, category=@category, body=@body,
-       why_this_works=@why_this_works, tags=@tags, updated_at=@updated_at WHERE id=@id`
-    ).run({ ...data, updated_at: now, id: current.id });
+       why_this_works=@why_this_works, tags=@tags, updated_at=@updated_at WHERE id=@id AND user_id=@user_id`
+    ).run({ ...data, updated_at: now, id: current.id, user_id: userId });
     return { status: 200, row: db.prepare('SELECT * FROM prompts WHERE id = ?').get(current.id) };
   })();
 
@@ -84,7 +88,7 @@ router.put('/:id', (req, res) => {
 });
 
 router.delete('/:id', (req, res) => {
-  const info = db.prepare('DELETE FROM prompts WHERE id = ?').run(req.params.id);
+  const info = db.prepare('DELETE FROM prompts WHERE id = ? AND user_id = ?').run(req.params.id, req.user.id);
   if (info.changes === 0) return sendError(res, 404, 'NOT_FOUND', 'Prompt not found');
   res.json({ ok: true });
 });

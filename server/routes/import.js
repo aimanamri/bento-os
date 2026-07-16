@@ -54,10 +54,10 @@ router.post('/', (req, res) => {
   const now = Date.now();
   const info = db
     .prepare(
-      `INSERT INTO entries (title, body_md, summary, label, tags, urls, created_at, updated_at)
-       VALUES (?, ?, '', 'Uncategorized', '[]', '[]', ?, ?)`
+      `INSERT INTO entries (user_id, title, body_md, summary, label, tags, urls, created_at, updated_at)
+       VALUES (?, ?, ?, '', 'Uncategorized', '[]', '[]', ?, ?)`
     )
-    .run(title, text, now, now);
+    .run(req.user.id, title, text, now, now);
 
   const row = db.prepare('SELECT * FROM entries WHERE id = ?').get(info.lastInsertRowid);
   res.status(201).json({

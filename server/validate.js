@@ -168,6 +168,48 @@ function expectedUpdatedAt(body) {
   return v;
 }
 
+// ── auth (local variant) ──────────────────────────────────────
+// Usernames match the Supabase variant's rule (2–32 chars, starts
+// alphanumeric, then letters/digits/dot/dash/underscore) and are stored
+// lowercased so uniqueness is case-insensitive.
+const USERNAME_RE = /^[A-Za-z0-9][A-Za-z0-9_.-]{1,31}$/;
+const PASSWORD_MIN = 8;
+const PASSWORD_MAX = 200; // scrypt cost is fixed; cap absurd inputs
+const DEFAULT_PASSWORD = 'bentoos';
+
+function normalizeUsername(value) {
+  if (typeof value !== 'string' || !USERNAME_RE.test(value.trim())) {
+    throw new ValidationError('User ID must be 2–32 characters: letters, digits, dot, dash or underscore');
+  }
+  return value.trim().toLowerCase();
+}
+
+// Login only checks presence — never reveal the format rule to an attacker.
+function requirePassword(value) {
+  if (typeof value !== 'string' || value.length === 0) {
+    throw new ValidationError('Password is required');
+  }
+  return value;
+}
+
+// New passwords (signup / change): enforce policy server-side so a direct API
+// call can't set a weak or default password (the gap the Supabase review flagged).
+function newPassword(value) {
+  if (typeof value !== 'string') throw new ValidationError('Password is required');
+  // Default-reuse check first so it gives the accurate message even when the
+  // default happens to be shorter than the minimum (e.g. 'bentoos' is 7).
+  if (value === DEFAULT_PASSWORD) {
+    throw new ValidationError('The default password cannot be reused');
+  }
+  if (value.length < PASSWORD_MIN) {
+    throw new ValidationError(`Password needs at least ${PASSWORD_MIN} characters`);
+  }
+  if (value.length > PASSWORD_MAX) {
+    throw new ValidationError(`Password must be at most ${PASSWORD_MAX} characters`);
+  }
+  return value;
+}
+
 module.exports = {
   ValidationError,
   normalizeEntry,
@@ -176,4 +218,8 @@ module.exports = {
   ftsQuery,
   expectedUpdatedAt,
   optTimestamp,
+  normalizeUsername,
+  requirePassword,
+  newPassword,
+  DEFAULT_PASSWORD,
 };

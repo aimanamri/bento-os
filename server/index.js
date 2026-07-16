@@ -5,9 +5,15 @@ const express = require('express');
 const { db, SCHEMA_VERSION, checkpointAndClose } = require('./db');
 const { ValidationError } = require('./validate');
 const { sendError } = require('./errors');
+const {
+  attachUser, requireAuth, requirePasswordChanged, requireCsrfHeader,
+} = require('./auth');
 
 const app = express();
 app.disable('x-powered-by');
+// Trust the reverse proxy (tailscale serve) so req.ip and req.secure reflect
+// the real client, not the loopback hop.
+app.set('trust proxy', 'loopback');
 
 // SECURITY.md §2/§4 — headers on every response, CSP is the XSS backstop.
 // script-src 'self' with no inline allowance: even a sanitizer bypass
@@ -29,13 +35,24 @@ app.use((req, res, next) => {
 
 app.use(express.json({ limit: '2mb' }));
 
+// Every /api request resolves req.user from the session cookie (may be null)
+// and, on mutations, must carry the CSRF header.
+app.use('/api', attachUser, requireCsrfHeader);
+
 app.get('/api/health', (req, res) => {
   res.json({ ok: true, schema: SCHEMA_VERSION, now: Date.now() });
 });
 
-app.use('/api/entries', require('./routes/entries'));
-app.use('/api/prompts', require('./routes/prompts'));
-app.use('/api/import', require('./routes/import'));
+// Auth endpoints: login/signup are public; me/change-password guard themselves.
+app.use('/api/auth', require('./routes/auth'));
+
+// Content + admin routes require a signed-in user who has cleared any forced
+// password change. Per-user data scoping happens inside the routes.
+const gate = [requireAuth, requirePasswordChanged];
+app.use('/api/entries', gate, require('./routes/entries'));
+app.use('/api/prompts', gate, require('./routes/prompts'));
+app.use('/api/import', gate, require('./routes/import'));
+app.use('/api/users', gate, require('./routes/users'));
 
 app.use('/api', (req, res) => sendError(res, 404, 'NOT_FOUND', 'Unknown API route'));
 
