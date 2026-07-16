@@ -1,9 +1,11 @@
 # Bento OS 🍱
 
-Local-first personal knowledge base and prompt library. Vanilla JS + Tailwind
-frontend, Express + SQLite (WAL) backend, macOS bento-glass UI, Tailscale-only
-remote access. See [PROJECT-BRIEF.md](PROJECT-BRIEF.md) and [docs/](docs/) for
-the full specification.
+Multi-user personal knowledge base and prompt library. Vanilla JS + Tailwind
+frontend, Express + SQLite (WAL) backend with server-side auth/RBAC, macOS
+bento-glass UI, Tailscale-only remote access. See [PROJECT-BRIEF.md](PROJECT-BRIEF.md)
+and [docs/](docs/) for the full specification — auth design in
+[docs/IMPLEMENTATION-LOCAL.md](docs/IMPLEMENTATION-LOCAL.md) and
+[docs/DATABASE-LOCAL.md](docs/DATABASE-LOCAL.md).
 
 ## Run
 
@@ -12,10 +14,24 @@ npm install
 npm run dev        # builds CSS/static/vendor, then starts the server
 ```
 
-Open http://127.0.0.1:3000. The server binds to loopback **only** — that is
-deliberate (see [docs/SECURITY.md](docs/SECURITY.md) §4).
+Open http://127.0.0.1:3000 and sign in. On first boot a **global admin** is
+created — username `admin`, password `bentoos` — and you're forced to set a
+new password before the dashboard opens. The server binds to loopback **only**
+(see [docs/SECURITY.md](docs/SECURITY.md) §4).
 
 `npm start` skips the build and just starts the server.
+
+## Accounts & roles
+
+- **Global admin** (one only): can reset normal-user passwords and promote
+  users to admin. **Admins**: reset normal-user passwords. **Normal users**:
+  read/write only their own LogBook + prompts. Admins never see other users'
+  entries, passwords, or IPs.
+- Self-signup is on by default; set `BENTO_OPEN_SIGNUP=0` to make accounts
+  admin-created only.
+- Forgot the global-admin password? `node scripts/reset-user-password.js admin`
+  (needs shell access to the host — the recovery root of trust).
+- "Delete my account" is a GDPR/PDPA **hard delete** (account + all data).
 
 ## Remote access (Tailscale)
 
