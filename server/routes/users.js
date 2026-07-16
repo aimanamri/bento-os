@@ -44,7 +44,17 @@ router.delete('/me', async (req, res) => {
   if (req.user.role === 'global_admin') {
     return sendError(res, 403, 'FORBIDDEN', 'The global admin account cannot be deleted');
   }
-  db.prepare('DELETE FROM users WHERE id = ?').run(req.user.id);
+  // Hard delete (GDPR/PDPA). entries/prompts carry no DB-level FK (SQLite
+  // ALTER limitation — see migration 003), so cascade them explicitly here;
+  // sessions would cascade via their real FK, but we delete all four in one
+  // transaction so nothing of the user survives.
+  const uid = req.user.id;
+  db.transaction(() => {
+    db.prepare('DELETE FROM entries  WHERE user_id = ?').run(uid);
+    db.prepare('DELETE FROM prompts  WHERE user_id = ?').run(uid);
+    db.prepare('DELETE FROM sessions WHERE user_id = ?').run(uid);
+    db.prepare('DELETE FROM users    WHERE id = ?').run(uid);
+  })();
   clearSessionCookie(req, res);
   res.json({ ok: true });
 });

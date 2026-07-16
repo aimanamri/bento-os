@@ -46,17 +46,18 @@ PRAGMA busy_timeout = 5000;
 PRAGMA foreign_keys = ON;   -- now load-bearing: user_id / session FKs cascade
 ```
 
-`PRAGMA foreign_keys = ON` was future-proofing before; it is now **required**
-— the `ON DELETE CASCADE` chain from `users` is what makes GDPR account
-deletion a real hard delete (§7).
+`PRAGMA foreign_keys = ON` was future-proofing before; it is now load-bearing
+for the `sessions` FK cascade. (entries/prompts ownership has no DB FK — a
+SQLite `ALTER` limitation — so their GDPR cascade is done explicitly in the
+delete route; see §3 and §7.)
 
 ## 2. Entity-relationship diagram
 
 ```mermaid
 erDiagram
-    users ||--o{ sessions : "user_id, cascade"
-    users ||--o{ entries  : "user_id, cascade"
-    users ||--o{ prompts  : "user_id, cascade"
+    users ||--o{ sessions : "user_id, FK cascade"
+    users ||--o{ entries  : "user_id, app cascade"
+    users ||--o{ prompts  : "user_id, app cascade"
     entries ||--|| entries_fts : "content_rowid = id"
     prompts ||--|| prompts_fts : "content_rowid = id"
 
@@ -163,14 +164,18 @@ Identical to the single-user schema (see [IMPLEMENTATION-PLAN.md §2](IMPLEMENTA
 except each gains:
 
 ```sql
-ALTER TABLE entries ADD COLUMN user_id INTEGER NOT NULL DEFAULT 0
-  REFERENCES users(id) ON DELETE CASCADE;
-ALTER TABLE prompts ADD COLUMN user_id INTEGER NOT NULL DEFAULT 0
-  REFERENCES users(id) ON DELETE CASCADE;
+ALTER TABLE entries ADD COLUMN user_id INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE prompts ADD COLUMN user_id INTEGER NOT NULL DEFAULT 0;
 CREATE INDEX entries_user_idx ON entries(user_id, updated_at DESC);
 CREATE INDEX prompts_user_idx ON prompts(user_id, category, title);
 ```
 
+- These columns carry **no DB-level foreign key**: SQLite forbids
+  `ALTER TABLE ADD COLUMN ... REFERENCES` with a non-NULL default on a table
+  that already has rows. Ownership integrity is enforced by the app — routes
+  always stamp `user_id` from the session, and account deletion cascades
+  explicitly (§7). Only `sessions`, created fresh via `CREATE TABLE`, keeps a
+  real `ON DELETE CASCADE`.
 - Migration `003` backfills all pre-existing rows to the bootstrapped global
   admin, then the routes always set `user_id` on insert and filter on it for
   every read/update/delete.
@@ -261,11 +266,12 @@ SQL), because it needs to compute a scrypt hash in JS — see IMPLEMENTATION-LOC
 
 ## 7. Hard deletes (GDPR / PDPA)
 
-Account deletion is `DELETE FROM users WHERE id = ?`. Every dependent FK
-(`sessions`, `entries`, `prompts`) is `ON DELETE CASCADE`, so the row and all
-of that user's content vanish in one statement — no soft-delete flags, no
-retained PII. The global admin cannot self-delete (the singleton superuser
-must exist); the route rejects it. Entry/prompt deletion has always been a
+Account deletion (`DELETE /api/users/me`) removes the user and all their
+content in one transaction: `sessions` would cascade via its real FK, but the
+route deletes `entries`, `prompts`, `sessions`, and the `users` row explicitly
+(entries/prompts have no DB FK — §3), so nothing of the user survives — no
+soft-delete flags, no retained PII. The global admin cannot self-delete (the
+singleton superuser must exist); the route rejects it. Entry/prompt deletion has always been a
 hard `DELETE` and is unchanged. Run `VACUUM` (or `PRAGMA auto_vacuum`) if you
 need the freed pages returned to the OS promptly.
 

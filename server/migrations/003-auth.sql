@@ -48,10 +48,16 @@ CREATE TABLE rate_limits (
 -- the bootstrapped global admin immediately after this migration, before the
 -- server accepts requests. The immutability triggers below deliberately allow
 -- the one-time 0 -> real-id backfill, then lock ownership forever after.
-ALTER TABLE entries ADD COLUMN user_id INTEGER NOT NULL DEFAULT 0
-  REFERENCES users(id) ON DELETE CASCADE;
-ALTER TABLE prompts ADD COLUMN user_id INTEGER NOT NULL DEFAULT 0
-  REFERENCES users(id) ON DELETE CASCADE;
+--
+-- NOTE: SQLite forbids `ALTER TABLE ADD COLUMN ... REFERENCES` with a non-NULL
+-- default on a table that already has rows, so these columns carry no DB-level
+-- foreign key. Ownership integrity is instead enforced by the app: routes
+-- always stamp user_id from the session, and account deletion cascades to
+-- entries/prompts explicitly in the DELETE /api/users/me transaction
+-- (server/routes/users.js). `sessions` above keeps a real FK cascade because
+-- it's a CREATE TABLE, not an ALTER.
+ALTER TABLE entries ADD COLUMN user_id INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE prompts ADD COLUMN user_id INTEGER NOT NULL DEFAULT 0;
 
 CREATE INDEX entries_user_idx ON entries(user_id, updated_at DESC);
 CREATE INDEX prompts_user_idx ON prompts(user_id, category, title);
