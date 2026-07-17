@@ -6,6 +6,17 @@ SDK, macOS bento-glass UI. Multi-user with RBAC, Row-Level Security and
 GDPR/PDPA hard-delete semantics. See [PROJECT-BRIEF.md](PROJECT-BRIEF.md) and
 [docs/](docs/) for the full specification.
 
+> **Backend:** Supabase is the **default/production** backend — this branch
+> (`main`). A functionally equivalent **local SQLite + Express** backend, for
+> offline development and testing, lives on the **`dev-local-auth`** branch.
+> Both share the same frontend, RBAC model, and GDPR guarantees; the design
+> of each is documented side by side in
+> [docs/IMPLEMENTATION-SUPABASE.md](docs/IMPLEMENTATION-SUPABASE.md) /
+> [docs/DATABASE-SUPABASE.md](docs/DATABASE-SUPABASE.md) (default) and
+> [docs/IMPLEMENTATION-LOCAL.md](docs/IMPLEMENTATION-LOCAL.md) /
+> [docs/DATABASE-LOCAL.md](docs/DATABASE-LOCAL.md) (testing). See
+> [docs/IMPLEMENTATION-PLAN.md](docs/IMPLEMENTATION-PLAN.md) for the overview.
+
 ## Setup
 
 1. Follow [docs/SUPABASE-MIGRATION.md](docs/SUPABASE-MIGRATION.md): create a
