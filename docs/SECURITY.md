@@ -205,6 +205,19 @@ codebase: **zero inline `<script>`/`onclick=` anywhere** — all listeners
 attached in JS, and this CSP is tested against a real headless browser (not
 just asserted) in the app's Playwright suites.
 
+**Supabase variant — `connect-src` origin pinning.** The cloud build has to
+let the browser reach its Supabase project, so `server/index.js` appends the
+project's REST/Auth/Realtime origin to `connect-src` (e.g. `connect-src
+'self' https://<ref>.supabase.co wss://<ref>.supabase.co`). That origin is
+resolved most-specific-first: the `BENTO_SUPABASE_URL` environment variable,
+else `SUPABASE_URL` read from `supabase-config.js` (the same value the
+browser bundle uses, so a configured deploy is pinned to exactly one project
+with no extra env setup), else a `https://*.supabase.co` wildcard that exists
+only for an unconfigured fresh checkout. Deriving the origin from config
+instead of defaulting to the wildcard keeps a real deployment from silently
+permitting `fetch`/exfiltration to *any* Supabase project — the tightest
+`connect-src` that still lets the app work.
+
 ---
 
 ## 3. SQL, FTS5, and Dynamic-Fields Injection Prevention
@@ -219,6 +232,19 @@ just asserted) in the app's Playwright suites.
   `q.split(/\s+/).filter(Boolean).slice(0, 12).map(t => '"' + t.replace(/"/g,'""') + '"*').join(' ')` —
   so every token is a literal string, still bound as a parameter (also
   capped at 12 tokens, a minor DoS guard).
+- **Control characters are stripped before the `MATCH` string is built.** A
+  search term containing a NUL byte (`U+0000`) used to reach SQLite's FTS5
+  parser, which reads the `MATCH` query as a C string: the embedded NUL
+  terminated it mid-token and raised `SqliteError: unterminated string`,
+  surfacing as an HTTP 500 on `GET /api/{entries,prompts,snippets}?q=…`.
+  This was never injection — the value is bound as a parameter, so tables
+  and per-user scoping were never at risk — but any user could crash their
+  own search. `ftsQuery()` now maps every C0 control character
+  (`\u0000`–`\u001f`) to a space *before* tokenizing, so they behave as
+  delimiters and never reach the `MATCH` expression. The Supabase variant
+  applies the identical guard in `ftsClean()` (`src/js/api.js`) before
+  `.textSearch()`, since a NUL likewise cannot exist in a Postgres `text`
+  value and would abort the request. Found via penetration testing.
 - Dynamic bits of SQL that cannot be parameters (sort column, direction)
   come from a hardcoded allowlist, never from the request.
 - **`tags`/`urls`/`fields`/prompt `tags` are all written via
@@ -279,7 +305,7 @@ just asserted) in the app's Playwright suites.
 - [ ] Fixtures neutralized end-to-end in a real browser (not just unit-tested): `<img onerror>`, `<svg><foreignObject><script>`, `javascript:`/`data:` links, a `<sup onclick=…>` (must render as literal text, not a stripped element), a Mermaid node label containing `<img onerror=…>` (must render as either escaped text or nothing — never execute)
 - [ ] A bare `<sup>2</sup>`/`<sub>2</sub>` still renders as a real element (regression check for lesson #2's sibling risk — over-tightening the sup/sub rule)
 - [ ] A real Mermaid diagram with 2+ nodes renders with **visible label text**, not just shapes (regression check for lesson #2)
-- [ ] FTS smoke: search for `" OR 1=1 --`, `title:x`, `a AND` returns results or an empty set, never a 500
+- [ ] FTS smoke: search for `" OR 1=1 --`, `title:x`, `a AND`, and a query containing a NUL byte (`U+0000`) each returns results or an empty set, never a 500 (regression check for the FTS control-byte fix, § 3)
 - [ ] `POST /api/entries` with `fields: {"a": {"nested": 1}}` → 400; with `fields: ["not","an","object"]` → 400
 - [ ] Import: 3 MB file → 413; NUL-byte content renamed `.md` → 400; huge single-line md → renders or degrades, no hang
 - [ ] Server unreachable via LAN IP; reachable via `ts.net` HTTPS; Clipboard API works there
