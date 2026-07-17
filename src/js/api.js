@@ -1,8 +1,8 @@
 // Data layer: same api(path, { method, body }) contract the UI has always
 // used, now dispatching to the Supabase SDK instead of the local Express
 // API. Response shapes, error codes (VALIDATION / NOT_FOUND / CONFLICT /
-// NETWORK) and the 409 payload contract are preserved so logbook.js and
-// prompts.js work unchanged.
+// NETWORK) and the 409 payload contract are preserved so logbook.js,
+// prompts.js and snippets.js work unchanged.
 //
 // RLS note: every query here implicitly carries `user_id = auth.uid()` —
 // the database, not this file, is what enforces per-user isolation.
@@ -11,6 +11,7 @@ import { sb } from './supabase.js';
 import {
   normalizeEntry,
   normalizePrompt,
+  normalizeSnippet,
   optTimestamp,
   expectedUpdatedAt,
   parseMarkdownImport,
@@ -18,7 +19,7 @@ import {
 } from './normalize.js';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from './supabase-config.js';
 
-export const SCHEMA_VERSION = 3; // Supabase/Postgres era
+export const SCHEMA_VERSION = 4; // Supabase/Postgres era (4 adds snippets)
 
 export class ApiError extends Error {
   constructor(status, code, message, payload) {
@@ -220,6 +221,70 @@ async function deletePrompt(id) {
   return { ok: true };
 }
 
+/* ── snippets ───────────────────────────────────────────────── */
+
+async function getSnippet(id) {
+  const { data, error } = await run(sb.from('snippets').select('*').eq('id', id).maybeSingle());
+  if (error) throwDbError(error);
+  if (!data) throw new ApiError(404, 'NOT_FOUND', 'Snippet not found', null);
+  return { snippet: data };
+}
+
+async function listSnippets(params) {
+  const q = params.get('q');
+  const tag = params.get('tag');
+
+  let query = sb.from('snippets').select('*');
+  if (q && q.trim()) {
+    query = query.textSearch('search', q.trim(), { type: 'websearch', config: 'english' });
+  }
+  if (tag && tag.trim()) query = query.contains('tags', JSON.stringify([tag.trim()]));
+  query = query.order('category', { ascending: true }).order('title', { ascending: true });
+
+  const { data, error } = await run(query);
+  if (error) throwDbError(error);
+  return { snippets: data };
+}
+
+async function createSnippet(body) {
+  const data = normalizeSnippet(body);
+  const now = Date.now();
+  const user_id = await currentUserId();
+  const { data: row, error } = await run(
+    sb.from('snippets').insert({ ...data, user_id, created_at: now, updated_at: now }).select().single()
+  );
+  if (error) throwDbError(error);
+  return { snippet: row };
+}
+
+async function updateSnippet(id, body) {
+  const expected = expectedUpdatedAt(body);
+  const data = normalizeSnippet(body);
+  const now = Date.now();
+
+  const { data: rows, error } = await run(
+    sb.from('snippets').update({ ...data, updated_at: now }).eq('id', id).eq('updated_at', expected).select()
+  );
+  if (error) throwDbError(error);
+  if (rows.length > 0) return { snippet: rows[0] };
+
+  const { data: current } = await run(sb.from('snippets').select('*').eq('id', id).maybeSingle());
+  if (!current) {
+    throw new ApiError(404, 'NOT_FOUND', 'Snippet not found — it may have been deleted on another device', null);
+  }
+  throw new ApiError(409, 'CONFLICT', 'Snippet was saved on another device', {
+    error: { code: 'CONFLICT', message: 'Snippet was saved on another device' },
+    snippet: current,
+  });
+}
+
+async function deleteSnippet(id) {
+  const { data: rows, error } = await run(sb.from('snippets').delete().eq('id', id).select('id'));
+  if (error) throwDbError(error);
+  if (rows.length === 0) throw new ApiError(404, 'NOT_FOUND', 'Snippet not found', null);
+  return { ok: true };
+}
+
 /* ── health ─────────────────────────────────────────────────── */
 
 async function health() {
@@ -262,6 +327,12 @@ export async function api(path, { method = 'GET', body } = {}) {
       if (method === 'POST') return await createPrompt(body);
       if (method === 'PUT') return await updatePrompt(id, body);
       if (method === 'DELETE') return await deletePrompt(id);
+    }
+    if (resource === 'snippets') {
+      if (method === 'GET') return id ? await getSnippet(id) : await listSnippets(url.searchParams);
+      if (method === 'POST') return await createSnippet(body);
+      if (method === 'PUT') return await updateSnippet(id, body);
+      if (method === 'DELETE') return await deleteSnippet(id);
     }
     if (resource === 'import' && method === 'POST') return await importEntry(body);
   } catch (e) {

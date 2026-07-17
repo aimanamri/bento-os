@@ -1,7 +1,8 @@
-// Reactive face card — sits above the Prompt Library list. The card behaves
-// like a physical object anchored at its center: it tilts away from the
-// cursor and its expression escalates as the cursor closes in, based on
-// distance from the card's center (not just hover).
+// Reactive face card — sits above the Prompt Library / Code Snippets lists.
+// initFaceCard(hostId) can be called once per host for independent instances.
+// The card behaves like a physical object anchored at its center: it tilts
+// away from the cursor and its expression escalates as the cursor closes in,
+// based on distance from the card's center (not just hover).
 //
 // States, by distance from card center:
 //   > FAR_PX             idle     ( • ◡ • )  flat, no tilt
@@ -23,8 +24,8 @@ function clamp(v, lo, hi) {
   return Math.min(hi, Math.max(lo, v));
 }
 
-export function initFaceCard() {
-  const host = document.getElementById('pr-face-card');
+export function initFaceCard(hostId) {
+  const host = document.getElementById(hostId);
   if (!host) return;
 
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;

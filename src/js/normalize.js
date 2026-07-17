@@ -131,6 +131,16 @@ export function normalizePrompt(body) {
   return { title, body: promptBody, category, why_this_works, tags: normalizeTags(body.tags) };
 }
 
+// Code snippets mirror prompts: `category` doubles as the language/tool label
+// and `notes` carries the flag/gotcha prose.
+export function normalizeSnippet(body) {
+  const title = reqString(body.title, 'title', TITLE_MAX).trim();
+  const snippetBody = reqString(body.body, 'body');
+  const category = optString(body.category, 'category', 64).trim().toUpperCase() || 'GENERAL';
+  const notes = optString(body.notes, 'notes', 10000);
+  return { title, body: snippetBody, category, notes, tags: normalizeTags(body.tags) };
+}
+
 // Optional user-supplied timestamp (UNIX ms). Modified time is manually
 // editable; created time is not (the DB trigger guards it).
 export function optTimestamp(value, field) {

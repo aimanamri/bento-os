@@ -1,8 +1,8 @@
 // POST {} — GDPR/PDPA "right to be forgotten": the authenticated caller
 // permanently deletes their own account. auth.admin.deleteUser() removes the
 // auth.users row, and every ON DELETE CASCADE FK (profiles, user_roles,
-// entries, prompts) hard-deletes with it — no soft-delete anywhere, and no
-// PII is retained.
+// entries, prompts, snippets) hard-deletes with it — no soft-delete anywhere,
+// and no PII is retained.
 //
 // The global admin cannot self-delete: the singleton superuser must exist.
 
