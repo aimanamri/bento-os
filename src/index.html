@@ -40,6 +40,10 @@
           <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7 8-4 4 4 4"/><path d="m17 8 4 4-4 4"/><path d="m14 4-4 16"/></svg>
           Prompt Library
         </button>
+        <button id="tab-snippets" role="tab" aria-selected="false" aria-controls="view-snippets" class="btn btn-ghost text-sm data-[active=true]:bg-panel-2 data-[active=true]:border-edge" data-active="false">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m6 9 3 3-3 3"/><path d="M12 15h5"/></svg>
+          Code Snippets
+        </button>
       </nav>
 
       <div class="ml-auto flex items-center gap-1">
@@ -262,6 +266,23 @@
           <div id="pr-groups" class="mt-2"></div>
         </div>
       </section>
+
+      <!-- ══════════ Tab 3 · Code Snippets ══════════ -->
+      <section id="view-snippets" role="tabpanel" aria-labelledby="tab-snippets" class="hidden h-full min-h-0 overflow-y-auto" hidden>
+        <div class="mx-auto max-w-3xl px-4 py-6">
+          <div id="sn-face-card" class="mb-8"></div>
+          <div class="flex gap-2">
+            <label for="sn-search" class="sr-only">Search snippets</label>
+            <input id="sn-search" type="search" class="input flex-1 !py-2.5 text-base" placeholder="Search commands, languages, tags…" autocomplete="off">
+            <button id="sn-new" class="btn btn-primary whitespace-nowrap">
+              <svg class="icon !h-4 !w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+              New Snippet
+            </button>
+          </div>
+          <div id="sn-pills" class="mt-3 flex flex-wrap gap-1.5" role="group" aria-label="Filter by tag"></div>
+          <div id="sn-groups" class="mt-2"></div>
+        </div>
+      </section>
     </main>
 
     <!-- ══ Status dock (red traffic light) ══ -->
@@ -391,6 +412,48 @@
       <div class="flex justify-end gap-2 border-t border-edge px-5 py-3">
         <button type="button" class="btn" data-close-dialog>Cancel</button>
         <button type="submit" class="btn btn-primary">Save Prompt</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="dlg-snippet" class="modal-wide" aria-labelledby="dlg-snippet-title">
+    <form id="snippet-form" class="flex max-h-[85dvh] flex-col" novalidate>
+      <div class="flex items-center justify-between border-b border-edge px-5 py-3">
+        <h2 id="dlg-snippet-title" class="text-base font-semibold">New Snippet</h2>
+        <button type="button" class="icon-btn btn-ghost" data-close-dialog aria-label="Close snippet editor">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="flex flex-col gap-3 overflow-y-auto p-5 text-sm">
+        <div>
+          <label for="sf-title" class="mb-1 block text-xs font-medium text-ink-muted">Title <span class="text-danger">*</span></label>
+          <input id="sf-title" class="input" required maxlength="300">
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label for="sf-category" class="mb-1 block text-xs font-medium text-ink-muted">Language / Tool</label>
+            <input id="sf-category" class="input uppercase" placeholder="BASH" maxlength="64">
+          </div>
+          <div>
+            <label for="sf-tags" class="mb-1 block text-xs font-medium text-ink-muted">Tags (comma-separated)</label>
+            <input id="sf-tags" class="input" placeholder="ssh, remote">
+          </div>
+        </div>
+        <div>
+          <label for="sf-body" class="mb-1 block text-xs font-medium text-ink-muted">Command <span class="text-danger">*</span></label>
+          <textarea id="sf-body" class="input min-h-[140px] resize-y font-mono text-xs" required
+            placeholder="curl -v {{URL Link}}"></textarea>
+          <p class="mt-1 text-xs text-ink-muted">Double-brace variables like <code>{{File Name}}</code> become directly editable placeholders on the card.</p>
+        </div>
+        <div>
+          <label for="sf-notes" class="mb-1 block text-xs font-medium text-ink-muted">Notes</label>
+          <textarea id="sf-notes" class="input min-h-[80px] resize-y" placeholder="Flags, platform differences, gotchas…"></textarea>
+        </div>
+        <p id="sf-error" class="hidden text-xs text-danger" role="alert"></p>
+      </div>
+      <div class="flex justify-end gap-2 border-t border-edge px-5 py-3">
+        <button type="button" class="btn" data-close-dialog>Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Snippet</button>
       </div>
     </form>
   </dialog>

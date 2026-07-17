@@ -271,7 +271,16 @@
   border-radius: 3px; padding: 0 3px;
 }
 
-/* Card flip ("Why this works") */
+/* Language/tool accent on snippet cards — hue is set per category from JS
+   (--cat-hue), so any Language/Tool the user types gets a stable color. */
+.cat-dot {
+  display: inline-block; width: 0.5rem; height: 0.5rem; border-radius: 9999px;
+  margin-right: 0.45rem; flex: none;
+  background: hsl(var(--cat-hue, 210) 65% 55%);
+}
+.cat-accent { border-left-width: 3px; border-left-color: hsl(var(--cat-hue, 210) 65% 55%); }
+
+/* Card flip ("Why this works" / snippet notes) */
 .flip-scene { perspective: 1400px; }
 .flip-inner {
   position: relative; transition: transform 350ms ease; transform-style: preserve-3d;

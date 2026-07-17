@@ -8,12 +8,14 @@ import { setMermaidTheme } from './render.js';
 import { initAuth } from './auth.js';
 import { initLogbook } from './logbook.js';
 import { initPrompts } from './prompts.js';
+import { initSnippets } from './snippets.js';
 import { initFaceCard } from './face-card.js';
 
 const frame = document.getElementById('frame');
 const TOOLS = {
   logbook: { tab: document.getElementById('tab-logbook'), view: document.getElementById('view-logbook'), name: 'Docs LogBook' },
   prompts: { tab: document.getElementById('tab-prompts'), view: document.getElementById('view-prompts'), name: 'Prompt Library' },
+  snippets: { tab: document.getElementById('tab-snippets'), view: document.getElementById('view-snippets'), name: 'Code Snippets' },
 };
 
 /* ── theme (dark-first; UX-SPEC §1) ─────────────────────────── */
@@ -55,9 +57,10 @@ function activateTab(id) {
 }
 
 function initTabs() {
-  const tabs = [TOOLS.logbook.tab, TOOLS.prompts.tab];
+  const tabs = [TOOLS.logbook.tab, TOOLS.prompts.tab, TOOLS.snippets.tab];
   TOOLS.logbook.tab.addEventListener('click', () => activateTab('logbook'));
   TOOLS.prompts.tab.addEventListener('click', () => activateTab('prompts'));
+  TOOLS.snippets.tab.addEventListener('click', () => activateTab('snippets'));
   // Arrow-key navigation on the tablist (UX-SPEC §5)
   for (const tab of tabs) {
     tab.addEventListener('keydown', (e) => {
@@ -194,4 +197,6 @@ setInterval(healthCheck, 60000);
 
 initLogbook();
 initPrompts();
-initFaceCard();
+initSnippets();
+initFaceCard('pr-face-card');
+initFaceCard('sn-face-card');

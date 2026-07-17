@@ -1,51 +1,59 @@
-// Prompt Library — search, pill tag filters, category groups, card flip,
-// and the {{Variable}} fill-in engine (EDGE-CASES §5).
+// Code Snippets — search, pill tag filters, language/tool category groups,
+// card flip, and the shared {{Variable}} fill-in engine (EDGE-CASES §5).
 
 import { api } from './api.js';
 import { toast, confirmModal } from './ui.js';
 import { copyText } from './clipboard.js';
 import { parseVars, composeBody, buildEditableBody } from './vars.js';
 
-export { parseVars, composeBody };
-
 const el = {
-  search: document.getElementById('pr-search'),
-  pills: document.getElementById('pr-pills'),
-  groups: document.getElementById('pr-groups'),
-  newBtn: document.getElementById('pr-new'),
-  dlg: document.getElementById('dlg-prompt'),
-  form: document.getElementById('prompt-form'),
-  fTitle: document.getElementById('pf-title'),
-  fCategory: document.getElementById('pf-category'),
-  fTags: document.getElementById('pf-tags'),
-  fBody: document.getElementById('pf-body'),
-  fWhy: document.getElementById('pf-why'),
-  fError: document.getElementById('pf-error'),
-  dlgTitle: document.getElementById('dlg-prompt-title'),
+  search: document.getElementById('sn-search'),
+  pills: document.getElementById('sn-pills'),
+  groups: document.getElementById('sn-groups'),
+  newBtn: document.getElementById('sn-new'),
+  dlg: document.getElementById('dlg-snippet'),
+  form: document.getElementById('snippet-form'),
+  fTitle: document.getElementById('sf-title'),
+  fCategory: document.getElementById('sf-category'),
+  fTags: document.getElementById('sf-tags'),
+  fBody: document.getElementById('sf-body'),
+  fNotes: document.getElementById('sf-notes'),
+  fError: document.getElementById('sf-error'),
+  dlgTitle: document.getElementById('dlg-snippet-title'),
 };
 
 const state = {
-  prompts: [],
+  snippets: [],
   activeTags: new Set(),
-  editing: null, // prompt being edited in the dialog, or null for new
-  fill: new Map(), // promptId -> Map(varName -> currently-typed value)
+  editing: null, // snippet being edited in the dialog, or null for new
+  fill: new Map(), // snippetId -> Map(varName -> currently-typed value)
 };
+
+/* ── category color accent ─────────────────────────────────────
+   Deterministic hue from the category string so any Language/Tool the
+   user types (BASH, POWERSHELL, GIT, MAVEN, ...) gets a stable, distinct
+   accent with no hardcoded color table to maintain. */
+function categoryHue(name) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
+  return hash % 360;
+}
 
 /* ── data ───────────────────────────────────────────────────── */
 
 async function load() {
   const params = new URLSearchParams();
   if (el.search.value.trim()) params.set('q', el.search.value.trim());
-  const data = await api(`/api/prompts?${params}`);
-  state.prompts = data.prompts;
+  const data = await api(`/api/snippets?${params}`);
+  state.snippets = data.snippets;
   render();
 }
 
-function visiblePrompts() {
-  if (state.activeTags.size === 0) return state.prompts;
+function visibleSnippets() {
+  if (state.activeTags.size === 0) return state.snippets;
   // OR across active tags, AND-composed with the server-side search
-  return state.prompts.filter((p) =>
-    p.tags.some((t) => state.activeTags.has(t.toLowerCase()))
+  return state.snippets.filter((s) =>
+    s.tags.some((t) => state.activeTags.has(t.toLowerCase()))
   );
 }
 
@@ -58,7 +66,7 @@ function render() {
 
 function renderPills() {
   const tags = new Map(); // lower -> display
-  for (const p of state.prompts) for (const t of p.tags) tags.set(t.toLowerCase(), t);
+  for (const s of state.snippets) for (const t of s.tags) tags.set(t.toLowerCase(), t);
   // Drop active tags that no longer exist
   for (const t of [...state.activeTags]) if (!tags.has(t)) state.activeTags.delete(t);
 
@@ -90,17 +98,17 @@ function renderPills() {
 
 function renderGroups() {
   el.groups.textContent = '';
-  const visible = visiblePrompts();
+  const visible = visibleSnippets();
 
   if (visible.length === 0) {
     const empty = document.createElement('div');
     empty.className = 'flex flex-col items-center gap-3 py-16 text-center text-sm text-ink-muted';
     const msg = document.createElement('p');
-    if (state.prompts.length === 0 && !el.search.value.trim()) {
-      msg.textContent = 'No prompts yet. Save your first reusable template.';
+    if (state.snippets.length === 0 && !el.search.value.trim()) {
+      msg.textContent = 'No snippets yet. Save your first reusable command.';
       const cta = document.createElement('button');
       cta.className = 'btn btn-primary';
-      cta.textContent = 'New Prompt';
+      cta.textContent = 'New Snippet';
       cta.addEventListener('click', () => openDialog(null));
       empty.append(msg, cta);
     } else {
@@ -121,21 +129,27 @@ function renderGroups() {
     return;
   }
 
-  // Alphabetical all-caps category groups, generous vertical padding (§UX-4)
+  // Alphabetical all-caps category (Language/Tool) groups, generous vertical
+  // padding (§UX-4), each with a deterministic color accent by hue.
   const byCategory = new Map();
-  for (const p of visible) {
-    if (!byCategory.has(p.category)) byCategory.set(p.category, []);
-    byCategory.get(p.category).push(p);
+  for (const s of visible) {
+    if (!byCategory.has(s.category)) byCategory.set(s.category, []);
+    byCategory.get(s.category).push(s);
   }
 
-  for (const [category, prompts] of [...byCategory.entries()].sort()) {
+  for (const [category, snippets] of [...byCategory.entries()].sort()) {
+    const hue = categoryHue(category);
     const section = document.createElement('section');
     section.className = 'pt-8 first:pt-4';
     const h = document.createElement('h2');
-    h.className = 'mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-ink-muted';
-    h.textContent = category;
+    h.className = 'mb-3 flex items-center text-xs font-semibold uppercase tracking-[0.14em] text-ink-muted';
+    h.style.setProperty('--cat-hue', String(hue));
+    const dot = document.createElement('span');
+    dot.className = 'cat-dot';
+    dot.setAttribute('aria-hidden', 'true');
+    h.append(dot, document.createTextNode(category));
     section.appendChild(h);
-    for (const p of prompts) section.appendChild(renderCard(p));
+    for (const s of snippets) section.appendChild(renderCard(s, hue));
     el.groups.appendChild(section);
   }
 }
@@ -178,13 +192,14 @@ function iconActionBtn(label, paths, onClick, extra = '') {
 const EDIT_ICON = ['M12 20h9', 'M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z'];
 const DELETE_ICON = ['M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6'];
 
-function renderCard(p) {
-  const fillValues = state.fill.get(p.id) || new Map();
-  state.fill.set(p.id, fillValues);
-  const vars = parseVars(p.body);
+function renderCard(s, hue) {
+  const fillValues = state.fill.get(s.id) || new Map();
+  state.fill.set(s.id, fillValues);
+  const vars = parseVars(s.body);
 
   const scene = document.createElement('article');
   scene.className = 'flip-scene mb-3';
+  scene.style.setProperty('--cat-hue', String(hue));
   const inner = document.createElement('div');
   inner.className = 'flip-inner';
   scene.appendChild(inner);
@@ -192,19 +207,20 @@ function renderCard(p) {
 
   /* front */
   const front = document.createElement('div');
-  front.className = 'flip-front flex flex-col gap-3 rounded-card border border-edge bg-panel p-4 shadow-card';
+  front.className =
+    'cat-accent flip-front flex flex-col gap-3 rounded-card border border-edge bg-panel p-4 shadow-card';
 
   const head = document.createElement('div');
   head.className = 'flex items-start justify-between gap-2';
   const titleWrap = document.createElement('div');
   const title = document.createElement('h3');
   title.className = 'text-base font-bold';
-  title.textContent = p.title;
+  title.textContent = s.title;
   titleWrap.appendChild(title);
-  if (p.tags.length) {
+  if (s.tags.length) {
     const chips = document.createElement('div');
     chips.className = 'mt-1 flex flex-wrap gap-1';
-    for (const t of p.tags) {
+    for (const t of s.tags) {
       const chip = document.createElement('span');
       chip.className = 'tag-chip';
       chip.textContent = t;
@@ -217,8 +233,8 @@ function renderCard(p) {
   const editRow = document.createElement('div');
   editRow.className = 'flex flex-none gap-0.5';
   editRow.append(
-    iconActionBtn('Edit prompt', EDIT_ICON, () => openDialog(p), 'text-ink-muted'),
-    iconActionBtn('Delete prompt', DELETE_ICON, () => deletePrompt(p), 'text-ink-muted hover:text-danger')
+    iconActionBtn('Edit snippet', EDIT_ICON, () => openDialog(s), 'text-ink-muted'),
+    iconActionBtn('Delete snippet', DELETE_ICON, () => deleteSnippet(s), 'text-ink-muted hover:text-danger')
   );
   head.appendChild(editRow);
   front.appendChild(head);
@@ -227,9 +243,9 @@ function renderCard(p) {
   well.className =
     'max-h-56 overflow-y-auto whitespace-pre-wrap rounded-md border border-edge bg-panel-2 p-3 font-mono text-xs leading-relaxed';
   if (vars.length) {
-    buildEditableBody(well, p.body, fillValues);
+    buildEditableBody(well, s.body, fillValues);
   } else {
-    well.textContent = p.body;
+    well.textContent = s.body;
   }
   front.appendChild(well);
 
@@ -244,7 +260,7 @@ function renderCard(p) {
   actions.className = 'flex flex-wrap items-center gap-1.5';
 
   const copyBtn = actionBtn('Copy', async () => {
-    const text = vars.length ? composeBody(p.body, fillValues) : p.body;
+    const text = vars.length ? composeBody(s.body, fillValues) : s.body;
     const ok = await copyText(text);
     if (ok) {
       copyBtn.textContent = '✓ Copied';
@@ -253,9 +269,9 @@ function renderCard(p) {
   }, 'btn-primary');
   actions.appendChild(copyBtn);
 
-  if (p.why_this_works && p.why_this_works.trim()) {
+  if (s.notes && s.notes.trim()) {
     actions.appendChild(
-      actionBtn('Why this works', () => {
+      actionBtn('Notes', () => {
         scene.dataset.flipped = 'true';
         back.querySelector('button')?.focus();
       }, 'btn-ghost')
@@ -263,18 +279,19 @@ function renderCard(p) {
   }
   front.appendChild(actions);
 
-  /* back — "Why this works" prose (§UX-4) */
+  /* back — notes prose (§UX-4) */
   const back = document.createElement('div');
-  back.className = 'flip-back flex flex-col gap-3 rounded-card border border-accent/40 bg-panel p-4 shadow-card';
+  back.className =
+    'cat-accent flip-back flex flex-col gap-3 rounded-card border border-accent/40 bg-panel p-4 shadow-card';
   const backHead = document.createElement('div');
   backHead.className = 'flex items-center justify-between gap-2';
   const backTitle = document.createElement('h3');
   backTitle.className = 'text-sm font-semibold text-accent';
-  backTitle.textContent = 'Why this works';
+  backTitle.textContent = 'Notes';
   backHead.append(backTitle, actionBtn('Back', () => (scene.dataset.flipped = 'false'), 'btn-ghost'));
   const prose = document.createElement('p');
   prose.className = 'overflow-y-auto text-sm leading-relaxed text-ink-muted';
-  prose.textContent = p.why_this_works || '';
+  prose.textContent = s.notes || '';
   back.append(backHead, prose);
 
   inner.append(front, back);
@@ -283,14 +300,14 @@ function renderCard(p) {
 
 /* ── CRUD dialog ────────────────────────────────────────────── */
 
-function openDialog(prompt) {
-  state.editing = prompt;
-  el.dlgTitle.textContent = prompt ? 'Edit Prompt' : 'New Prompt';
-  el.fTitle.value = prompt?.title || '';
-  el.fCategory.value = prompt?.category || '';
-  el.fTags.value = (prompt?.tags || []).join(', ');
-  el.fBody.value = prompt?.body || '';
-  el.fWhy.value = prompt?.why_this_works || '';
+function openDialog(snippet) {
+  state.editing = snippet;
+  el.dlgTitle.textContent = snippet ? 'Edit Snippet' : 'New Snippet';
+  el.fTitle.value = snippet?.title || '';
+  el.fCategory.value = snippet?.category || '';
+  el.fTags.value = (snippet?.tags || []).join(', ');
+  el.fBody.value = snippet?.body || '';
+  el.fNotes.value = snippet?.notes || '';
   el.fError.classList.add('hidden');
   el.dlg.showModal();
   el.fTitle.focus();
@@ -303,39 +320,39 @@ async function submitDialog(e) {
     category: el.fCategory.value,
     tags: el.fTags.value,
     body: el.fBody.value,
-    why_this_works: el.fWhy.value,
+    notes: el.fNotes.value,
   };
   if (!body.title.trim() || !body.body.trim()) {
-    el.fError.textContent = 'A prompt needs both a title and prompt text.';
+    el.fError.textContent = 'A snippet needs both a title and command text.';
     el.fError.classList.remove('hidden');
     (!body.title.trim() ? el.fTitle : el.fBody).focus();
     return;
   }
   try {
     if (state.editing) {
-      await api(`/api/prompts/${state.editing.id}`, {
+      await api(`/api/snippets/${state.editing.id}`, {
         method: 'PUT',
         body: { ...body, expected_updated_at: state.editing.updated_at },
       });
     } else {
-      await api('/api/prompts', { method: 'POST', body });
+      await api('/api/snippets', { method: 'POST', body });
     }
     el.dlg.close();
-    toast(state.editing ? 'Prompt updated' : 'Prompt saved', 'ok');
+    toast(state.editing ? 'Snippet updated' : 'Snippet saved', 'ok');
     await load();
   } catch (err) {
     if (err.status === 409) {
       el.dlg.close();
       const choice = await confirmModal({
         title: 'Saved on another device',
-        body: 'This prompt changed on the server since you opened it.',
+        body: 'This snippet changed on the server since you opened it.',
         actions: [
           { label: 'Reload theirs', value: 'reload', style: 'primary' },
           { label: 'Overwrite theirs', value: 'overwrite', style: 'danger' },
         ],
       });
       if (choice === 'overwrite') {
-        state.editing = err.payload.prompt;
+        state.editing = err.payload.snippet;
         el.dlg.showModal();
         await submitDialog(e);
       } else {
@@ -348,10 +365,10 @@ async function submitDialog(e) {
   }
 }
 
-async function deletePrompt(p) {
+async function deleteSnippet(s) {
   const choice = await confirmModal({
-    title: 'Delete this prompt?',
-    body: `“${p.title}” will be permanently deleted.`,
+    title: 'Delete this snippet?',
+    body: `“${s.title}” will be permanently deleted.`,
     actions: [
       { label: 'Cancel', value: 'cancel', style: 'primary' },
       { label: 'Delete', value: 'delete', style: 'danger' },
@@ -359,9 +376,9 @@ async function deletePrompt(p) {
   });
   if (choice !== 'delete') return;
   try {
-    await api(`/api/prompts/${p.id}`, { method: 'DELETE' });
-    state.fill.delete(p.id);
-    toast('Prompt deleted', 'ok');
+    await api(`/api/snippets/${s.id}`, { method: 'DELETE' });
+    state.fill.delete(s.id);
+    toast('Snippet deleted', 'ok');
     await load();
   } catch (e) {
     toast(e.message, 'err');
@@ -370,7 +387,7 @@ async function deletePrompt(p) {
 
 /* ── init ───────────────────────────────────────────────────── */
 
-export async function initPrompts() {
+export async function initSnippets() {
   let searchTimer = null;
   el.search.addEventListener('input', () => {
     clearTimeout(searchTimer);
@@ -382,6 +399,6 @@ export async function initPrompts() {
   try {
     await load();
   } catch (e) {
-    toast("Couldn't load prompts", 'err');
+    toast("Couldn't load snippets", 'err');
   }
 }

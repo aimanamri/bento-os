@@ -5,7 +5,7 @@ const path = require('path');
 const Database = require('better-sqlite3');
 const { hashPasswordSync } = require('./password');
 
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 const DATA_DIR = path.join(__dirname, '..', 'data');
 const DB_PATH = process.env.BENTO_DB || path.join(DATA_DIR, 'bento.db');
 const MIGRATIONS_DIR = path.join(__dirname, 'migrations');

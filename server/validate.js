@@ -141,6 +141,23 @@ function normalizePrompt(body) {
   };
 }
 
+// Code snippets mirror prompts: `category` doubles as the language/tool label
+// and `notes` carries the flag/gotcha prose.
+function normalizeSnippet(body) {
+  const title = reqString(body.title, 'title', TITLE_MAX).trim();
+  const snippetBody = reqString(body.body, 'body');
+  const category =
+    optString(body.category, 'category', 64).trim().toUpperCase() || 'GENERAL';
+  const notes = optString(body.notes, 'notes', 10000);
+  return {
+    title,
+    body: snippetBody,
+    category,
+    notes,
+    tags: JSON.stringify(normalizeTags(body.tags)),
+  };
+}
+
 // FTS5 MATCH takes a query language, not a string — rewrite user input into
 // quoted prefix tokens so every token is a literal (SECURITY.md §3).
 function ftsQuery(q) {
@@ -214,6 +231,7 @@ module.exports = {
   ValidationError,
   normalizeEntry,
   normalizePrompt,
+  normalizeSnippet,
   normalizeTags,
   ftsQuery,
   expectedUpdatedAt,
