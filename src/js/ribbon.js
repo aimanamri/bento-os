@@ -92,9 +92,11 @@ const BUTTONS = [
   ['Checkbox item', 'M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11', () => insertBlock('- [ ] task', 6)],
   ['Insert 3×4 table', 'M3 5h18v14H3zM3 10h18M3 15h18M9 5v14M15 5v14', () => insertBlock(TABLE_3X4)],
   null,
-  ['Success alert block', 'M22 11.1V12a10 10 0 1 1-5.9-9.1M22 4 12 14l-3-3', () => insertBlock('> ✅ **Success:** what worked', 20)],
-  ['Info alert block', 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 16v-4M12 8h.01', () => insertBlock('> ℹ️ **Info:** good to know', 17)],
-  ['Warning alert block', 'm10.3 3.9-8.2 14A2 2 0 0 0 3.8 21h16.4a2 2 0 0 0 1.7-3l-8.2-14a2 2 0 0 0-3.4 0zM12 9v4M12 17h.01', () => insertBlock('> ⚠️ **Warning:** watch out for', 20)],
+  ['Note alert block', 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 16v-4M12 8h.01', () => insertBlock('> [!NOTE]\n> Useful information', '> [!NOTE]\n> '.length)],
+  ['Tip alert block', 'M9 18h6M10 22h4M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5.6.6 1.27 1.34 1.41 2.5', () => insertBlock('> [!TIP]\n> Helpful advice', '> [!TIP]\n> '.length)],
+  ['Important alert block', 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2zM12 8v4M12 15h.01', () => insertBlock('> [!IMPORTANT]\n> Key information', '> [!IMPORTANT]\n> '.length)],
+  ['Warning alert block', 'm10.3 3.9-8.2 14A2 2 0 0 0 3.8 21h16.4a2 2 0 0 0 1.7-3l-8.2-14a2 2 0 0 0-3.4 0zM12 9v4M12 17h.01', () => insertBlock('> [!WARNING]\n> Urgent information', '> [!WARNING]\n> '.length)],
+  ['Caution alert block', 'M12 16h.01M12 8v4M7.86 2h8.28L22 7.86v8.28L16.14 22H7.86L2 16.14V7.86z', () => insertBlock('> [!CAUTION]\n> Risks or negative outcomes', '> [!CAUTION]\n> '.length)],
 ];
 
 const BULB_ITEMS = [
@@ -258,13 +260,22 @@ A syntax error shows a local warning chip; the rest of the note still renders.
 
 ## Alert blocks
 
-Start a quote with the marker emoji:
+Start a quote with a \`[!TYPE]\` marker on its own line:
 
-> ✅ **Success:** it worked
+> [!NOTE]
+> Useful information that users should know, even when skimming content.
 
-> ℹ️ **Info:** context
+> [!TIP]
+> Helpful advice for doing things better or more easily.
 
-> ⚠️ **Warning:** gotcha
+> [!IMPORTANT]
+> Key information users need to know to achieve their goal.
+
+> [!WARNING]
+> Urgent info that needs immediate user attention to avoid problems.
+
+> [!CAUTION]
+> Advises about risks or negative outcomes of certain actions.
 
 ## Good to know
 
