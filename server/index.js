@@ -4,18 +4,36 @@
 // + Auth) via the vendored supabase-js SDK; the old SQLite-backed /api
 // routes are gone. This process just serves dist/ with hardened headers.
 
+const fs = require('fs');
 const path = require('path');
 const express = require('express');
 
 const app = express();
 app.disable('x-powered-by');
 
-// The Supabase project origin, e.g. https://xxxx.supabase.co — needed so the
-// CSP connect-src allowlist can be exact. Falls back to *.supabase.co so a
-// fresh checkout still works before configuration.
+// The configured project's SUPABASE_URL, read from the same file the browser
+// bundle uses, so the CSP connect-src is pinned to the real project even when
+// BENTO_SUPABASE_URL is not set in the environment. Returns null (→ wildcard)
+// only for a fresh checkout still carrying a placeholder.
+function supabaseOriginFromConfig() {
+  try {
+    const cfg = fs.readFileSync(path.join(__dirname, '..', 'src', 'js', 'supabase-config.js'), 'utf8');
+    const m = cfg.match(/SUPABASE_URL\s*=\s*['"]([^'"]+)['"]/);
+    if (!m) return null;
+    const { origin } = new URL(m[1]);
+    return origin.includes('*') ? null : origin;
+  } catch {
+    return null;
+  }
+}
+
+// CSP connect-src allowlist origin, most-specific source first:
+//   1. BENTO_SUPABASE_URL env var (deployment override)
+//   2. SUPABASE_URL from supabase-config.js (single source of truth)
+//   3. https://*.supabase.co wildcard (unconfigured fresh checkout)
 const SUPABASE_ORIGIN = process.env.BENTO_SUPABASE_URL
   ? new URL(process.env.BENTO_SUPABASE_URL).origin
-  : 'https://*.supabase.co';
+  : (supabaseOriginFromConfig() || 'https://*.supabase.co');
 const SUPABASE_WSS = SUPABASE_ORIGIN.replace(/^https:/, 'wss:');
 
 // SECURITY.md §2/§4 — headers on every response, CSP is the XSS backstop.
