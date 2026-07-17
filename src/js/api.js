@@ -35,6 +35,14 @@ const ENTRY_LIST_COLS = 'id, title, summary, label, sublabel, tags, fields, crea
 
 const TIMEOUT_MS = 10000;
 
+// Strip C0 control characters before full-text search. A NUL byte in
+// particular cannot exist in a Postgres text value, so it aborts the request;
+// the rest are meaningless in a search term. Mapping them to spaces lets them
+// act as token delimiters. Mirrors the local variant's ftsQuery hardening.
+function ftsClean(q) {
+  return String(q).replace(/[\u0000-\u001f]/g, ' ').trim();
+}
+
 // Supabase queries get the same 10 s budget the old fetch wrapper had
 // (EDGE-CASES §3.5). PostgREST builders are thenables, so race them.
 async function run(builder) {
@@ -78,9 +86,10 @@ async function listEntries(params) {
   const label = params.get('label');
 
   let query = sb.from('entries').select(ENTRY_LIST_COLS);
-  if (q && q.trim()) {
+  const search = q ? ftsClean(q) : '';
+  if (search) {
     // Native Postgres FTS over the generated tsvector column (GIN-indexed).
-    query = query.textSearch('search', q.trim(), { type: 'websearch', config: 'english' });
+    query = query.textSearch('search', search, { type: 'websearch', config: 'english' });
   }
   if (tag && tag.trim()) query = query.contains('tags', JSON.stringify([tag.trim()]));
   if (label && label.trim()) query = query.eq('label', label.trim());
@@ -171,8 +180,9 @@ async function listPrompts(params) {
   const tag = params.get('tag');
 
   let query = sb.from('prompts').select('*');
-  if (q && q.trim()) {
-    query = query.textSearch('search', q.trim(), { type: 'websearch', config: 'english' });
+  const search = q ? ftsClean(q) : '';
+  if (search) {
+    query = query.textSearch('search', search, { type: 'websearch', config: 'english' });
   }
   if (tag && tag.trim()) query = query.contains('tags', JSON.stringify([tag.trim()]));
   query = query.order('category', { ascending: true }).order('title', { ascending: true });
@@ -235,8 +245,9 @@ async function listSnippets(params) {
   const tag = params.get('tag');
 
   let query = sb.from('snippets').select('*');
-  if (q && q.trim()) {
-    query = query.textSearch('search', q.trim(), { type: 'websearch', config: 'english' });
+  const search = q ? ftsClean(q) : '';
+  if (search) {
+    query = query.textSearch('search', search, { type: 'websearch', config: 'english' });
   }
   if (tag && tag.trim()) query = query.contains('tags', JSON.stringify([tag.trim()]));
   query = query.order('category', { ascending: true }).order('title', { ascending: true });
