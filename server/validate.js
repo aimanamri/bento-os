@@ -161,7 +161,13 @@ function normalizeSnippet(body) {
 // FTS5 MATCH takes a query language, not a string — rewrite user input into
 // quoted prefix tokens so every token is a literal (SECURITY.md §3).
 function ftsQuery(q) {
-  const tokens = String(q).split(/\s+/).filter(Boolean).slice(0, 12);
+  // Strip C0 control characters first. A NUL byte in particular is read by
+  // FTS5's MATCH parser as a C-string terminator, aborting mid-token with a
+  // "SqliteError: unterminated string" that surfaced as a 500; the rest are
+  // meaningless in a search token. Mapping them to spaces lets the split below
+  // discard them cleanly (\s already covers tab/newline, not NUL/\x01–\x08).
+  const cleaned = String(q).replace(/[\u0000-\u001f]/g, ' ');
+  const tokens = cleaned.split(/\s+/).filter(Boolean).slice(0, 12);
   if (tokens.length === 0) return null;
   return tokens.map((t) => `"${t.replace(/"/g, '""')}"*`).join(' ');
 }
