@@ -116,17 +116,47 @@ function transformTaskLists(host) {
   }
 }
 
-// Blockquotes starting with ✅ / ℹ️ / ⚠️ become the pre-styled
-// Success / Info / Warning component blocks the ribbon injects.
+// Legacy markers (pre-GFM): blockquote starting with an emoji gets a
+// colored border only, no header — kept so notes written before the GFM
+// alert syntax landed still render the way they did when saved.
+const LEGACY_ALERT_KINDS = [
+  ['✅', 'alert-success'],
+  ['ℹ️', 'alert-info'],
+  ['⚠️', 'alert-warning'],
+];
+
+// GitHub-Flavored Markdown alerts: a blockquote whose first line is
+// `[!NOTE]` / `[!TIP]` / `[!IMPORTANT]` / `[!WARNING]` / `[!CAUTION]`
+// becomes a colored, icon-labeled callout — the ribbon inserts this syntax.
+const GFM_ALERT_KINDS = {
+  NOTE: { cls: 'alert-note', icon: 'ℹ️', label: 'Note' },
+  TIP: { cls: 'alert-tip', icon: '💡', label: 'Tip' },
+  IMPORTANT: { cls: 'alert-important', icon: '❗', label: 'Important' },
+  WARNING: { cls: 'alert-warning', icon: '⚠️', label: 'Warning' },
+  CAUTION: { cls: 'alert-caution', icon: '🛑', label: 'Caution' },
+};
+const GFM_MARKER_RE = /^\s*\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\n?/;
+
 function transformAlerts(host) {
-  const kinds = [
-    ['✅', 'alert-success'],
-    ['ℹ️', 'alert-info'],
-    ['⚠️', 'alert-warning'],
-  ];
   for (const bq of host.querySelectorAll('blockquote')) {
+    const firstBlock = bq.querySelector('p') || bq;
+    const m = GFM_MARKER_RE.exec(firstBlock.textContent || '');
+    if (m) {
+      const kind = GFM_ALERT_KINDS[m[1]];
+      bq.classList.add('alert', kind.cls);
+      // Strip the "[!TYPE]" marker text out of the first text node so it
+      // isn't shown twice alongside the header we render in its place.
+      const walker = document.createTreeWalker(firstBlock, NodeFilter.SHOW_TEXT);
+      const node = walker.nextNode();
+      if (node) node.nodeValue = node.nodeValue.replace(GFM_MARKER_RE, '');
+      const header = document.createElement('div');
+      header.className = 'alert-title';
+      header.textContent = `${kind.icon} ${kind.label}`;
+      bq.insertBefore(header, bq.firstChild);
+      continue;
+    }
     const text = bq.textContent.trimStart();
-    for (const [marker, cls] of kinds) {
+    for (const [marker, cls] of LEGACY_ALERT_KINDS) {
       if (text.startsWith(marker)) {
         bq.classList.add('alert', cls);
         break;

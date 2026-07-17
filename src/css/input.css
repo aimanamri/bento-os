@@ -17,6 +17,7 @@
     --c-info: 37 99 235;
     --c-warn: 158 106 22;
     --c-danger: 200 52 44;
+    --c-purple: 124 58 237;
     --glass-tint: 255 255 255;
   }
   .dark {
@@ -31,6 +32,7 @@
     --c-info: 88 166 255;
     --c-warn: 227 179 65;
     --c-danger: 240 98 93;
+    --c-purple: 167 139 250;
     --glass-tint: 23 27 33;
   }
 
@@ -234,6 +236,16 @@
 .md-preview blockquote.alert-success { border-color: rgb(var(--c-ok) / 0.5); background: rgb(var(--c-ok) / 0.10); border-left: 3px solid rgb(var(--c-ok)); }
 .md-preview blockquote.alert-info { border-color: rgb(var(--c-info) / 0.5); background: rgb(var(--c-info) / 0.10); border-left: 3px solid rgb(var(--c-info)); }
 .md-preview blockquote.alert-warning { border-color: rgb(var(--c-warn) / 0.5); background: rgb(var(--c-warn) / 0.10); border-left: 3px solid rgb(var(--c-warn)); }
+.md-preview blockquote.alert-note { border-color: rgb(var(--c-info) / 0.5); background: rgb(var(--c-info) / 0.10); border-left: 3px solid rgb(var(--c-info)); }
+.md-preview blockquote.alert-tip { border-color: rgb(var(--c-ok) / 0.5); background: rgb(var(--c-ok) / 0.10); border-left: 3px solid rgb(var(--c-ok)); }
+.md-preview blockquote.alert-important { border-color: rgb(var(--c-purple) / 0.5); background: rgb(var(--c-purple) / 0.10); border-left: 3px solid rgb(var(--c-purple)); }
+.md-preview blockquote.alert-caution { border-color: rgb(var(--c-danger) / 0.5); background: rgb(var(--c-danger) / 0.10); border-left: 3px solid rgb(var(--c-danger)); }
+.md-preview blockquote .alert-title { font-weight: 600; margin-bottom: 0.3em; }
+.md-preview blockquote.alert-note .alert-title { color: rgb(var(--c-info)); }
+.md-preview blockquote.alert-tip .alert-title { color: rgb(var(--c-ok)); }
+.md-preview blockquote.alert-important .alert-title { color: rgb(var(--c-purple)); }
+.md-preview blockquote.alert-warning .alert-title { color: rgb(var(--c-warn)); }
+.md-preview blockquote.alert-caution .alert-title { color: rgb(var(--c-danger)); }
 
 /* Localized render-failure chips (EDGE-CASES §4.1–4.2) */
 .render-error {
