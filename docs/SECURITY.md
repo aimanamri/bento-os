@@ -275,6 +275,20 @@ just asserted) in the app's Playwright suites.
   runs each migration inside a transaction. **Back up before running a new
   migration** — migration 002 was a destructive one (it dropped columns
   and their data by design; see IMPLEMENTATION-PLAN.md § 8.1).
+- **Deploying a migration — the step differs by backend, and getting it
+  wrong ships client code against a schema that isn't there:**
+  - *Local (SQLite) variant:* the `db.js` runner auto-applies any file in
+    `server/migrations/` not yet in `schema_migrations` on the next server
+    boot. Deploying the code deploys the schema — no manual step.
+  - *Supabase variant:* files in `supabase/migrations/` are **not** applied
+    automatically. After committing one, push it to the hosted project:
+    `supabase link --project-ref <ref>` (once per checkout), then
+    `supabase db push`, which applies only migrations missing from the
+    remote's history. Skip it and the client queries a table the database
+    doesn't have — PostgREST then returns *"Could not find the table
+    'public.<name>' in the schema cache"* (the `snippets` table hit exactly
+    this gap). Confirm with the read-only `supabase migration list`: the
+    Local and Remote columns must match before the feature is really live.
 - **localStorage drafts** are a crash buffer, not a store: never synced to
   the server without explicit user confirmation (the restore modal),
   cleared on successful save, and namespaced (`bento.draft.v1`) so a schema
