@@ -377,6 +377,49 @@ async function refreshSkills(body) {
   return await invokeFn('skills-proxy', { action: 'refresh', skill_ids: ids });
 }
 
+// Vet a prospective catalog entry: locates the skill folder on GitHub and
+// returns its frontmatter. Admin-only (enforced by the Edge Function).
+async function resolveSkill(body) {
+  return await invokeFn('skills-proxy', {
+    action: 'resolve',
+    owner: body?.owner,
+    repo: body?.repo,
+    skill: body?.skill ?? null,
+    skill_path: body?.skill_path ?? null,
+  });
+}
+
+// Catalog writes ride on RLS: only admins pass the skill_catalog policies,
+// so a non-admin caller gets a permission error from PostgREST (42501).
+async function createSkill(body) {
+  const now = Date.now();
+  const { data, error } = await run(
+    sb.from('skill_catalog').insert({
+      name: body?.name,
+      description: body?.description ?? '',
+      owner: body?.owner,
+      repo: body?.repo,
+      skill_path: body?.skill_path,
+      category: (body?.category || 'GENERAL').toUpperCase(),
+      install_command: body?.install_command,
+      tags: Array.isArray(body?.tags) ? body.tags : [],
+      created_at: now,
+      updated_at: now,
+    }).select().single()
+  );
+  if (error) {
+    if (error.code === '23505') throw new ApiError(409, 'DUPLICATE', 'That skill is already in the catalog', null);
+    throwDbError(error);
+  }
+  return { skill: data };
+}
+
+async function deleteSkillEntry(id) {
+  const { error } = await run(sb.from('skill_catalog').delete().eq('id', id));
+  if (error) throwDbError(error);
+  return { ok: true };
+}
+
 /* ── health ─────────────────────────────────────────────────── */
 
 async function health() {
@@ -428,12 +471,17 @@ export async function api(path, { method = 'GET', body } = {}) {
     }
     if (resource === 'skills') {
       if (id === 'refresh' && method === 'POST') return await refreshSkills(body);
+      if (id === 'resolve' && method === 'POST') return await resolveSkill(body);
       const sub = parts[3];
       if (sub === 'install') {
         if (method === 'POST') return await installSkill(id, body);
         if (method === 'DELETE') return await uninstallSkill(id);
       } else if (method === 'GET') {
         return id ? await getSkill(id, url.searchParams.get('force') === '1') : await listSkills();
+      } else if (method === 'POST' && !id) {
+        return await createSkill(body);
+      } else if (method === 'DELETE' && id) {
+        return await deleteSkillEntry(id);
       }
     }
     if (resource === 'import' && method === 'POST') return await importEntry(body);

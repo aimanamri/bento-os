@@ -1,8 +1,11 @@
 // POST { action: 'fetch', skill_id, force? } | { action: 'refresh', skill_ids[] }
+//    | { action: 'resolve', owner, repo, skill?, skill_path? }
 // Server-side-only gateway to GitHub for the Skills tab (client CSP forbids
 // external fetches; skills.sh's own API requires Vercel OIDC and is
 // unreachable from self-hosted Bento OS — see the implementation plan's
-// "Verified external facts"). Any authenticated role may call this.
+// "Verified external facts"). Any authenticated role may call fetch/refresh;
+// resolve is admin-only (it exists to vet new catalog entries, and catalog
+// writes are admin-gated by RLS).
 //
 // Caching (1h TTL) + a global GitHub budget protect the shared
 // unauthenticated quota (60 req/hr per IP): when the budget is exhausted we
@@ -10,6 +13,7 @@
 //
 //   fetch   → { skill_md, upstream_sha, fetched_at, cached }
 //   refresh → { shas: { [skill_id]: sha|null } }  (sha-only, for update alerts)
+//   resolve → { owner, repo, skill_path, name, description, upstream_sha }
 
 import { corsHeaders, errorResponse, getCaller, json, serviceClient, withinRateLimit } from '../_shared/mod.ts';
 import type { Caller } from '../_shared/mod.ts';
@@ -174,6 +178,108 @@ async function handleRefresh(caller: Caller, body: Record<string, unknown>): Pro
   return json(200, { shas });
 }
 
+// Frontmatter is the vercel-labs ecosystem contract: SKILL.md opens with a
+// YAML block carrying at least `name` and `description`.
+function parseFrontmatter(md: string): { name: string | null; description: string | null } {
+  const m = md.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+  if (!m) return { name: null, description: null };
+  const pick = (key: string): string | null => {
+    const line = m[1].match(new RegExp(`^${key}:\\s*(.+)$`, 'm'));
+    return line ? line[1].trim().replace(/^["']|["']$/g, '') : null;
+  };
+  return { name: pick('name'), description: pick('description') };
+}
+
+const SLUG_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/;
+const PATH_RE = /^[A-Za-z0-9._-]+(\/[A-Za-z0-9._-]+){0,9}$/;
+
+// Locate a skill folder in a repo and read its SKILL.md. Tries the two
+// conventional layouts first (skills/<name>, <name>) before paying for a
+// full recursive tree listing.
+async function handleResolve(caller: Caller, body: Record<string, unknown>): Promise<Response> {
+  if (caller.role !== 'admin' && caller.role !== 'global_admin') {
+    return errorResponse(403, 'FORBIDDEN', 'Only admins can add catalog entries');
+  }
+  const owner = String(body.owner ?? '');
+  const repo = String(body.repo ?? '');
+  const skill = body.skill == null ? null : String(body.skill);
+  const givenPath = body.skill_path == null ? null : String(body.skill_path);
+  if (!SLUG_RE.test(owner) || !SLUG_RE.test(repo)) {
+    return errorResponse(400, 'VALIDATION', 'owner and repo are required');
+  }
+  if (givenPath !== null && !PATH_RE.test(givenPath)) {
+    return errorResponse(400, 'VALIDATION', 'skill_path is not a valid repo path');
+  }
+  if (givenPath === null && (skill === null || !SLUG_RE.test(skill))) {
+    return errorResponse(400, 'VALIDATION', 'skill name (or skill_path) is required');
+  }
+
+  if (!(await withinRateLimit(`skills:${caller.id}`, MAX_PER_USER_HOUR, 3600))) {
+    return errorResponse(429, 'RATE_LIMITED', 'Too many skill lookups — try again later');
+  }
+  if (!(await withinRateLimit('skills:github', MAX_GITHUB_PER_HOUR, 3600))) {
+    return errorResponse(429, 'RATE_LIMITED', 'GitHub budget exhausted — try again in an hour');
+  }
+
+  const candidates = givenPath !== null ? [givenPath] : [`skills/${skill}`, skill!];
+  try {
+    for (const path of candidates) {
+      const res = await fetchWithTimeout(
+        `https://raw.githubusercontent.com/${owner}/${repo}/HEAD/${path}/SKILL.md`,
+        { headers: githubHeaders() },
+      );
+      if (res.status === 404) continue;
+      if (!res.ok) throw new Error(`raw fetch ${res.status}`);
+      const md = await res.text();
+      const fm = parseFrontmatter(md);
+      const upstream_sha = await fetchTreeSha(owner, repo, path).catch(() => null);
+      return json(200, {
+        owner,
+        repo,
+        skill_path: path,
+        name: fm.name ?? skill ?? path.split('/').pop(),
+        description: fm.description ?? '',
+        upstream_sha,
+      });
+    }
+
+    // Conventional layouts missed — search the whole tree for the folder.
+    const res = await fetchWithTimeout(
+      `https://api.github.com/repos/${owner}/${repo}/git/trees/HEAD?recursive=1`,
+      { headers: githubHeaders({ Accept: 'application/vnd.github+json' }) },
+    );
+    if (!res.ok) throw new Error(`tree fetch ${res.status}`);
+    const tree = await res.json();
+    const wanted = `/${skill}/SKILL.md`.toLowerCase();
+    const hit = (tree.tree ?? []).find(
+      (e: { type: string; path: string }) => e.type === 'blob' && e.path.toLowerCase().endsWith(wanted),
+    );
+    if (!hit) {
+      return errorResponse(404, 'NOT_FOUND', `No folder "${skill}" with a SKILL.md found in ${owner}/${repo}`);
+    }
+    const path = hit.path.slice(0, -'/SKILL.md'.length);
+    const mdRes = await fetchWithTimeout(
+      `https://raw.githubusercontent.com/${owner}/${repo}/HEAD/${hit.path}`,
+      { headers: githubHeaders() },
+    );
+    if (!mdRes.ok) throw new Error(`raw fetch ${mdRes.status}`);
+    const md = await mdRes.text();
+    const fm = parseFrontmatter(md);
+    const upstream_sha = await fetchTreeSha(owner, repo, path).catch(() => null);
+    return json(200, {
+      owner,
+      repo,
+      skill_path: path,
+      name: fm.name ?? skill,
+      description: fm.description ?? '',
+      upstream_sha,
+    });
+  } catch (e) {
+    console.error('[skills-proxy] resolve failed', (e as Error).message);
+    return errorResponse(502, 'UPSTREAM', 'Could not reach GitHub to verify the skill');
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return errorResponse(405, 'METHOD', 'POST only');
@@ -190,5 +296,6 @@ Deno.serve(async (req) => {
 
   if (body.action === 'fetch') return await handleFetch(caller, body);
   if (body.action === 'refresh') return await handleRefresh(caller, body);
+  if (body.action === 'resolve') return await handleResolve(caller, body);
   return errorResponse(400, 'VALIDATION', 'Unknown action');
 });
