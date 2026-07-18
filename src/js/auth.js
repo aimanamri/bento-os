@@ -274,11 +274,22 @@ function wireUserMenu() {
 
 /* ── admin panel (usernames + roles only — data blindness) ──── */
 
+// In-memory mirror of the user list so actions can patch a single row
+// (row.replaceWith / row.remove) instead of a full re-fetch + re-render —
+// the dialog stays open and the search filter survives every action.
+const adminState = { users: [], filter: '' };
+
 async function openAdminPanel() {
   const dlg = document.getElementById('dlg-admin');
+  document.getElementById('admin-search').value = '';
+  adminState.filter = '';
+  dlg.showModal();
+  await loadAdminUsers();
+}
+
+async function loadAdminUsers() {
   const list = document.getElementById('admin-user-list');
   list.textContent = 'Loading…';
-  dlg.showModal();
 
   const [{ data: profiles, error: pErr }, { data: roles }] = await Promise.all([
     sb.from('profiles').select('id, username').order('username'),
@@ -289,76 +300,113 @@ async function openAdminPanel() {
     return;
   }
   const roleById = new Map((roles || []).map((r) => [r.user_id, r]));
+  adminState.users = profiles.map((p) => ({
+    id: p.id,
+    username: p.username,
+    role: roleById.get(p.id)?.role || 'user',
+    requires_password_change: !!roleById.get(p.id)?.requires_password_change,
+  }));
+  renderAdminList();
+}
 
+function visibleAdminUsers() {
+  const term = adminState.filter.trim().toLowerCase();
+  if (!term) return adminState.users;
+  return adminState.users.filter((u) => u.username.toLowerCase().includes(term));
+}
+
+function renderAdminList() {
+  const list = document.getElementById('admin-user-list');
   list.textContent = '';
-  for (const p of profiles) {
-    const r = roleById.get(p.id);
-    const row = document.createElement('div');
-    row.className = 'flex items-center gap-2 rounded-md border border-edge bg-panel-2/50 px-3 py-2';
-
-    const name = document.createElement('span');
-    name.className = 'min-w-0 flex-1 truncate text-sm font-medium';
-    name.textContent = p.username;
-    row.appendChild(name);
-
-    const badge = document.createElement('span');
-    badge.className = 'rounded-full border border-edge px-2 py-0.5 text-[11px] text-ink-muted';
-    badge.textContent = r?.role === 'global_admin' ? 'global admin' : r?.role || 'user';
-    row.appendChild(badge);
-
-    if (r?.requires_password_change) {
-      const flag = document.createElement('span');
-      flag.className = 'text-[11px] text-warn-hue';
-      flag.title = 'Must change password on next login';
-      flag.textContent = 'pw reset pending';
-      row.appendChild(flag);
-    }
-
-    // Admins (and the global admin) may reset Normal User passwords only.
-    if (r?.role === 'user' && p.id !== state.user.id) {
-      const resetBtn = document.createElement('button');
-      resetBtn.className = 'btn text-xs !py-1';
-      resetBtn.textContent = 'Reset password';
-      resetBtn.addEventListener('click', () => resetPassword(p, resetBtn));
-      row.appendChild(resetBtn);
-    }
-
-    // Only the global admin can elevate a Normal User to admin.
-    if (state.role === 'global_admin' && r?.role === 'user') {
-      const promoteBtn = document.createElement('button');
-      promoteBtn.className = 'btn text-xs !py-1';
-      promoteBtn.textContent = 'Make admin';
-      promoteBtn.addEventListener('click', async () => {
-        promoteBtn.disabled = true;
-        const { error } = await sb.rpc('promote_to_admin', { target_user_id: p.id });
-        if (error) {
-          promoteBtn.disabled = false;
-          return toast('Promotion failed', 'err');
-        }
-        toast(`${p.username} is now an admin`);
-        openAdminPanel(); // re-render
-      });
-      row.appendChild(promoteBtn);
-    }
-    if (state.role === 'global_admin' && r?.role === 'admin') {
-      const demoteBtn = document.createElement('button');
-      demoteBtn.className = 'btn text-xs !py-1';
-      demoteBtn.textContent = 'Remove admin';
-      demoteBtn.addEventListener('click', async () => {
-        demoteBtn.disabled = true;
-        const { error } = await sb.rpc('demote_to_user', { target_user_id: p.id });
-        if (error) {
-          demoteBtn.disabled = false;
-          return toast('Demotion failed', 'err');
-        }
-        toast(`${p.username} is a normal user again`);
-        openAdminPanel();
-      });
-      row.appendChild(demoteBtn);
-    }
-
-    list.appendChild(row);
+  const visible = visibleAdminUsers();
+  if (visible.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'py-6 text-center text-sm text-ink-muted';
+    empty.textContent = adminState.users.length === 0 ? 'No users yet.' : `Nothing matches “${adminState.filter.trim()}”.`;
+    list.appendChild(empty);
+    return;
   }
+  for (const u of visible) list.appendChild(renderAdminRow(u));
+}
+
+function renderAdminRow(u) {
+  const row = document.createElement('div');
+  row.className = 'flex items-center gap-2 rounded-md border border-edge bg-panel-2/50 px-3 py-2';
+  row.dataset.userId = u.id;
+
+  const name = document.createElement('span');
+  name.className = 'min-w-0 flex-1 truncate text-sm font-medium';
+  name.textContent = u.username;
+  row.appendChild(name);
+
+  const badge = document.createElement('span');
+  badge.className = 'rounded-full border border-edge px-2 py-0.5 text-[11px] text-ink-muted';
+  badge.textContent = u.role === 'global_admin' ? 'global admin' : u.role;
+  row.appendChild(badge);
+
+  if (u.requires_password_change) {
+    const flag = document.createElement('span');
+    flag.className = 'text-[11px] text-warn-hue';
+    flag.title = 'Must change password on next login';
+    flag.textContent = 'pw reset pending';
+    row.appendChild(flag);
+  }
+
+  // Admins (and the global admin) may reset Normal User passwords only.
+  if (u.role === 'user' && u.id !== state.user.id) {
+    const resetBtn = document.createElement('button');
+    resetBtn.className = 'btn text-xs !py-1';
+    resetBtn.textContent = 'Reset password';
+    resetBtn.addEventListener('click', () => resetPassword(u, resetBtn));
+    row.appendChild(resetBtn);
+  }
+
+  // Only the global admin can elevate a Normal User to admin.
+  if (state.role === 'global_admin' && u.role === 'user') {
+    const promoteBtn = document.createElement('button');
+    promoteBtn.className = 'btn text-xs !py-1';
+    promoteBtn.textContent = 'Make admin';
+    promoteBtn.addEventListener('click', async () => {
+      promoteBtn.disabled = true;
+      const { error } = await sb.rpc('promote_to_admin', { target_user_id: u.id });
+      if (error) {
+        promoteBtn.disabled = false;
+        return toast('Promotion failed', 'err');
+      }
+      u.role = 'admin';
+      row.replaceWith(renderAdminRow(u));
+      toast(`${u.username} is now an admin`);
+    });
+    row.appendChild(promoteBtn);
+  }
+  if (state.role === 'global_admin' && u.role === 'admin') {
+    const demoteBtn = document.createElement('button');
+    demoteBtn.className = 'btn text-xs !py-1';
+    demoteBtn.textContent = 'Remove admin';
+    demoteBtn.addEventListener('click', async () => {
+      demoteBtn.disabled = true;
+      const { error } = await sb.rpc('demote_to_user', { target_user_id: u.id });
+      if (error) {
+        demoteBtn.disabled = false;
+        return toast('Demotion failed', 'err');
+      }
+      u.role = 'user';
+      row.replaceWith(renderAdminRow(u));
+      toast(`${u.username} is a normal user again`);
+    });
+    row.appendChild(demoteBtn);
+  }
+
+  // Delete: global_admin only, never self, never another global admin.
+  if (state.role === 'global_admin' && u.role !== 'global_admin' && u.id !== state.user.id) {
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'btn text-xs !py-1 text-danger';
+    deleteBtn.textContent = 'Delete';
+    deleteBtn.addEventListener('click', () => deleteUser(u, row));
+    row.appendChild(deleteBtn);
+  }
+
+  return row;
 }
 
 async function resetPassword(profile, btn) {
@@ -378,8 +426,77 @@ async function resetPassword(profile, btn) {
   });
   btn.disabled = false;
   if (error) return toast('Reset failed — you may be rate limited', 'err');
+  profile.requires_password_change = true;
+  btn.closest('[data-user-id]')?.replaceWith(renderAdminRow(profile));
   toast(`${profile.username}'s password was reset to the default`);
-  openAdminPanel();
+}
+
+async function deleteUser(profile, row) {
+  const choice = await confirmModal({
+    title: `Delete ${profile.username}?`,
+    body: 'This permanently erases their account and every LogBook entry, prompt and snippet they own. There is no undo.',
+    actions: [
+      { label: 'Cancel', value: 'cancel' },
+      { label: 'Delete everything', value: 'delete', style: 'danger' },
+    ],
+  });
+  if (choice !== 'delete') return;
+  const { error } = await sb.functions.invoke('admin-delete-user', {
+    body: { target_user_id: profile.id },
+  });
+  if (error) return toast('Deletion failed — you may be rate limited', 'err');
+  adminState.users = adminState.users.filter((u) => u.id !== profile.id);
+  row.remove();
+  toast(`${profile.username} was deleted`);
+}
+
+async function createUser(username) {
+  const { data, error } = await sb.functions.invoke('admin-create-user', {
+    body: { username },
+  });
+  if (error) {
+    let message = 'Account creation failed';
+    try {
+      const payload = await error.context?.json?.();
+      if (payload?.error?.code === 'USERNAME_TAKEN') message = 'That User ID is taken';
+      else if (payload?.error?.message) message = payload.error.message;
+    } catch (e) {
+      /* fall back to the generic message */
+    }
+    toast(message, 'err');
+    return;
+  }
+  const created = {
+    id: data.user.id,
+    username: data.user.username,
+    role: data.user.role,
+    requires_password_change: true,
+  };
+  adminState.users.push(created);
+  adminState.users.sort((a, b) => a.username.localeCompare(b.username));
+  renderAdminList();
+  toast(`${created.username} created — default password is "${DEFAULT_PASSWORD}"`);
+}
+
+function wireAdminPanel() {
+  document.getElementById('admin-search').addEventListener('input', (e) => {
+    adminState.filter = e.target.value;
+    renderAdminList();
+  });
+
+  document.getElementById('admin-create-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const input = document.getElementById('admin-create-username');
+    const username = input.value.trim().toLowerCase();
+    if (!validUsername(username)) {
+      return toast('User ID: 2–32 letters, digits, dot, dash or underscore', 'err');
+    }
+    const btn = e.target.querySelector('button[type="submit"]');
+    btn.disabled = true;
+    await createUser(username);
+    btn.disabled = false;
+    input.value = '';
+  });
 }
 
 /* ── boot ───────────────────────────────────────────────────── */
@@ -393,6 +510,7 @@ export async function initAuth() {
   wireLoginForm();
   wireChangePasswordForm();
   wireUserMenu();
+  wireAdminPanel();
 
   sb.auth.onAuthStateChange((event) => {
     if (event === 'SIGNED_OUT') location.reload();

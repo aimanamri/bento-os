@@ -197,8 +197,11 @@ enforced correctly by design in the **local** variant (IMPLEMENTATION-LOCAL
 3. **Tag filtering lost case-insensitivity** and **search lost BM25 ranking**
    in the SQL→PostgREST port (DATABASE-SUPABASE §5) — behavior regressions vs
    the SQLite original, not security issues.
-4. **New users get no seed/onboarding content** (the old first-boot welcome
-   entry + sample prompt aren't recreated per-user).
+4. ~~New users get no seed/onboarding content~~ — closed by
+   `20260718000001_new_user_seeds.sql`: every new account now gets a
+   Welcome LogBook entry + one example prompt via `seed_user_content()`,
+   called from `handle_new_user()` and exception-guarded so a seeding
+   failure can never block signup.
 5. **`api.js` timeout doesn't cancel the request**, so a slow write that
    times out can still commit and a retry can duplicate it.
 

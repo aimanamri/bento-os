@@ -19,7 +19,7 @@ import {
 } from './normalize.js';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from './supabase-config.js';
 
-export const SCHEMA_VERSION = 4; // Supabase/Postgres era (4 adds snippets)
+export const SCHEMA_VERSION = 5; // 5 adds skills + new-user content seeding
 
 export class ApiError extends Error {
   constructor(status, code, message, payload) {
@@ -296,6 +296,87 @@ async function deleteSnippet(id) {
   return { ok: true };
 }
 
+/* ── skills ─────────────────────────────────────────────────── */
+
+// Edge Function calls surface as a generic FunctionsHttpError; unwrap the
+// {error:{code,message}} body (same shape errorResponse() in _shared/mod.ts
+// sends) into the same ApiError every other resource in this module throws.
+async function invokeFn(name, body) {
+  const { data, error } = await sb.functions.invoke(name, { body });
+  if (error) {
+    const status = error.context?.status ?? 500;
+    let code = 'INTERNAL';
+    let message = error.message || 'Request failed';
+    try {
+      const payload = await error.context?.json?.();
+      if (payload?.error) {
+        code = payload.error.code || code;
+        message = payload.error.message || message;
+      }
+    } catch (e) {
+      /* response body already consumed or not JSON — fall back above */
+    }
+    throw new ApiError(status, code, message, null);
+  }
+  return data;
+}
+
+async function listSkills() {
+  const user_id = await currentUserId();
+  const [{ data: catalog, error: cErr }, { data: installs, error: iErr }, { data: cache, error: chErr }] = await Promise.all([
+    run(sb.from('skill_catalog').select('*').order('category').order('name')),
+    run(sb.from('user_skills').select('*').eq('user_id', user_id)),
+    run(sb.from('skill_cache').select('skill_id, upstream_sha')),
+  ]);
+  if (cErr) throwDbError(cErr);
+  if (iErr) throwDbError(iErr);
+  if (chErr) throwDbError(chErr);
+
+  const installById = new Map((installs || []).map((i) => [i.skill_id, i]));
+  const shaById = new Map((cache || []).map((c) => [c.skill_id, c.upstream_sha]));
+  const skills = catalog.map((s) => {
+    const install = installById.get(s.id);
+    const upstream_sha = shaById.get(s.id) ?? null;
+    return {
+      ...s,
+      installed: !!install,
+      installed_sha: install?.installed_sha ?? null,
+      upstream_sha,
+      update_available: !!(install && upstream_sha && install.installed_sha !== upstream_sha),
+    };
+  });
+  return { skills };
+}
+
+async function getSkill(id, force) {
+  const { data: skill, error } = await run(sb.from('skill_catalog').select('*').eq('id', id).maybeSingle());
+  if (error) throwDbError(error);
+  if (!skill) throw new ApiError(404, 'NOT_FOUND', 'Skill not found', null);
+  const proxied = await invokeFn('skills-proxy', { action: 'fetch', skill_id: id, force: !!force });
+  return { skill, ...proxied };
+}
+
+async function installSkill(id, body) {
+  const user_id = await currentUserId();
+  const { error } = await run(
+    sb.from('user_skills').upsert({ user_id, skill_id: id, installed_sha: body?.sha ?? null, installed_at: Date.now() })
+  );
+  if (error) throwDbError(error);
+  return { ok: true };
+}
+
+async function uninstallSkill(id) {
+  const user_id = await currentUserId();
+  const { error } = await run(sb.from('user_skills').delete().eq('user_id', user_id).eq('skill_id', id));
+  if (error) throwDbError(error);
+  return { ok: true };
+}
+
+async function refreshSkills(body) {
+  const ids = Array.isArray(body?.ids) ? body.ids : [];
+  return await invokeFn('skills-proxy', { action: 'refresh', skill_ids: ids });
+}
+
 /* ── health ─────────────────────────────────────────────────── */
 
 async function health() {
@@ -344,6 +425,16 @@ export async function api(path, { method = 'GET', body } = {}) {
       if (method === 'POST') return await createSnippet(body);
       if (method === 'PUT') return await updateSnippet(id, body);
       if (method === 'DELETE') return await deleteSnippet(id);
+    }
+    if (resource === 'skills') {
+      if (id === 'refresh' && method === 'POST') return await refreshSkills(body);
+      const sub = parts[3];
+      if (sub === 'install') {
+        if (method === 'POST') return await installSkill(id, body);
+        if (method === 'DELETE') return await uninstallSkill(id);
+      } else if (method === 'GET') {
+        return id ? await getSkill(id, url.searchParams.get('force') === '1') : await listSkills();
+      }
     }
     if (resource === 'import' && method === 'POST') return await importEntry(body);
   } catch (e) {
