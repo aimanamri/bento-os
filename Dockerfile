@@ -3,7 +3,7 @@
 # Bento OS — production image (multi-stage)
 #   deps    → production-only node_modules (express + better-sqlite3)
 #   build   → full deps, compiles CSS + copies static/vendor assets into dist/
-#   runtime → minimal, non-root, read-only-friendly; ships dist/ + server/ only
+#   runtime → minimal, non-root, read-only-friendly; ships dist/ + server/ + scripts/
 #
 # The client libs (mermaid, katex, markdown-it, dompurify) are build-time-only:
 # they are baked into dist/vendor and served statically, so the Node process
@@ -35,10 +35,13 @@ RUN apk add --no-cache tini \
  && addgroup -g 1001 -S nodejs \
  && adduser -S nodejs -u 1001
 
-# Only the two things the server actually loads at runtime, plus built assets.
+# Only the things the server actually loads at runtime, plus built assets.
+# scripts/ is included for the break-glass password reset (see DOCKER.md) —
+# it's a one-off CLI invoked via `docker compose exec`, never by the server.
 COPY --from=deps  --chown=nodejs:nodejs /app/node_modules ./node_modules
 COPY --from=build --chown=nodejs:nodejs /app/dist    ./dist
 COPY --from=build --chown=nodejs:nodejs /app/server  ./server
+COPY --from=build --chown=nodejs:nodejs /app/scripts ./scripts
 COPY --chown=nodejs:nodejs package*.json ./
 
 # Writable data dir owned by the app user — works even with no volume mounted

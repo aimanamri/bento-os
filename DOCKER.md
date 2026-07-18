@@ -29,6 +29,19 @@ your LAN. To reach it from other devices, front it with Tailscale:
 tailscale serve --bg https / http://127.0.0.1:8481
 ```
 
+### First login
+
+The first boot against an empty `./data` bootstraps a single global admin:
+
+```
+username: admin
+password: bentoos
+```
+
+A password change is forced on that first login. Self-signup for additional
+accounts is on by default (`role: user`) — set `BENTO_OPEN_SIGNUP=0` in
+`docker-compose.yml` to make new accounts admin-created only.
+
 ### Everyday commands
 
 ```bash
@@ -70,7 +83,9 @@ The dev service is behind a Compose **profile** so it never starts by accident.
 docker compose --profile dev up bento-dev      # build + run with live source mounted
 ```
 
-Open **http://127.0.0.1:3000**.
+Open **http://127.0.0.1:3000**. First login is the same bootstrapped admin as
+production (`admin` / `bentoos`, password change forced) unless `./data` already
+holds a database from a previous run.
 
 Your working tree is bind-mounted into the container. `node_modules` is **not** —
 the container keeps its own Linux-built copy (via an anonymous volume) so the native
@@ -98,8 +113,9 @@ A three-stage build keeps the runtime image small and free of build tooling:
 1. **deps** — installs *production* dependencies only (`express`, `better-sqlite3`).
 2. **build** — installs everything and runs `npm run build` (Tailwind + vendor copy),
    producing `dist/`.
-3. **runtime** — copies just `node_modules` (prod), `dist/`, and `server/` onto a clean
-   `node:20-alpine`, runs as a non-root user under `tini`.
+3. **runtime** — copies just `node_modules` (prod), `dist/`, `server/`, and `scripts/`
+   (for break-glass password recovery) onto a clean `node:20-alpine`, runs as a
+   non-root user under `tini`.
 
 The client libraries (`mermaid`, `katex`, `markdown-it`, `dompurify`) are
 **build-time only**: they're bundled into `dist/vendor` and served as static files, so
@@ -123,6 +139,7 @@ The compose file applies these by default:
 | `cpus: 1.0`, `pids_limit: 256`   | Caps CPU and process/thread fork bombs.               |
 | `logging` max 10m × 3            | Log rotation so logs can't fill the disk.             |
 | `HEALTHCHECK` on `/api/health`   | Docker restarts/report on an unhealthy container.     |
+| `BENTO_OPEN_SIGNUP=1`            | Self-signup on by default; set to `0` to lock new accounts to admin-created only. |
 
 ---
 
@@ -138,6 +155,22 @@ docker compose up -d
 ```
 
 Restore by replacing `./data` with an extracted backup before `docker compose up -d`.
+
+---
+
+## Password recovery
+
+Locked out (including the global admin)? Reset a user's password from the host —
+this only requires filesystem/shell access to the running container, matching the
+local variant's recovery model (see `docs/IMPLEMENTATION-LOCAL.md` §8):
+
+```bash
+docker compose exec bento node scripts/reset-user-password.js <username>
+```
+
+This resets the password to `bentoos`, forces a change on next login, and revokes
+that user's active sessions. The runtime image ships `scripts/reset-user-password.js`
+for exactly this purpose (see the `Dockerfile`'s runtime stage).
 
 ---
 
