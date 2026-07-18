@@ -258,11 +258,20 @@ Append-only, numbered, transactional, tracked in `schema_migrations`
 | 001 | `001-init.sql` | Initial `entries`, `prompts`, both `*_fts` + sync triggers |
 | 002 | `002-dynamic-fields.sql` | Adds `entries.fields`; drops `platform`/`is_valid`; rebuilds `entries_fts` |
 | 003 | `003-auth.sql` | Adds `users`, `sessions`, `rate_limits`; adds `user_id` to `entries`/`prompts` (+ indexes, immutability trigger); backfills existing rows to the bootstrapped global admin |
+| 004 | `004-snippets.sql` | Adds `snippets` (real FK, `ON DELETE CASCADE`) + `snippets_fts` + sync triggers |
+| 005 | `005-skills.sql` | Adds `skill_catalog` (shared, admin-curated), `user_skills` (owner-only install tracking), `skill_cache` (server-only GitHub content cache); seeds the 12-skill catalog. No FTS — the Skills tab filters client-side. |
 
 Migration `003` runs its data backfill inside the same transaction that adds
 the column, so a half-applied auth migration is impossible. The bootstrap of
 the global-admin **row** itself happens in `server/db.js`'s seed step (not in
 SQL), because it needs to compute a scrypt hash in JS — see IMPLEMENTATION-LOCAL §3.
+
+`server/db.js`'s `seedUser(ownerId)` (the Welcome LogBook entry + example
+prompt, per UX-SPEC §7) is not specific to the bootstrap admin — it's
+idempotent per-user (COUNT guards) and is now also invoked for every new
+account: self-signup (`POST /api/auth/signup`) and admin-created accounts
+(`POST /api/users`). Every new user gets the same first-run tour the global
+admin has always had.
 
 ## 7. Hard deletes (GDPR / PDPA)
 
@@ -274,6 +283,13 @@ soft-delete flags, no retained PII. The global admin cannot self-delete (the
 singleton superuser must exist); the route rejects it. Entry/prompt deletion has always been a
 hard `DELETE` and is unchanged. Run `VACUUM` (or `PRAGMA auto_vacuum`) if you
 need the freed pages returned to the OS promptly.
+
+`DELETE /api/users/:id` (global admin only) runs the same style of explicit
+cascade against a target other than the caller — `entries`, `prompts`,
+`snippets`, `user_skills`, `sessions`, then the `users` row — and is rejected
+for the caller's own id and for any `global_admin` target (the singleton
+superuser can only ever remove itself via a different admin, which doesn't
+exist by construction).
 
 ## 8. Modeling decisions worth knowing
 

@@ -5,7 +5,7 @@ const path = require('path');
 const Database = require('better-sqlite3');
 const { hashPasswordSync } = require('./password');
 
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 const DATA_DIR = path.join(__dirname, '..', 'data');
 const DB_PATH = process.env.BENTO_DB || path.join(DATA_DIR, 'bento.db');
 const MIGRATIONS_DIR = path.join(__dirname, 'migrations');
@@ -76,8 +76,11 @@ function backfillOwnerless(adminId) {
 
 // Welcome seeds double as a render self-test: they exercise markdown,
 // KaTeX, Mermaid, and all three alert blocks on first boot (UX-SPEC §7).
-// Now scoped to the global admin — seeded only when that user has none.
-function seed(ownerId) {
+// Idempotent per-user (COUNT guards below), so it's safe to call for ANY
+// user id at the moment of their creation — not just the bootstrap global
+// admin. Call sites: boot (global admin), POST /api/auth/signup, and the
+// admin-driven POST /api/users create-user route.
+function seedUser(ownerId) {
   const now = Date.now();
 
   const entryCount = db.prepare('SELECT COUNT(*) AS n FROM entries WHERE user_id = ?').get(ownerId).n;
@@ -166,7 +169,7 @@ function seed(ownerId) {
 runMigrations();
 const globalAdminId = ensureGlobalAdmin();
 backfillOwnerless(globalAdminId);
-seed(globalAdminId);
+seedUser(globalAdminId);
 
 function checkpointAndClose() {
   try {
@@ -177,4 +180,4 @@ function checkpointAndClose() {
   }
 }
 
-module.exports = { db, SCHEMA_VERSION, DB_PATH, checkpointAndClose };
+module.exports = { db, SCHEMA_VERSION, DB_PATH, checkpointAndClose, seedUser };

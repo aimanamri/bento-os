@@ -160,10 +160,22 @@ on the Supabase side). All of `/api/entries`, `/api/prompts`, `/api/import`,
 | Method & path | Guard | Purpose |
 |---|---|---|
 | `GET /api/users` | admin | List `{id, username, role, requires_password_change}` only — **no** password_hash, no session/IP data (data blindness) |
+| `POST /api/users` | admin | `{username}` → new normal user, default password + forced rotation, rate-limited 20/h; also seeds Welcome content (`seedUser`, §3/DATABASE-LOCAL §6); 409 `USERNAME_TAKEN` on duplicate |
 | `POST /api/users/:id/reset-password` | admin | Target must be role `user`; resets to `bentoos`, sets the flag; rate-limited |
 | `POST /api/users/:id/promote` | global_admin | `user → admin` |
 | `POST /api/users/:id/demote` | global_admin | `admin → user` |
+| `DELETE /api/users/:id` | global_admin | Hard delete + cascade (entries/prompts/snippets/user_skills/sessions); rejects self and any `global_admin` target |
 | `DELETE /api/users/me` | auth | GDPR self-delete (hard, cascade); global admin rejected |
+
+### Skills (`/api/skills`, `server/routes/skills.js`)
+
+| Method & path | Purpose | Notes |
+|---|---|---|
+| `GET /api/skills` | Merged catalog + install state | `skill_catalog` LEFT JOIN `user_skills` (own) LEFT JOIN `skill_cache`; adds `installed`, `installed_sha`, `upstream_sha`, `update_available` |
+| `GET /api/skills/:id?force=1` | Cache-or-fetch SKILL.md | 1h TTL; per-user 30/h + global `skills:github` 40/h rate budgets (`withinRateLimit`), serves stale cache on budget exhaustion or GitHub failure; 8s timeout |
+| `POST /api/skills/:id/install` | `{sha}` → mark installed | Upserts `user_skills` |
+| `DELETE /api/skills/:id/install` | Mark not installed | |
+| `POST /api/skills/refresh` | `{ids}` → sha-only refresh | Same rate budgets; upserts `skill_cache.upstream_sha` per id, `{shas:{id:sha|null}}` |
 
 ### Content (unchanged shape, now scoped)
 

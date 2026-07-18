@@ -8,7 +8,7 @@
 //   POST /api/auth/signup           {username, password}   (unless disabled)
 
 const express = require('express');
-const { db } = require('../db');
+const { db, seedUser } = require('../db');
 const { hashPassword, verifyPassword } = require('../password');
 const {
   createSession, destroySession, destroyUserSessions,
@@ -123,6 +123,13 @@ router.post('/signup', async (req, res, next) => {
       `INSERT INTO users (username, password_hash, role, requires_password_change, created_at, updated_at)
        VALUES (?, ?, 'user', 0, ?, ?)`
     ).run(username, hash, now, now);
+
+    // A seeding bug must never fail signup — warn and move on.
+    try {
+      seedUser(info.lastInsertRowid);
+    } catch (seedErr) {
+      console.warn('[auth] seedUser failed for new signup', info.lastInsertRowid, seedErr);
+    }
 
     const token = createSession(info.lastInsertRowid);
     setSessionCookie(req, res, token);

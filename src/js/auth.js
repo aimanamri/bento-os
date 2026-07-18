@@ -219,81 +219,135 @@ function wireUserMenu() {
 
 /* ── admin panel (usernames + roles only — data blindness) ──── */
 
+// In-memory mirror of the user list so actions can patch a single row
+// (row.replaceWith / row.remove) instead of a full re-fetch + re-render —
+// the dialog stays open and the search filter survives every action.
+const adminState = { users: [], filter: '' };
+const USERNAME_RE = /^[A-Za-z0-9][A-Za-z0-9_.-]{1,31}$/;
+
 async function openAdminPanel() {
   const dlg = document.getElementById('dlg-admin');
+  document.getElementById('admin-search').value = '';
+  adminState.filter = '';
+  dlg.showModal();
+  await loadAdminUsers();
+}
+
+async function loadAdminUsers() {
   const list = document.getElementById('admin-user-list');
   list.textContent = 'Loading…';
-  dlg.showModal();
-
-  let users;
   try {
-    ({ users } = await api('/api/users'));
+    ({ users: adminState.users } = await api('/api/users'));
   } catch {
     list.textContent = 'Could not load users.';
     return;
   }
+  renderAdminList();
+}
 
+function visibleAdminUsers() {
+  const term = adminState.filter.trim().toLowerCase();
+  if (!term) return adminState.users;
+  return adminState.users.filter((u) => u.username.toLowerCase().includes(term));
+}
+
+function renderAdminList() {
+  const list = document.getElementById('admin-user-list');
   list.textContent = '';
-  for (const u of users) {
-    const row = document.createElement('div');
-    row.className = 'flex items-center gap-2 rounded-md border border-edge bg-panel-2/50 px-3 py-2';
-
-    const name = document.createElement('span');
-    name.className = 'min-w-0 flex-1 truncate text-sm font-medium';
-    name.textContent = u.username;
-    row.appendChild(name);
-
-    const badge = document.createElement('span');
-    badge.className = 'rounded-full border border-edge px-2 py-0.5 text-[11px] text-ink-muted';
-    badge.textContent = u.role === 'global_admin' ? 'global admin' : u.role;
-    row.appendChild(badge);
-
-    if (u.requires_password_change) {
-      const flag = document.createElement('span');
-      flag.className = 'text-[11px] text-warn-hue';
-      flag.title = 'Must change password on next login';
-      flag.textContent = 'pw reset pending';
-      row.appendChild(flag);
-    }
-
-    // Admins (and the global admin) may reset Normal User passwords only.
-    if (u.role === 'user' && u.id !== state.user.id) {
-      row.appendChild(actionButton('Reset password', () => resetPassword(u)));
-    }
-    // Only the global admin promotes / demotes.
-    if (state.user.role === 'global_admin' && u.role === 'user') {
-      row.appendChild(actionButton('Make admin', () => roleAction(`/api/users/${u.id}/promote`, `${u.username} is now an admin`)));
-    }
-    if (state.user.role === 'global_admin' && u.role === 'admin') {
-      row.appendChild(actionButton('Remove admin', () => roleAction(`/api/users/${u.id}/demote`, `${u.username} is a normal user again`)));
-    }
-
-    list.appendChild(row);
+  const visible = visibleAdminUsers();
+  if (visible.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'py-6 text-center text-sm text-ink-muted';
+    empty.textContent = adminState.users.length === 0 ? 'No users yet.' : `Nothing matches “${adminState.filter.trim()}”.`;
+    list.appendChild(empty);
+    return;
   }
+  for (const u of visible) list.appendChild(renderAdminRow(u));
 }
 
-function actionButton(label, onClick) {
-  const b = document.createElement('button');
-  b.className = 'btn text-xs !py-1';
-  b.textContent = label;
-  b.addEventListener('click', async () => {
-    b.disabled = true;
-    try { await onClick(); } finally { b.disabled = false; }
-  });
-  return b;
-}
+function renderAdminRow(u) {
+  const row = document.createElement('div');
+  row.className = 'flex items-center gap-2 rounded-md border border-edge bg-panel-2/50 px-3 py-2';
+  row.dataset.userId = u.id;
 
-async function roleAction(path, successMsg) {
-  try {
-    await api(path, { method: 'POST' });
-    toast(successMsg);
-    openAdminPanel();
-  } catch (err) {
-    toast(err instanceof ApiError ? err.message : 'Action failed', 'err');
+  const name = document.createElement('span');
+  name.className = 'min-w-0 flex-1 truncate text-sm font-medium';
+  name.textContent = u.username;
+  row.appendChild(name);
+
+  const badge = document.createElement('span');
+  badge.className = 'rounded-full border border-edge px-2 py-0.5 text-[11px] text-ink-muted';
+  badge.textContent = u.role === 'global_admin' ? 'global admin' : u.role;
+  row.appendChild(badge);
+
+  if (u.requires_password_change) {
+    const flag = document.createElement('span');
+    flag.className = 'text-[11px] text-warn-hue';
+    flag.title = 'Must change password on next login';
+    flag.textContent = 'pw reset pending';
+    row.appendChild(flag);
   }
+
+  // Admins (and the global admin) may reset Normal User passwords only.
+  if (u.role === 'user' && u.id !== state.user.id) {
+    const resetBtn = document.createElement('button');
+    resetBtn.className = 'btn text-xs !py-1';
+    resetBtn.textContent = 'Reset password';
+    resetBtn.addEventListener('click', () => resetPassword(u, resetBtn));
+    row.appendChild(resetBtn);
+  }
+
+  // Only the global admin promotes / demotes.
+  if (state.user.role === 'global_admin' && u.role === 'user') {
+    const promoteBtn = document.createElement('button');
+    promoteBtn.className = 'btn text-xs !py-1';
+    promoteBtn.textContent = 'Make admin';
+    promoteBtn.addEventListener('click', async () => {
+      promoteBtn.disabled = true;
+      try {
+        await api(`/api/users/${u.id}/promote`, { method: 'POST' });
+      } catch (err) {
+        promoteBtn.disabled = false;
+        return toast(err instanceof ApiError ? err.message : 'Promotion failed', 'err');
+      }
+      u.role = 'admin';
+      row.replaceWith(renderAdminRow(u));
+      toast(`${u.username} is now an admin`);
+    });
+    row.appendChild(promoteBtn);
+  }
+  if (state.user.role === 'global_admin' && u.role === 'admin') {
+    const demoteBtn = document.createElement('button');
+    demoteBtn.className = 'btn text-xs !py-1';
+    demoteBtn.textContent = 'Remove admin';
+    demoteBtn.addEventListener('click', async () => {
+      demoteBtn.disabled = true;
+      try {
+        await api(`/api/users/${u.id}/demote`, { method: 'POST' });
+      } catch (err) {
+        demoteBtn.disabled = false;
+        return toast(err instanceof ApiError ? err.message : 'Demotion failed', 'err');
+      }
+      u.role = 'user';
+      row.replaceWith(renderAdminRow(u));
+      toast(`${u.username} is a normal user again`);
+    });
+    row.appendChild(demoteBtn);
+  }
+
+  // Delete: global_admin only, never self, never another global admin.
+  if (state.user.role === 'global_admin' && u.role !== 'global_admin' && u.id !== state.user.id) {
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'btn text-xs !py-1 text-danger';
+    deleteBtn.textContent = 'Delete';
+    deleteBtn.addEventListener('click', () => deleteUser(u, row));
+    row.appendChild(deleteBtn);
+  }
+
+  return row;
 }
 
-async function resetPassword(user) {
+async function resetPassword(user, btn) {
   const choice = await confirmModal({
     title: `Reset ${user.username}'s password?`,
     body: `Their password returns to the default ("${DEFAULT_PASSWORD}") and they must choose a new one at next login.`,
@@ -303,13 +357,78 @@ async function resetPassword(user) {
     ],
   });
   if (choice !== 'reset') return;
+  btn.disabled = true;
   try {
     await api(`/api/users/${user.id}/reset-password`, { method: 'POST' });
-    toast(`${user.username}'s password was reset to the default`);
-    openAdminPanel();
   } catch (err) {
-    toast(err instanceof ApiError ? err.message : 'Reset failed', 'err');
+    btn.disabled = false;
+    return toast(err instanceof ApiError ? err.message : 'Reset failed', 'err');
   }
+  user.requires_password_change = true;
+  btn.closest('[data-user-id]')?.replaceWith(renderAdminRow(user));
+  toast(`${user.username}'s password was reset to the default`);
+}
+
+async function deleteUser(user, row) {
+  const choice = await confirmModal({
+    title: `Delete ${user.username}?`,
+    body: 'This permanently erases their account and every LogBook entry, prompt and snippet they own. There is no undo.',
+    actions: [
+      { label: 'Cancel', value: 'cancel' },
+      { label: 'Delete everything', value: 'delete', style: 'danger' },
+    ],
+  });
+  if (choice !== 'delete') return;
+  try {
+    await api(`/api/users/${user.id}`, { method: 'DELETE' });
+  } catch (err) {
+    return toast(err instanceof ApiError ? err.message : 'Deletion failed', 'err');
+  }
+  adminState.users = adminState.users.filter((u) => u.id !== user.id);
+  row.remove();
+  toast(`${user.username} was deleted`);
+}
+
+async function createUser(username) {
+  try {
+    const { user } = await api('/api/users', { method: 'POST', body: { username } });
+    const created = {
+      id: user.id,
+      username: user.username,
+      role: user.role,
+      requires_password_change: true,
+    };
+    adminState.users.push(created);
+    adminState.users.sort((a, b) => a.username.localeCompare(b.username));
+    renderAdminList();
+    toast(`${created.username} created — default password is "${DEFAULT_PASSWORD}"`);
+  } catch (err) {
+    const message = err instanceof ApiError && err.code === 'USERNAME_TAKEN'
+      ? 'That User ID is taken'
+      : (err.message || 'Account creation failed');
+    toast(message, 'err');
+  }
+}
+
+function wireAdminPanel() {
+  document.getElementById('admin-search').addEventListener('input', (e) => {
+    adminState.filter = e.target.value;
+    renderAdminList();
+  });
+
+  document.getElementById('admin-create-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const input = document.getElementById('admin-create-username');
+    const username = input.value.trim().toLowerCase();
+    if (!USERNAME_RE.test(username)) {
+      return toast('User ID: 2–32 letters, digits, dot, dash or underscore', 'err');
+    }
+    const btn = e.target.querySelector('button[type="submit"]');
+    btn.disabled = true;
+    await createUser(username);
+    btn.disabled = false;
+    input.value = '';
+  });
 }
 
 /* ── boot ───────────────────────────────────────────────────── */
@@ -318,6 +437,7 @@ export async function initAuth() {
   wireLoginForm();
   wireChangePasswordForm();
   wireUserMenu();
+  wireAdminPanel();
 
   // Mid-session reactions: an expired cookie (401) or a fresh forced-rotation
   // flag (403) on any later call bounces the whole app to the right screen.
