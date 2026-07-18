@@ -4,15 +4,17 @@
 // the catalog is admin-curated shared content, not something users author.
 
 import { api } from './api.js';
-import { toast } from './ui.js';
+import { toast, confirmModal } from './ui.js';
 import { copyText } from './clipboard.js';
 import { renderInto } from './render.js';
+import { getAuthState } from './auth.js';
 
 const el = {
   search: document.getElementById('sk-search'),
   pills: document.getElementById('sk-pills'),
   groups: document.getElementById('sk-groups'),
   refreshBtn: document.getElementById('sk-refresh'),
+  addBtn: document.getElementById('sk-add'),
   guideBody: document.getElementById('sk-guide-body'),
   dlg: document.getElementById('dlg-skill'),
   dlgTitle: document.getElementById('dlg-skill-title'),
@@ -24,7 +26,24 @@ const el = {
   dlgCopy: document.getElementById('dlg-skill-copy'),
   dlgDownload: document.getElementById('dlg-skill-download'),
   dlgInstallBtn: document.getElementById('dlg-skill-install'),
+  dlgRemoveBtn: document.getElementById('dlg-skill-remove'),
+  addDlg: document.getElementById('dlg-skill-add'),
+  addForm: document.getElementById('ska-form'),
+  skaUrl: document.getElementById('ska-url'),
+  skaResolve: document.getElementById('ska-resolve'),
+  skaOwner: document.getElementById('ska-owner'),
+  skaRepo: document.getElementById('ska-repo'),
+  skaPath: document.getElementById('ska-path'),
+  skaName: document.getElementById('ska-name'),
+  skaCategory: document.getElementById('ska-category'),
+  skaDesc: document.getElementById('ska-desc'),
+  skaTags: document.getElementById('ska-tags'),
 };
+
+function isAdmin() {
+  const role = getAuthState().role;
+  return role === 'admin' || role === 'global_admin';
+}
 
 const state = {
   skills: [],
@@ -68,6 +87,7 @@ your account. If that folder changes upstream later, the card shows an
 async function load() {
   const data = await api('/api/skills');
   state.skills = data.skills;
+  el.addBtn.classList.toggle('hidden', !isAdmin());
   render();
 }
 
@@ -234,6 +254,7 @@ async function openDetail(s) {
   el.dlgRaw.textContent = '';
   setSkillView('rendered');
   updateDetailButtons(s);
+  el.dlgRemoveBtn.classList.toggle('hidden', !isAdmin());
   el.dlg.showModal();
 
   try {
@@ -295,6 +316,108 @@ async function copyInstallCommand() {
   if (ok) toast('Install command copied');
 }
 
+/* ── add / remove catalog entries (admin) ───────────────────── */
+
+// Accepts a skills.sh page URL, a GitHub tree URL, or a bare
+// owner/repo[/skill] shorthand and splits it into resolver inputs. A GitHub
+// tree link carries the exact folder path; the other forms only name the
+// skill, so the server has to locate the folder.
+function parseSkillRef(input) {
+  const text = input.trim().replace(/\/+$/, '');
+  if (!text) return null;
+
+  const gh = text.match(/^https?:\/\/(?:www\.)?github\.com\/([^/]+)\/([^/]+)\/tree\/[^/]+\/(.+)$/);
+  if (gh) {
+    const path = gh[3];
+    return { owner: gh[1], repo: gh[2], skill: path.split('/').pop(), skill_path: path };
+  }
+
+  const sk = text.match(/^https?:\/\/(?:www\.)?skills?\.sh\/([^/]+)\/([^/]+)(?:\/([^/]+))?$/);
+  if (sk) return { owner: sk[1], repo: sk[2], skill: sk[3] ?? null, skill_path: null };
+
+  const bare = text.match(/^([A-Za-z0-9._-]+)\/([A-Za-z0-9._-]+)(?:\/([A-Za-z0-9._-]+))?$/);
+  if (bare) return { owner: bare[1], repo: bare[2], skill: bare[3] ?? null, skill_path: null };
+
+  return null;
+}
+
+async function resolveFromUrl() {
+  const ref = parseSkillRef(el.skaUrl.value);
+  if (!ref) return toast('Enter a skills.sh / GitHub URL or owner/repo/skill', 'err');
+  if (!ref.skill && !ref.skill_path) return toast('Include the skill name: owner/repo/skill-name', 'err');
+
+  el.skaResolve.disabled = true;
+  el.skaResolve.textContent = 'Looking up…';
+  try {
+    const found = await api('/api/skills/resolve', { method: 'POST', body: ref });
+    el.skaOwner.value = found.owner;
+    el.skaRepo.value = found.repo;
+    el.skaPath.value = found.skill_path;
+    el.skaName.value = found.name || '';
+    el.skaDesc.value = found.description || '';
+    toast('Skill found — review the details and add it');
+  } catch (e) {
+    toast(e.message || 'Lookup failed', 'err');
+  } finally {
+    el.skaResolve.disabled = false;
+    el.skaResolve.textContent = 'Look up';
+  }
+}
+
+async function submitAddSkill(e) {
+  e.preventDefault();
+  const owner = el.skaOwner.value.trim();
+  const repo = el.skaRepo.value.trim();
+  const skill_path = el.skaPath.value.trim().replace(/^\/+|\/+$/g, '');
+  const name = el.skaName.value.trim();
+  if (!owner || !repo || !skill_path || !name) {
+    return toast('Owner, repository, folder path, and name are required', 'err');
+  }
+  const body = {
+    name,
+    description: el.skaDesc.value.trim(),
+    owner,
+    repo,
+    skill_path,
+    category: el.skaCategory.value.trim() || 'GENERAL',
+    install_command: `npx skills add ${owner}/${repo} --skill ${name}`,
+    tags: el.skaTags.value.split(',').map((t) => t.trim()).filter(Boolean),
+  };
+  try {
+    const { skill } = await api('/api/skills', { method: 'POST', body });
+    state.skills.push({ ...skill, installed: false, installed_sha: null, upstream_sha: null, update_available: false });
+    render();
+    el.addDlg.close();
+    el.addForm.reset();
+    toast(`${skill.name} added to the catalog`);
+  } catch (err) {
+    toast(err.message, 'err');
+  }
+}
+
+async function removeFromCatalog() {
+  const s = state.current;
+  if (!s) return;
+  const choice = await confirmModal({
+    title: 'Remove skill',
+    body: `Remove “${s.name}” from the catalog for everyone? Install records for it are deleted too.`,
+    actions: [
+      { label: 'Cancel', value: 'cancel' },
+      { label: 'Remove', value: 'remove', style: 'danger' },
+    ],
+  });
+  if (choice !== 'remove') return;
+  try {
+    await api(`/api/skills/${s.id}`, { method: 'DELETE' });
+    state.skills = state.skills.filter((x) => x.id !== s.id);
+    el.dlg.close();
+    render();
+    toast(`${s.name} removed from the catalog`);
+  } catch (e) {
+    toast(e.message, 'err');
+  }
+}
+
 async function checkForUpdates() {
   const ids = state.skills.filter((s) => s.installed).map((s) => s.id);
   if (ids.length === 0) return toast('No installed skills to check');
@@ -327,6 +450,14 @@ export async function initSkills() {
   el.dlgCopy.addEventListener('click', copyInstallCommand);
   el.dlgDownload.addEventListener('click', downloadSkillMd);
   el.dlgInstallBtn.addEventListener('click', toggleInstalled);
+  el.dlgRemoveBtn.addEventListener('click', removeFromCatalog);
+
+  el.addBtn.addEventListener('click', () => {
+    el.addForm.reset();
+    el.addDlg.showModal();
+  });
+  el.skaResolve.addEventListener('click', resolveFromUrl);
+  el.addForm.addEventListener('submit', submitAddSkill);
 
   try {
     await load();

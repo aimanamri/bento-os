@@ -13,10 +13,13 @@
 //   POST   /api/skills/:id/install {sha}  mark installed
 //   DELETE /api/skills/:id/install         mark not installed
 //   POST   /api/skills/refresh     {ids}  sha-only refresh (update alerts)
+//   POST   /api/skills/resolve     admin: locate a skill on GitHub, read frontmatter
+//   POST   /api/skills             admin: add a catalog entry
+//   DELETE /api/skills/:id         admin: remove a catalog entry
 
 const express = require('express');
 const { db } = require('../db');
-const { withinRateLimit } = require('../auth');
+const { withinRateLimit, requireAdmin } = require('../auth');
 const { sendError } = require('../errors');
 
 const router = express.Router();
@@ -243,6 +246,143 @@ router.post('/refresh', async (req, res) => {
     }
   }
   res.json({ shas });
+});
+
+/* ── catalog curation (admin) ─────────────────────────────────── */
+
+const SLUG_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/;
+const PATH_RE = /^[A-Za-z0-9._-]+(\/[A-Za-z0-9._-]+){0,9}$/;
+
+// Frontmatter is the vercel-labs ecosystem contract: SKILL.md opens with a
+// YAML block carrying at least `name` and `description`.
+function parseFrontmatter(md) {
+  const m = md.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+  if (!m) return { name: null, description: null };
+  const pick = (key) => {
+    const line = m[1].match(new RegExp(`^${key}:\\s*(.+)$`, 'm'));
+    return line ? line[1].trim().replace(/^["']|["']$/g, '') : null;
+  };
+  return { name: pick('name'), description: pick('description') };
+}
+
+// Locate a skill folder in a repo and read its SKILL.md. Tries the two
+// conventional layouts first (skills/<name>, <name>) before paying for a
+// full recursive tree listing. Mirrors skills-proxy's resolve action.
+router.post('/resolve', requireAdmin, async (req, res) => {
+  const owner = String(req.body?.owner ?? '');
+  const repo = String(req.body?.repo ?? '');
+  const skill = req.body?.skill == null ? null : String(req.body.skill);
+  const givenPath = req.body?.skill_path == null ? null : String(req.body.skill_path);
+  if (!SLUG_RE.test(owner) || !SLUG_RE.test(repo)) {
+    return sendError(res, 400, 'VALIDATION', 'owner and repo are required');
+  }
+  if (givenPath !== null && !PATH_RE.test(givenPath)) {
+    return sendError(res, 400, 'VALIDATION', 'skill_path is not a valid repo path');
+  }
+  if (givenPath === null && (skill === null || !SLUG_RE.test(skill))) {
+    return sendError(res, 400, 'VALIDATION', 'skill name (or skill_path) is required');
+  }
+
+  if (!withinRateLimit(`skills:${req.user.id}`, MAX_PER_USER_HOUR, HOUR_MS)) {
+    return sendError(res, 429, 'RATE_LIMITED', 'Too many skill lookups — try again later');
+  }
+  if (!withinRateLimit('skills:github', MAX_GITHUB_PER_HOUR, HOUR_MS)) {
+    return sendError(res, 429, 'RATE_LIMITED', 'GitHub budget exhausted — try again in an hour');
+  }
+
+  const candidates = givenPath !== null ? [givenPath] : [`skills/${skill}`, skill];
+  try {
+    for (const path of candidates) {
+      const r = await fetchWithTimeout(
+        `https://raw.githubusercontent.com/${owner}/${repo}/HEAD/${path}/SKILL.md`,
+        { headers: githubHeaders() }
+      );
+      if (r.status === 404) continue;
+      if (!r.ok) throw new Error(`raw fetch ${r.status}`);
+      const md = await r.text();
+      const fm = parseFrontmatter(md);
+      const upstream_sha = await fetchTreeSha(owner, repo, path).catch(() => null);
+      return res.json({
+        owner, repo, skill_path: path,
+        name: fm.name ?? skill ?? path.split('/').pop(),
+        description: fm.description ?? '',
+        upstream_sha,
+      });
+    }
+
+    // Conventional layouts missed — search the whole tree for the folder.
+    const r = await fetchWithTimeout(
+      `https://api.github.com/repos/${owner}/${repo}/git/trees/HEAD?recursive=1`,
+      { headers: githubHeaders({ Accept: 'application/vnd.github+json' }) }
+    );
+    if (!r.ok) throw new Error(`tree fetch ${r.status}`);
+    const tree = await r.json();
+    const wanted = `/${skill}/SKILL.md`.toLowerCase();
+    const hit = (tree.tree ?? []).find((e) => e.type === 'blob' && e.path.toLowerCase().endsWith(wanted));
+    if (!hit) {
+      return sendError(res, 404, 'NOT_FOUND', `No folder "${skill}" with a SKILL.md found in ${owner}/${repo}`);
+    }
+    const path = hit.path.slice(0, -'/SKILL.md'.length);
+    const mdRes = await fetchWithTimeout(
+      `https://raw.githubusercontent.com/${owner}/${repo}/HEAD/${hit.path}`,
+      { headers: githubHeaders() }
+    );
+    if (!mdRes.ok) throw new Error(`raw fetch ${mdRes.status}`);
+    const md = await mdRes.text();
+    const fm = parseFrontmatter(md);
+    const upstream_sha = await fetchTreeSha(owner, repo, path).catch(() => null);
+    return res.json({
+      owner, repo, skill_path: path,
+      name: fm.name ?? skill,
+      description: fm.description ?? '',
+      upstream_sha,
+    });
+  } catch (e) {
+    console.error('[skills] resolve failed', e.message);
+    return sendError(res, 502, 'UPSTREAM', 'Could not reach GitHub to verify the skill');
+  }
+});
+
+router.post('/', requireAdmin, (req, res) => {
+  const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
+  const owner = String(req.body?.owner ?? '').trim();
+  const repo = String(req.body?.repo ?? '').trim();
+  const skill_path = String(req.body?.skill_path ?? '').trim().replace(/^\/+|\/+$/g, '');
+  if (!name || !SLUG_RE.test(owner) || !SLUG_RE.test(repo) || !PATH_RE.test(skill_path)) {
+    return sendError(res, 400, 'VALIDATION', 'name, owner, repo, and skill_path are required');
+  }
+  const now = Date.now();
+  try {
+    const info = db.prepare(
+      `INSERT INTO skill_catalog (name, description, owner, repo, skill_path, category, install_command, tags, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      name,
+      typeof req.body?.description === 'string' ? req.body.description.trim() : '',
+      owner, repo, skill_path,
+      (typeof req.body?.category === 'string' && req.body.category.trim() ? req.body.category.trim() : 'GENERAL').toUpperCase(),
+      typeof req.body?.install_command === 'string' && req.body.install_command.trim()
+        ? req.body.install_command.trim()
+        : `npx skills add ${owner}/${repo} --skill ${name}`,
+      JSON.stringify(Array.isArray(req.body?.tags) ? req.body.tags.filter((t) => typeof t === 'string') : []),
+      now, now
+    );
+    const skill = db.prepare('SELECT * FROM skill_catalog WHERE id = ?').get(info.lastInsertRowid);
+    res.status(201).json({ skill: rowOut(skill) });
+  } catch (e) {
+    if (String(e.message).includes('UNIQUE')) {
+      return sendError(res, 409, 'DUPLICATE', 'That skill is already in the catalog');
+    }
+    throw e;
+  }
+});
+
+router.delete('/:id', requireAdmin, (req, res) => {
+  const id = parseId(req.params.id);
+  if (!id) return sendError(res, 400, 'VALIDATION', 'Invalid skill id');
+  const info = db.prepare('DELETE FROM skill_catalog WHERE id = ?').run(id); // user_skills/skill_cache cascade
+  if (info.changes === 0) return sendError(res, 404, 'NOT_FOUND', 'Skill not found');
+  res.json({ ok: true });
 });
 
 module.exports = router;

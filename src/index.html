@@ -298,6 +298,10 @@
               <svg class="icon !h-4 !w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
               Check for updates
             </button>
+            <button id="sk-add" class="btn btn-primary hidden whitespace-nowrap">
+              <svg class="icon !h-4 !w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+              Add skill
+            </button>
           </div>
           <div id="sk-pills" class="mt-3 flex flex-wrap gap-1.5" role="group" aria-label="Filter by category"></div>
 
@@ -476,11 +480,69 @@
         <pre id="dlg-skill-raw" class="hidden overflow-x-auto whitespace-pre-wrap p-5 font-mono text-xs leading-relaxed"></pre>
       </div>
       <div class="flex flex-wrap justify-end gap-2 border-t border-edge px-5 py-3">
+        <button type="button" id="dlg-skill-remove" class="btn btn-danger mr-auto hidden text-xs">Remove from catalog</button>
         <button type="button" id="dlg-skill-copy" class="btn text-xs">Copy install command</button>
         <button type="button" id="dlg-skill-download" class="btn text-xs">Download SKILL.md</button>
         <button type="button" id="dlg-skill-install" class="btn btn-primary text-xs">Mark installed</button>
       </div>
     </div>
+  </dialog>
+
+  <dialog id="dlg-skill-add" class="modal-wide" aria-labelledby="dlg-skill-add-title">
+    <form id="ska-form" class="flex max-h-[85dvh] flex-col" novalidate>
+      <div class="flex items-center justify-between border-b border-edge px-5 py-3">
+        <h2 id="dlg-skill-add-title" class="text-base font-semibold">Add skill to catalog</h2>
+        <button type="button" class="icon-btn btn-ghost" data-close-dialog aria-label="Close add skill">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
+        <div>
+          <label for="ska-url" class="mb-1 block text-xs font-semibold text-ink-muted">Skill URL or owner/repo/skill</label>
+          <div class="flex gap-2">
+            <input id="ska-url" class="input flex-1 text-sm" placeholder="https://skills.sh/owner/repo/skill-name" autocomplete="off">
+            <button type="button" id="ska-resolve" class="btn whitespace-nowrap text-xs">Look up</button>
+          </div>
+          <p class="mt-1 text-xs text-ink-muted">Accepts skills.sh and GitHub links — or fill in the fields below by hand.</p>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label for="ska-owner" class="mb-1 block text-xs font-semibold text-ink-muted">GitHub owner</label>
+            <input id="ska-owner" class="input w-full text-sm" required autocomplete="off">
+          </div>
+          <div>
+            <label for="ska-repo" class="mb-1 block text-xs font-semibold text-ink-muted">Repository</label>
+            <input id="ska-repo" class="input w-full text-sm" required autocomplete="off">
+          </div>
+        </div>
+        <div>
+          <label for="ska-path" class="mb-1 block text-xs font-semibold text-ink-muted">Skill folder path in repo</label>
+          <input id="ska-path" class="input w-full text-sm" placeholder="skills/my-skill" required autocomplete="off">
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label for="ska-name" class="mb-1 block text-xs font-semibold text-ink-muted">Name</label>
+            <input id="ska-name" class="input w-full text-sm" required autocomplete="off">
+          </div>
+          <div>
+            <label for="ska-category" class="mb-1 block text-xs font-semibold text-ink-muted">Category</label>
+            <input id="ska-category" class="input w-full text-sm" placeholder="GENERAL" autocomplete="off">
+          </div>
+        </div>
+        <div>
+          <label for="ska-desc" class="mb-1 block text-xs font-semibold text-ink-muted">Description</label>
+          <textarea id="ska-desc" rows="2" class="input w-full resize-y text-sm"></textarea>
+        </div>
+        <div>
+          <label for="ska-tags" class="mb-1 block text-xs font-semibold text-ink-muted">Tags (comma-separated)</label>
+          <input id="ska-tags" class="input w-full text-sm" placeholder="documents, workflow" autocomplete="off">
+        </div>
+      </div>
+      <div class="flex justify-end gap-2 border-t border-edge px-5 py-3">
+        <button type="button" class="btn" data-close-dialog>Cancel</button>
+        <button type="submit" class="btn btn-primary">Add to catalog</button>
+      </div>
+    </form>
   </dialog>
 
   <dialog id="dlg-snippet" class="modal-wide" aria-labelledby="dlg-snippet-title">
