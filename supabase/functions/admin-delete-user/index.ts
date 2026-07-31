@@ -1,7 +1,7 @@
 // POST { target_user_id } — the global admin permanently deletes another
 // user's account. auth.admin.deleteUser() removes the auth.users row, and
 // every ON DELETE CASCADE FK (profiles, user_roles, entries, prompts,
-// snippets, user_skills) hard-deletes with it — same GDPR/PDPA guarantee as
+// snippets) hard-deletes with it — same GDPR/PDPA guarantee as
 // the self-service delete-account function.
 //
 // RBAC constraints (RBAC §2): global_admin only; never self, never another

@@ -3,8 +3,9 @@
 > Companion documents: [IMPLEMENTATION-SUPABASE.md](IMPLEMENTATION-SUPABASE.md) · [DATABASE-LOCAL.md](DATABASE-LOCAL.md) · [SECURITY.md](SECURITY.md) · [EDGE-CASES.md](EDGE-CASES.md)
 >
 > Source of truth: `supabase/migrations/` on the `main` / `dev-supabase`
-> line. This document describes the schema as of `20260718000002_skills.sql`
-> (`SCHEMA_VERSION = 5`, the Supabase/PostgreSQL era). The local SQLite
+> line. This document describes the schema as of
+> `20260731000002_drop_skills.sql` (`SCHEMA_VERSION = 6`, the
+> Supabase/PostgreSQL era). The local SQLite
 > equivalent of this same feature set is [DATABASE-LOCAL.md](DATABASE-LOCAL.md).
 
 ---
@@ -13,7 +14,7 @@
 
 PostgreSQL on Supabase, accessed from the browser through PostgREST via the
 vendored `supabase-js` SDK — there is no application data server anymore
-(Express is reduced to a static host). Nine public tables:
+(Express is reduced to a static host). Six public tables:
 
 - **`entries`** / **`prompts`** / **`snippets`** — the three content domains,
   per-user (`user_id → auth.users`) with owner-only Row-Level Security.
@@ -22,9 +23,6 @@ vendored `supabase-js` SDK — there is no application data server anymore
   `requires_password_change` forced-rotation flag.
 - **`rate_limits`** — fixed-window counters for Edge Functions (service-role
   only: RLS enabled with zero policies).
-- **`skill_catalog`** / **`user_skills`** / **`skill_cache`** — the Skills
-  tab's admin-curated catalog, per-user install tracking, and server-only
-  GitHub content cache (§10).
 
 The FTS5 shadow tables and their trigger synchronization are gone, replaced
 by a generated `search tsvector` column + GIN index on both content tables —
@@ -110,14 +108,11 @@ RLS is enabled on every public table. "owner" = `user_id = auth.uid()`.
 | profiles | self **or** admin | — (signup trigger) | — | — (cascade only) |
 | user_roles | self **or** admin | — (signup trigger) | — (RPC / service role) | — (cascade only) |
 | rate_limits | — | — | — | — |
-| skill_catalog | authenticated | admin | admin | admin |
-| user_skills | owner | owner | owner | owner |
-| skill_cache | authenticated | — (service role) | — (service role) | — (service role) |
 
 Admins have **no** policy on the content tables (entries/prompts/snippets):
-LogBook data blindness is structural and deliberately does **not** extend to
-`skill_catalog`, which is shared, admin-curated reference data rather than
-user content (§10). `user_roles` has no client write path, so self-elevation
+LogBook data blindness is structural — every public table now holds personal
+content or RBAC bookkeeping, so no table grants admins a read path into user
+data. `user_roles` has no client write path, so self-elevation
 is impossible; role changes go through `SECURITY DEFINER` RPCs or
 service-role Edge Functions, and the `one_global_admin` partial unique index
 caps the superuser count at one.
@@ -172,33 +167,16 @@ in IMPLEMENTATION-SUPABASE §7.
   `timestamptz`): the optimistic-concurrency contract and editable Modified
   field are numeric end-to-end. RBAC tables use `timestamptz`.
 
-## 10. Skills catalog (schema v5)
+## 10. Removed: Skills catalog (was schema v5)
 
-Added by `20260718000002_skills.sql`. Unlike entries/prompts/snippets this
-is **shared, not personal, content**: the catalog is admin-curated and every
-authenticated user reads the same rows.
-
-- **`skill_catalog`** — one row per catalog skill (`name` unique;
-  `unique(owner, repo, skill_path)`), seeded with the 12 verified skills at
-  migration time. `select` is open to any authenticated user; `insert` /
-  `update` / `delete` require `is_admin()`.
-- **`user_skills`** — per-user "I've installed this" tracking
-  (`pk(user_id, skill_id)`), owner-only RLS like entries/prompts/snippets.
-  `installed_sha` is a snapshot of the upstream tree SHA at the moment the
-  user marked it installed — self-reported, not verified against a real
-  filesystem.
-- **`skill_cache`** — server-only cache of fetched `SKILL.md` content plus
-  the upstream tree SHA and ETag, keyed `pk(skill_id)`. `select` is open to
-  authenticated users (so the client can read a previously-fetched body
-  without another round trip); there are **no** insert/update/delete
-  policies — only the `skills-proxy` Edge Function's service-role client
-  (which bypasses RLS) ever writes it.
-
-`update_available` is computed client-side (`src/js/api.js`), not stored:
-`user_skills.installed_sha != skill_cache.upstream_sha`. Content actually
-comes from GitHub, fetched server-side only (the client CSP forbids
-external fetches) with a 1-hour cache TTL and a shared rate budget — see
-`supabase/functions/skills-proxy/index.ts` and IMPLEMENTATION-SUPABASE.md.
+`20260718000002_skills.sql` added a shared, admin-curated agent-skill
+catalog (`skill_catalog` / `user_skills` / `skill_cache`) plus a
+`skills-proxy` Edge Function that fetched `SKILL.md` from GitHub server-side.
+The whole feature — tab, tables, and function — was dropped in
+`20260731000002_drop_skills.sql` (`SCHEMA_VERSION = 6`): it was read-mostly
+reference data duplicating skills.sh, and no content tool depended on it.
+Both migrations stay in the ledger so an already-migrated database and a
+fresh one converge on the same schema.
 
 ## 11. Known gaps (from the code review of this variant)
 

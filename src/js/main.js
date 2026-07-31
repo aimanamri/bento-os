@@ -9,7 +9,6 @@ import { initAuth } from './auth.js';
 import { initLogbook } from './logbook.js';
 import { initPrompts } from './prompts.js';
 import { initSnippets } from './snippets.js';
-import { initSkills } from './skills.js';
 import { initFaceCard } from './face-card.js';
 
 const frame = document.getElementById('frame');
@@ -17,7 +16,6 @@ const TOOLS = {
   logbook: { tab: document.getElementById('tab-logbook'), view: document.getElementById('view-logbook'), name: 'Docs LogBook' },
   prompts: { tab: document.getElementById('tab-prompts'), view: document.getElementById('view-prompts'), name: 'Prompt Library' },
   snippets: { tab: document.getElementById('tab-snippets'), view: document.getElementById('view-snippets'), name: 'Code Snippets' },
-  skills: { tab: document.getElementById('tab-skills'), view: document.getElementById('view-skills'), name: 'Skills' },
 };
 
 /* ── theme (dark-first; UX-SPEC §1) ─────────────────────────── */
@@ -200,6 +198,5 @@ setInterval(healthCheck, 60000);
 initLogbook();
 initPrompts();
 initSnippets();
-initSkills();
 initFaceCard('pr-face-card');
 initFaceCard('sn-face-card');

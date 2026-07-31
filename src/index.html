@@ -44,10 +44,6 @@
           <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m6 9 3 3-3 3"/><path d="M12 15h5"/></svg>
           Code Snippets
         </button>
-        <button id="tab-skills" role="tab" aria-selected="false" aria-controls="view-skills" class="btn btn-ghost text-sm data-[active=true]:bg-panel-2 data-[active=true]:border-edge" data-active="false">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-          Skills
-        </button>
       </nav>
 
       <div class="ml-auto flex items-center gap-1">
@@ -288,33 +284,6 @@
         </div>
       </section>
 
-      <!-- ══════════ Tab 4 · Skills ══════════ -->
-      <section id="view-skills" role="tabpanel" aria-labelledby="tab-skills" class="hidden h-full min-h-0 overflow-y-auto" hidden>
-        <div class="mx-auto max-w-3xl px-4 py-6">
-          <div class="flex gap-2">
-            <label for="sk-search" class="sr-only">Search skills</label>
-            <input id="sk-search" type="search" class="input flex-1 !py-2.5 text-base" placeholder="Search skills…" autocomplete="off">
-            <button id="sk-refresh" class="btn whitespace-nowrap">
-              <svg class="icon !h-4 !w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
-              Check for updates
-            </button>
-            <button id="sk-add" class="btn btn-primary hidden whitespace-nowrap">
-              <svg class="icon !h-4 !w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-              Add skill
-            </button>
-          </div>
-          <div id="sk-pills" class="mt-3 flex flex-wrap gap-1.5" role="group" aria-label="Filter by category"></div>
-
-          <details id="sk-guide-wrap" class="mt-4 rounded-card border border-edge bg-panel-2/50">
-            <summary class="cursor-pointer select-none px-4 py-2 text-xs font-semibold uppercase tracking-wider text-ink-muted hover:text-ink">
-              What are agent skills?
-            </summary>
-            <div id="sk-guide-body" class="md-preview px-4 pb-4"></div>
-          </details>
-
-          <div id="sk-groups" class="mt-2"></div>
-        </div>
-      </section>
     </main>
 
     <!-- ══ Status dock (red traffic light) ══ -->
@@ -449,94 +418,6 @@
       <div class="flex justify-end gap-2 border-t border-edge px-5 py-3">
         <button type="button" class="btn" data-close-dialog>Cancel</button>
         <button type="submit" class="btn btn-primary">Save Prompt</button>
-      </div>
-    </form>
-  </dialog>
-
-  <dialog id="dlg-skill" class="modal-wide" aria-labelledby="dlg-skill-title">
-    <div class="flex max-h-[85dvh] flex-col">
-      <div class="flex items-center justify-between border-b border-edge px-5 py-3">
-        <div class="min-w-0">
-          <h2 id="dlg-skill-title" class="truncate text-base font-semibold">Skill</h2>
-          <p id="dlg-skill-meta" class="truncate text-xs text-ink-muted"></p>
-        </div>
-        <button type="button" class="icon-btn btn-ghost" data-close-dialog aria-label="Close skill preview">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
-        </button>
-      </div>
-      <div id="dlg-skill-banner" class="hidden border-b border-edge bg-warn-hue/10 px-5 py-2 text-xs text-warn-hue"></div>
-      <div class="flex items-center justify-between gap-2 border-b border-edge px-5 py-2">
-        <div id="dlg-skill-viewtoggle" class="flex items-center rounded-md border border-edge bg-panel p-0.5" role="group" aria-label="Rendered or raw">
-          <button type="button" data-view="rendered" class="btn btn-ghost px-2.5 py-1 text-xs data-[active=true]:bg-accent data-[active=true]:text-surface" data-active="true">Rendered</button>
-          <button type="button" data-view="raw" class="btn btn-ghost px-2.5 py-1 text-xs data-[active=true]:bg-accent data-[active=true]:text-surface" data-active="false">Raw</button>
-        </div>
-      </div>
-      <div class="min-h-0 flex-1 overflow-y-auto">
-        <div id="dlg-skill-rendered" class="md-preview p-5"></div>
-        <pre id="dlg-skill-raw" class="hidden overflow-x-auto whitespace-pre-wrap p-5 font-mono text-xs leading-relaxed"></pre>
-      </div>
-      <div class="flex flex-wrap justify-end gap-2 border-t border-edge px-5 py-3">
-        <button type="button" id="dlg-skill-remove" class="btn btn-danger mr-auto hidden text-xs">Remove from catalog</button>
-        <button type="button" id="dlg-skill-copy" class="btn text-xs">Copy install command</button>
-        <button type="button" id="dlg-skill-download" class="btn text-xs">Download SKILL.md</button>
-        <button type="button" id="dlg-skill-install" class="btn btn-primary text-xs">Mark installed</button>
-      </div>
-    </div>
-  </dialog>
-
-  <dialog id="dlg-skill-add" class="modal-wide" aria-labelledby="dlg-skill-add-title">
-    <form id="ska-form" class="flex max-h-[85dvh] flex-col" novalidate>
-      <div class="flex items-center justify-between border-b border-edge px-5 py-3">
-        <h2 id="dlg-skill-add-title" class="text-base font-semibold">Add skill to catalog</h2>
-        <button type="button" class="icon-btn btn-ghost" data-close-dialog aria-label="Close add skill">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
-        </button>
-      </div>
-      <div class="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
-        <div>
-          <label for="ska-url" class="mb-1 block text-xs font-semibold text-ink-muted">Skill URL or owner/repo/skill</label>
-          <div class="flex gap-2">
-            <input id="ska-url" class="input flex-1 text-sm" placeholder="https://skills.sh/owner/repo/skill-name" autocomplete="off">
-            <button type="button" id="ska-resolve" class="btn whitespace-nowrap text-xs">Look up</button>
-          </div>
-          <p class="mt-1 text-xs text-ink-muted">Accepts skills.sh and GitHub links — or fill in the fields below by hand.</p>
-        </div>
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label for="ska-owner" class="mb-1 block text-xs font-semibold text-ink-muted">GitHub owner</label>
-            <input id="ska-owner" class="input w-full text-sm" required autocomplete="off">
-          </div>
-          <div>
-            <label for="ska-repo" class="mb-1 block text-xs font-semibold text-ink-muted">Repository</label>
-            <input id="ska-repo" class="input w-full text-sm" required autocomplete="off">
-          </div>
-        </div>
-        <div>
-          <label for="ska-path" class="mb-1 block text-xs font-semibold text-ink-muted">Skill folder path in repo</label>
-          <input id="ska-path" class="input w-full text-sm" placeholder="skills/my-skill" required autocomplete="off">
-        </div>
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label for="ska-name" class="mb-1 block text-xs font-semibold text-ink-muted">Name</label>
-            <input id="ska-name" class="input w-full text-sm" required autocomplete="off">
-          </div>
-          <div>
-            <label for="ska-category" class="mb-1 block text-xs font-semibold text-ink-muted">Category</label>
-            <input id="ska-category" class="input w-full text-sm" placeholder="GENERAL" autocomplete="off">
-          </div>
-        </div>
-        <div>
-          <label for="ska-desc" class="mb-1 block text-xs font-semibold text-ink-muted">Description</label>
-          <textarea id="ska-desc" rows="2" class="input w-full resize-y text-sm"></textarea>
-        </div>
-        <div>
-          <label for="ska-tags" class="mb-1 block text-xs font-semibold text-ink-muted">Tags (comma-separated)</label>
-          <input id="ska-tags" class="input w-full text-sm" placeholder="documents, workflow" autocomplete="off">
-        </div>
-      </div>
-      <div class="flex justify-end gap-2 border-t border-edge px-5 py-3">
-        <button type="button" class="btn" data-close-dialog>Cancel</button>
-        <button type="submit" class="btn btn-primary">Add to catalog</button>
       </div>
     </form>
   </dialog>
