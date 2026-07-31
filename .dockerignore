@@ -1,8 +1,13 @@
 # Dependencies / build output (reinstalled + regenerated inside the image)
 node_modules/
+**/node_modules/
 dist/
 npm-debug.log
 .npm
+
+# Sibling checkouts of the other variant branches — hundreds of MB of build
+# context that would otherwise be uploaded to the daemon on every build.
+.worktrees/
 
 # VCS / editor / OS cruft
 .git
@@ -20,6 +25,13 @@ npm-debug.log
 *.env.local
 backups/
 data/
+*.db
+*.db-shm
+*.db-wal
+
+# Supabase CLI project (migrations + Edge Functions) — deployed with the
+# `supabase` CLI, never needed to build or run the container.
+supabase/
 
 # Docs, notes, and generated analysis — not needed at build or runtime
 docs/

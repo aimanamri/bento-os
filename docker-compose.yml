@@ -1,4 +1,12 @@
 # Compose Spec — no top-level `version:` key is needed anymore.
+#
+# Bento OS is a STATIC host: all data lives in Supabase (PostgreSQL + Auth) and
+# is reached from the browser. The container holds no database and needs no
+# writable path — nothing here is stateful, so standing it up on another
+# machine is just: clone, `docker compose up -d`.
+#
+# Per-machine overrides go in a `.env` file next to this one (Compose reads it
+# automatically) — see DOCKER.md § Configuration.
 
 services:
   # ---- Production ----
@@ -8,21 +16,24 @@ services:
       dockerfile: Dockerfile
     image: bento-os:latest
     container_name: bento-os-prod
-    # Bind to loopback only; front it with `tailscale serve` for remote access.
+    # Published on loopback by default; front it with `tailscale serve` for
+    # remote access. Override per machine in .env — e.g. BENTO_BIND=0.0.0.0 to
+    # reach it from the LAN (read DOCKER.md § Exposing it first).
     ports:
-      - "127.0.0.1:8481:3000"
+      - "${BENTO_BIND:-127.0.0.1}:${BENTO_HOST_PORT:-8481}:3000"
     environment:
       - BENTO_PORT=3000
       - BENTO_HOST=0.0.0.0            # 0.0.0.0 *inside* the container so Docker can forward
       - NODE_ENV=production
       - NODE_OPTIONS=--max-old-space-size=384   # cap V8 heap under the 512m limit
-    volumes:
-      - ./data:/app/data             # SQLite db + WAL live here (only writable path)
+      # Pins the CSP connect-src to one Supabase origin. Leave unset to use the
+      # project baked into src/js/supabase-config.js at build time; set
+      # BENTO_SUPABASE_URL in .env to aim a deployment at a different project.
+      - BENTO_SUPABASE_URL=${BENTO_SUPABASE_URL:-}
     restart: unless-stopped
-    stop_grace_period: 15s           # allow the WAL checkpoint on shutdown
 
     # --- Security hardening ---
-    read_only: true                  # immutable root fs; app only writes ./data
+    read_only: true                  # immutable root fs — the app writes nothing
     tmpfs:
       - /tmp
     security_opt:
@@ -60,14 +71,20 @@ services:
       dockerfile: Dockerfile.dev
     image: bento-os:dev
     container_name: bento-os-dev
+    # `npm run dev` writes dist/ back into the bind-mounted source tree, so the
+    # container's user must own those files on the host. Docker Desktop
+    # (macOS/Windows) remaps ownership for you; on Linux set DOCKER_UID and
+    # DOCKER_GID in .env to your own `id -u` / `id -g` or the build fails with
+    # EACCES. See DOCKER.md § Development.
+    user: "${DOCKER_UID:-1001}:${DOCKER_GID:-1001}"
     ports:
       - "127.0.0.1:3000:3000"
     environment:
       - BENTO_PORT=3000
       - BENTO_HOST=0.0.0.0
       - NODE_ENV=development
+      - npm_config_cache=/tmp/.npm    # writable cache for the non-root user
     volumes:
       - .:/app                       # live source
       - /app/node_modules            # keep the image's linux-built node_modules
-      - ./data:/app/data
     restart: unless-stopped

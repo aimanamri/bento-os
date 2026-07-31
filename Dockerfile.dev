@@ -18,9 +18,9 @@ COPY package*.json ./
 RUN npm ci
 
 COPY . .
-# The anonymous node_modules volume and the data dir must be writable by the
-# unprivileged runtime user.
-RUN mkdir -p /app/data && chown -R nodejs:nodejs /app/data /app/node_modules
+# The anonymous node_modules volume must be writable by the unprivileged
+# runtime user. There is no data dir — state lives in Supabase.
+RUN chown -R nodejs:nodejs /app/node_modules
 
 USER nodejs
 EXPOSE 3000
