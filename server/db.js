@@ -164,6 +164,23 @@ function seedUser(ownerId) {
       now
     );
   }
+
+  const snippetCount = db.prepare('SELECT COUNT(*) AS n FROM snippets WHERE user_id = ?').get(ownerId).n;
+  if (snippetCount === 0) {
+    db.prepare(
+      `INSERT INTO snippets (user_id, title, category, body, notes, tags, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(
+      ownerId,
+      'Create and push a new branch',
+      'GIT',
+      'git checkout -b {{Branch Name}}\ngit push -u origin {{Branch Name}}',
+      'Filling in the branch name once keeps the checkout and push commands in sync — handy when you rename a feature branch mid-work.',
+      JSON.stringify(['git', 'workflow']),
+      now,
+      now
+    );
+  }
 }
 
 runMigrations();
