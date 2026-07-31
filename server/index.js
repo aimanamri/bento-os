@@ -52,7 +52,6 @@ const gate = [requireAuth, requirePasswordChanged];
 app.use('/api/entries', gate, require('./routes/entries'));
 app.use('/api/prompts', gate, require('./routes/prompts'));
 app.use('/api/snippets', gate, require('./routes/snippets'));
-app.use('/api/skills', gate, require('./routes/skills'));
 app.use('/api/import', gate, require('./routes/import'));
 app.use('/api/users', gate, require('./routes/users'));
 

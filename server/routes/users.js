@@ -147,7 +147,7 @@ router.post('/:id/demote', requireGlobalAdmin, (req, res) => {
 
 // Global-admin-driven hard delete: never self, never another global_admin
 // (the singleton superuser must always exist). Same five-table cascade as
-// DELETE /me, plus user_skills (installs the target never gets to keep).
+// DELETE /me.
 router.delete('/:id', requireGlobalAdmin, (req, res) => {
   const id = parseId(req.params.id);
   if (!id) return sendError(res, 400, 'VALIDATION', 'Invalid user id');
@@ -163,7 +163,6 @@ router.delete('/:id', requireGlobalAdmin, (req, res) => {
     db.prepare('DELETE FROM entries     WHERE user_id = ?').run(id);
     db.prepare('DELETE FROM prompts     WHERE user_id = ?').run(id);
     db.prepare('DELETE FROM snippets    WHERE user_id = ?').run(id);
-    db.prepare('DELETE FROM user_skills WHERE user_id = ?').run(id);
     db.prepare('DELETE FROM sessions    WHERE user_id = ?').run(id);
     db.prepare('DELETE FROM users       WHERE id = ?').run(id);
   })();
