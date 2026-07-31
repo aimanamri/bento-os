@@ -99,6 +99,14 @@ plain hover tooltip — no separate tooltip widget is used.
   EDGE-CASES § 9.8).
 - Sidebar becomes an overlay drawer (hamburger in title bar) with a scrim;
   swipe/Esc/scrim-tap closes. Focus trapped while open.
+- Metadata panel becomes the same kind of overlay, mirrored to the right
+  edge (gear in the entry header), with its own close button in the sheet
+  header — the scrim is not a discoverable exit on a phone, and the toggle
+  that opened it sits behind the overlay. It is **never** shown in flow at
+  this width: at `w-72` it would leave a 390 px viewport about 100 px of
+  workspace and wrap the entry header into a column of buttons
+  (EDGE-CASES § 8.7). Between 1024 px and 1280 px there is room, and it
+  stays an in-flow column there.
 
 ### Sidebar
 - Live search box filters as-you-type (input debounced 200 ms → FTS query).

@@ -206,12 +206,17 @@
   /* border-width is reset here too — width:0 alone leaves a 1px hairline
      from border-r/border-l visible at the collapsed edge (border-box
      sizing doesn't fold border into an explicit width:0). */
-  [data-focusmode="true"] .collapse-x { width: 0 !important; border-width: 0 !important; opacity: 0; visibility: hidden; }
+  /* `:not([data-drawer="open"])` on both collapse rules: these zero the
+     *columns*. An overlay the user just opened is not a column, and without
+     the guard a phone-width sheet opened while Focus Mode is on (or a
+     drawer opened after the sidebar was hidden at desktop width) collapses
+     to a 0px invisible box the moment it appears. */
+  [data-focusmode="true"] .collapse-x:not([data-drawer="open"]) { width: 0 !important; border-width: 0 !important; opacity: 0; visibility: hidden; }
 
   /* Manual sidebar Hide/Show — independent trigger, composes with Focus
      Mode above (either condition hides it; #lb-sidebar already carries
      .collapse-x's transition/overflow). */
-  #lb-sidebar[data-hidden="true"] { width: 0 !important; border-width: 0 !important; opacity: 0; visibility: hidden; }
+  #lb-sidebar[data-hidden="true"]:not([data-drawer="open"]) { width: 0 !important; border-width: 0 !important; opacity: 0; visibility: hidden; }
 
   /* ── Mobile entries drawer ────────────────────────────────────
      On desktop #lb-sidebar is a translucent column (bg-panel-2/50) sitting
@@ -241,6 +246,38 @@
   #lb-sidebar[data-drawer="open"] .entry-row .text-\[11px\],
   #lb-sidebar[data-drawer="open"] .entry-row .text-xs { font-size: 0.8125rem; }
 
+  /* ── Mobile metadata sheet ────────────────────────────────────
+     Below lg the metadata panel is an overlay, not a column. In flow it is
+     `w-72 flex-none` — 288px of a 390px phone — which left the workspace
+     ~100px wide and folded the entry header into a vertical stack of
+     buttons. Same drawer vocabulary as the entries list, mirrored to the
+     right edge; the opaque surface is declared here for the same
+     source-order reason (bg-panel-2/50 would otherwise show through). */
+  #lb-meta[data-drawer="open"] {
+    position: fixed;
+    inset-block: 0;
+    right: 0;
+    z-index: 50;
+    display: block;
+    width: min(88vw, 20rem);
+    background: rgb(var(--c-panel));
+    border-left: 1px solid rgb(var(--c-edge));
+    box-shadow: 0 24px 48px -12px rgb(0 0 0 / 0.45);
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    /* .collapse-x animates width; as a sheet the width change is a jump from
+       the column's 18rem, so only the slide should be visible. */
+    transition: none;
+    animation: sheet-in 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  @keyframes sheet-in { from { transform: translateX(100%); } }
+
+  /* The sheet needs its own way out — the scrim is not discoverable on a
+     phone, and the toggle that opened it is behind the overlay. */
+  #lb-meta[data-drawer="open"] #lb-meta-close { display: inline-flex; }
+  /* Touch-sized fields while it is a touch surface */
+  #lb-meta[data-drawer="open"] .input { @apply py-2; }
+
   .scrim {
     position: fixed;
     inset: 0;
@@ -252,7 +289,8 @@
   @keyframes scrim-in { from { opacity: 0; } }
 
   @media (prefers-reduced-motion: reduce) {
-    #lb-sidebar[data-drawer="open"] { animation: none; }
+    #lb-sidebar[data-drawer="open"],
+    #lb-meta[data-drawer="open"] { animation: none; }
     .scrim { animation: none; }
   }
 

@@ -37,6 +37,7 @@ const el = {
   drawerOpen: document.getElementById('lb-drawer-open'),
   metaToggle: document.getElementById('lb-meta-toggle'),
   metaPanel: document.getElementById('lb-meta'),
+  metaClose: document.getElementById('lb-meta-close'),
   summary: document.getElementById('meta-summary'),
   summaryWrap: document.getElementById('lb-summary-wrap'),
   label: document.getElementById('meta-label'),
@@ -1115,6 +1116,80 @@ function initNarrowToggle() {
   });
 }
 
+/* ── metadata panel: column on a tablet, sheet on a phone ────
+   The panel is `w-72 flex-none`. Shown in flow on a phone that is 288 of
+   ~390 available pixels, which squeezed the workspace until the entry
+   header wrapped into a column of buttons — so below lg it is promoted to
+   an overlay sheet instead (EDGE-CASES §8.5). Between lg and xl there is
+   room for the column, and that behaviour is unchanged. */
+function initMetaPanel() {
+  const asSheet = window.matchMedia('(max-width: 1023px)');
+  let scrim = null;
+
+  function apply(open) {
+    const sheet = open && asSheet.matches;
+
+    el.metaPanel.classList.toggle('max-xl:hidden', !open);
+    el.metaPanel.classList.toggle('max-xl:block', open && !sheet);
+    if (sheet) el.metaPanel.dataset.drawer = 'open';
+    else delete el.metaPanel.dataset.drawer;
+
+    if (sheet && !scrim) {
+      scrim = document.createElement('div');
+      scrim.className = 'scrim';
+      scrim.addEventListener('click', () => setOpen(false));
+      document.body.appendChild(scrim);
+    } else if (!sheet && scrim) {
+      scrim.remove();
+      scrim = null;
+    }
+    el.metaToggle.setAttribute('aria-pressed', String(open));
+  }
+
+  const isOpen = () => !el.metaPanel.classList.contains('max-xl:hidden');
+
+  function setOpen(open) {
+    const wasSheet = !!scrim;
+    apply(open);
+    // Move focus with the surface: into the sheet on open (its own close
+    // button, not the first input — a phone keyboard flying up unasked is
+    // worse than one extra tap), back to the toggle when it closes.
+    if (open && scrim) el.metaClose.focus();
+    else if (!open && wasSheet) el.metaToggle.focus();
+  }
+
+  el.metaToggle.addEventListener('click', () => setOpen(!isOpen()));
+  el.metaClose.addEventListener('click', () => setOpen(false));
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && scrim) setOpen(false);
+  });
+
+  // Rotating a phone into landscape can cross the lg line: re-resolve the
+  // open panel into whichever form fits rather than leaving a fixed sheet
+  // floating over a layout that has room for the column.
+  asSheet.addEventListener('change', () => {
+    if (isOpen()) apply(true);
+  });
+
+  // Swipe the sheet away — the entries drawer's gesture, mirrored.
+  let startX = null;
+  let startY = null;
+  el.metaPanel.addEventListener('touchstart', (e) => {
+    if (!scrim || e.touches.length !== 1) return;
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+  }, { passive: true });
+  el.metaPanel.addEventListener('touchend', (e) => {
+    if (startX === null) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - startX;
+    const dy = t.clientY - startY;
+    startX = null;
+    startY = null;
+    if (dx > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) setOpen(false);
+  }, { passive: true });
+}
+
 function initDrawer() {
   let scrim = null;
   // The overlay surface lives in CSS (#lb-sidebar[data-drawer="open"]), not in
@@ -1238,11 +1313,7 @@ export async function initLogbook() {
     dlg.showModal();
   });
 
-  el.metaToggle.addEventListener('click', () => {
-    const hidden = el.metaPanel.classList.toggle('max-xl:hidden');
-    el.metaPanel.classList.toggle('max-xl:block', !hidden);
-    el.metaToggle.setAttribute('aria-pressed', String(!hidden));
-  });
+  initMetaPanel();
 
   // Reading / Editor mode toggle
   el.modeToggle.addEventListener('click', () => {
