@@ -46,6 +46,25 @@ allowlist is exact.
 
 `npm start` skips the build and just starts the server.
 
+## Install it as an app (PWA)
+
+Bento OS ships a web app manifest and a service worker, so it can be
+installed to the dock/home screen and launched in its own window: open it in
+the browser and choose **Install Bento OS…** from the account menu (or the
+browser's own install control; on iOS, *Share → Add to Home Screen*).
+
+The service worker precaches the app shell — HTML, CSS, JS and the vendored
+render libraries — so an installed Bento OS **opens offline** instead of
+showing a browser error. It caches the application only: your entries,
+prompts and snippets live in Supabase and still need connectivity, so
+offline you get the workspace with an *offline* chip and empty lists. See
+[docs/SECURITY.md](docs/SECURITY.md) §4a for why the data layer is
+deliberately never cached.
+
+Registration needs a secure context — `localhost` in development, or the
+HTTPS Tailscale serve below. Over plain-HTTP LAN the app runs online-only.
+Regenerate the icon set with `npm run icons` after changing the mark.
+
 ## Remote access (Tailscale)
 
 ```bash
@@ -74,7 +93,7 @@ which only exists in secure contexts (there is a manual-copy fallback otherwise)
 ```
 server/          Static file host (Express) + CSP headers — no data layer
 supabase/        SQL migrations, Edge Functions (deployed with the CLI)
-src/             Frontend source (index.html, css/input.css, js/)
+src/             Frontend source (index.html, css/input.css, js/, sw.js, manifest)
 scripts/         Build helpers, admin bootstrap, SQLite→Supabase migration
 dist/            Build output (generated; served by Express)
 docs/            Implementation plan, security spec, edge cases, UX, database

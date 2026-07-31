@@ -7,10 +7,12 @@
   "scripts": {
     "dev": "npm run build && node server/index.js",
     "start": "node server/index.js",
-    "build": "npm run build:css && npm run build:static && npm run build:vendor",
+    "build": "npm run build:css && npm run build:static && npm run build:vendor && npm run build:sw",
     "build:css": "tailwindcss -i src/css/input.css -o dist/assets/app.css --minify",
     "build:static": "node scripts/copy-static.js",
     "build:vendor": "node scripts/copy-vendor.js",
+    "build:sw": "node scripts/build-sw.js",
+    "icons": "node scripts/make-icons.js",
     "setup:admin": "node scripts/setup-supabase-admin.js",
     "migrate:data": "node scripts/migrate-sqlite-to-supabase.js",
     "audit:deps": "npm audit"

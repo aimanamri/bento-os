@@ -287,5 +287,6 @@ Start a quote with a \`[!TYPE]\` marker on its own line:
 - **Created** is set once and can't be changed. **Modified** updates automatically on every save, but you can set it by hand — an edited value is kept instead of bumping to now.
 - **Import** takes \`.md\` files up to 2 MB. The first \`# H1\` becomes the title; YAML frontmatter is kept as plain text.
 - **Autosave** snapshots your draft every 10 seconds; you'll be offered a restore after a crash or refresh.
+- **Install Bento OS** from the account menu to run it in its own window. Installed, it still opens when you're offline — but your entries live on the server, so you'll see the workspace with an *offline* chip and empty lists until you're back online.
 - In prompts, \`{{Variable}}\` fill-ins match literally — \`{{A}}{{B}}\` is two variables, \`{{}}\` is plain text.
 `;

@@ -274,6 +274,11 @@ dump into a project: `psql "$DATABASE_URL" -f bento-backup-YYYY-MM-DD.sql`.
   check outbound network from the host.
 - **Config changes don't take effect:** `src/js/supabase-config.js` is baked in
   at build time. Use `docker compose up -d --build`, not `restart`.
+- **No install option / the app doesn't work offline:** service workers need a
+  secure context. Reaching the container at `http://localhost:3000` counts as
+  one; reaching it at `http://<lan-ip>:3000` does not, and the app silently
+  runs online-only. Put it behind the HTTPS Tailscale serve (README) to get
+  the installable, offline-capable build over the network.
 - **Container is `unhealthy`:** `docker compose logs bento` — the healthcheck
   fetches `/` every 30s after a 10s grace period.
 - **Port already in use:** set `BENTO_HOST_PORT` in `.env` (e.g. `9000`); the

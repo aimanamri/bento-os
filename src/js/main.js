@@ -10,6 +10,7 @@ import { initLogbook } from './logbook.js';
 import { initPrompts } from './prompts.js';
 import { initSnippets } from './snippets.js';
 import { initFaceCard } from './face-card.js';
+import { initPwa } from './pwa.js';
 
 const frame = document.getElementById('frame');
 const TOOLS = {
@@ -225,12 +226,22 @@ on('entry:dirty', ({ isDirty }) => {
 
 /* ── health check + offline indicator (§3.6/§3.7) ───────────── */
 
-async function healthCheck() {
+function setConnOffline(offline) {
   const conn = document.getElementById('conn-status');
+  conn.classList.toggle('hidden', !offline);
+  conn.classList.toggle('flex', offline);
+}
+
+async function healthCheck() {
+  // Installed as a PWA the app opens with no network at all — say so at once
+  // instead of waiting out the request timeout.
+  if (!navigator.onLine) {
+    setConnOffline(true);
+    return;
+  }
   try {
     const { schema } = await api('/api/health');
-    conn.classList.add('hidden');
-    conn.classList.remove('flex');
+    setConnOffline(false);
     const known = localStorage.getItem('bento.schema');
     if (known && Number(known) !== schema) {
       localStorage.setItem('bento.schema', String(schema));
@@ -240,14 +251,18 @@ async function healthCheck() {
     }
     localStorage.setItem('bento.schema', String(schema));
   } catch (e) {
-    conn.classList.remove('hidden');
-    conn.classList.add('flex');
+    setConnOffline(true);
   }
 }
 
 /* ── boot ───────────────────────────────────────────────────── */
 
 initTheme(); // login portal is themed too
+
+// Before the auth gate: `beforeinstallprompt` fires around page load, and
+// initAuth() blocks here for as long as the login screen is up — wiring the
+// PWA afterwards would miss the event and never offer the install item.
+initPwa();
 
 // Auth gate: nothing loads until the user is signed in and has cleared any
 // forced password change. Every Supabase query below runs under their RLS.
@@ -256,9 +271,17 @@ await initAuth();
 initTabs();
 initSwipeNav();
 initTrafficLights();
-activateTab('logbook'); // normal users land on their LogBook workspace
+// Manifest shortcuts (long-press the installed icon) land on ?tool=…
+const wanted = new URLSearchParams(location.search).get('tool');
+// hasOwn, not truthiness: `?tool=constructor` would otherwise pass and leave
+// every tab hidden.
+activateTab(Object.hasOwn(TOOLS, wanted ?? '') ? wanted : 'logbook');
 healthCheck();
 setInterval(healthCheck, 60000);
+// Connectivity changes are worth reflecting immediately — the 60 s poll is
+// the backstop, not the signal.
+window.addEventListener('offline', () => setConnOffline(true));
+window.addEventListener('online', () => healthCheck());
 
 initLogbook();
 initPrompts();

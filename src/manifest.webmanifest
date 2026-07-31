@@ -1,0 +1,27 @@
+{
+  "id": "/",
+  "name": "Bento OS",
+  "short_name": "Bento OS",
+  "description": "Personal knowledge base and prompt library — Docs LogBook, Prompt Library and Code Snippets in one bento-glass workspace.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "browser"],
+  "orientation": "any",
+  "background_color": "#0f1216",
+  "theme_color": "#0f1216",
+  "categories": ["productivity", "utilities"],
+  "lang": "en",
+  "dir": "ltr",
+  "launch_handler": { "client_mode": "focus-existing" },
+  "icons": [
+    { "src": "/assets/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/assets/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/assets/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Docs LogBook", "url": "/?tool=logbook" },
+    { "name": "Prompt Library", "url": "/?tool=prompts" },
+    { "name": "Code Snippets", "url": "/?tool=snippets" }
+  ]
+}

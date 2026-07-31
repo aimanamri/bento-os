@@ -8,6 +8,19 @@
   <link rel="stylesheet" href="/assets/app.css">
   <link rel="stylesheet" href="/vendor/katex.min.css">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8D%B1%3C/text%3E%3C/svg%3E">
+
+  <!-- PWA: installable + offline app shell (see src/sw.js) -->
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png">
+  <meta name="application-name" content="Bento OS">
+  <!-- Matches the surface token per theme so the OS chrome blends into the app -->
+  <meta name="theme-color" content="#f3f5f7" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f1216" media="(prefers-color-scheme: dark)">
+  <!-- iOS ignores the manifest's display mode; these are its equivalents -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Bento OS">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 </head>
 <body class="p-0 sm:p-4 md:p-6">
   <div class="wallpaper" aria-hidden="true"></div>
@@ -73,6 +86,8 @@
           <div id="user-menu" role="menu" aria-label="Account" class="glass absolute right-0 top-full z-50 mt-1 hidden w-52 rounded-card border p-1 shadow-lift">
             <button id="menu-admin" role="menuitem" class="btn btn-ghost hidden w-full justify-start text-xs">User management</button>
             <button id="menu-changepw" role="menuitem" class="btn btn-ghost w-full justify-start text-xs">Change password</button>
+            <!-- Shown only once the browser signals the app is installable -->
+            <button id="menu-install" role="menuitem" class="btn btn-ghost hidden w-full justify-start text-xs">Install Bento OS…</button>
             <button id="menu-delete" role="menuitem" class="btn btn-ghost hidden w-full justify-start text-xs text-danger">Delete my account…</button>
             <button id="menu-signout" role="menuitem" class="btn btn-ghost w-full justify-start text-xs">Sign out</button>
           </div>
