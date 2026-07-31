@@ -74,6 +74,70 @@ function initTabs() {
   }
 }
 
+/* ── swipe between tools (touch) ─────────────────────────────
+   On a phone the tablist is the only way across tools, and reaching for it
+   breaks the flow of reading. A horizontal swipe moves to the neighbouring
+   tool, matching what every tabbed mobile app does.
+
+   The guards matter more than the gesture: a swipe that starts inside
+   something the user can actually scroll sideways (a wide code block, a
+   Mermaid diagram, a table) belongs to that element, and a swipe inside a
+   text field belongs to the caret. */
+
+const SWIPE_MIN_PX = 60;      // shorter than this is a tap or a jitter
+const SWIPE_H_RATIO = 1.5;    // must be clearly horizontal, not a diagonal scroll
+
+function startsInScrollableX(node) {
+  for (let el = node; el && el !== document.body; el = el.parentElement) {
+    if (!(el instanceof Element)) continue;
+    const style = getComputedStyle(el);
+    const scrollable = /(auto|scroll)/.test(style.overflowX);
+    if (scrollable && el.scrollWidth > el.clientWidth + 1) return true;
+  }
+  return false;
+}
+
+function initSwipeNav() {
+  const main = document.querySelector('main');
+  if (!main) return;
+  let startX = null;
+  let startY = null;
+  let armed = false;
+
+  main.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1) return; // pinch/zoom is not a swipe
+    const target = e.target;
+    armed = !(
+      document.querySelector('dialog[open]') ||
+      document.querySelector('#lb-sidebar[data-drawer="open"]') ||
+      target.closest('input, textarea, select, [contenteditable="true"]') ||
+      startsInScrollableX(target)
+    );
+    if (!armed) return;
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+  }, { passive: true });
+
+  main.addEventListener('touchend', (e) => {
+    if (!armed || startX === null) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - startX;
+    const dy = t.clientY - startY;
+    startX = null;
+    startY = null;
+    if (Math.abs(dx) < SWIPE_MIN_PX || Math.abs(dx) < Math.abs(dy) * SWIPE_H_RATIO) return;
+
+    // Only tools still on screen participate; minimized ones live in the dock.
+    const open = Object.keys(TOOLS).filter((k) => !minimized.has(k));
+    const idx = open.indexOf(activeTool);
+    if (idx === -1) return;
+    const next = open[idx + (dx < 0 ? 1 : -1)];
+    if (!next) return; // no wrap-around: the ends should feel like ends
+    activateTab(next);
+    announce(`${TOOLS[next].name}`);
+  }, { passive: true });
+}
+
 /* ── traffic lights ─────────────────────────────────────────── */
 
 const dock = document.getElementById('dock');
@@ -190,6 +254,7 @@ initTheme(); // the login portal is themed too
 await initAuth();
 
 initTabs();
+initSwipeNav();
 initTrafficLights();
 activateTab('logbook'); // normal users land on their LogBook workspace
 healthCheck();
