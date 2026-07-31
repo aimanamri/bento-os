@@ -194,6 +194,13 @@ static/vendor assets once and starts the server. After changing source, restart:
 docker compose --profile dev restart bento-dev
 ```
 
+If a change still doesn't show up after that restart, suspect the service
+worker before suspecting the build: a rebuilt `dist/` produces a *new* worker,
+but the one already running keeps serving its cached copy of the app until
+every tab is closed (it waits on purpose — an update must never swap out a
+session with an unsaved draft). While iterating, tick **DevTools → Application
+→ Service Workers → "Update on reload"**, or work in a private window.
+
 Stop it:
 
 ```bash
@@ -207,8 +214,12 @@ docker compose --profile dev down
 A three-stage build keeps the runtime image small and free of build tooling:
 
 1. **deps** — installs *production* dependencies only (`express`, `better-sqlite3`).
-2. **build** — installs everything and runs `npm run build` (Tailwind + vendor copy),
-   producing `dist/`.
+2. **build** — installs everything and runs `npm run build` (Tailwind + static +
+   vendor copy + service-worker stamping), producing `dist/`. The step then
+   asserts that `dist/sw.js`, `dist/manifest.webmanifest` and the icons exist:
+   a `.dockerignore` slip that drops `src/assets/` would otherwise produce an
+   image that boots fine and is quietly no longer installable or
+   offline-capable, which is the kind of regression nobody notices for weeks.
 3. **runtime** — copies just `node_modules` (prod), `dist/`, `server/`, and `scripts/`
    (for break-glass password recovery) onto a clean `node:20-alpine`, runs as a
    non-root user under `tini`.
@@ -217,6 +228,27 @@ The client libraries (`mermaid`, `katex`, `markdown-it`, `dompurify`) are
 **build-time only**: they're bundled into `dist/vendor` and served as static files, so
 the Node server never loads them. They live in `devDependencies` and are therefore
 excluded from the runtime image — which is why it's ~225 MB instead of ~425 MB.
+
+### The PWA inside the container
+
+`dist/` carries the web app manifest, the icon set and `sw.js`, and Express
+serves them with the right content types (`application/manifest+json` for the
+manifest) — no extra route or header is needed. The service worker is stamped
+at image-build time with a hash of the assets it precaches, so **the same
+source produces the same worker** whether you build on the host or in the
+image, and every deploy lands in a fresh cache generation rather than serving
+a mix of old and new files.
+
+Two consequences worth knowing:
+
+- **Secure context required.** `http://localhost:8481` counts; `http://<lan-ip>:8481`
+  does not. Over a LAN IP the app runs, but the worker never registers, so it
+  is neither installable nor offline-capable. The Tailscale HTTPS serve is the
+  supported way to get the full behaviour off the host.
+- **Rebuilding does not evict a running worker.** The new one installs and
+  waits so an open session is never swapped mid-edit; it takes over once every
+  tab is closed. `docker compose up -d --build` therefore reaches users on
+  their next launch, not on their next refresh.
 
 ---
 
