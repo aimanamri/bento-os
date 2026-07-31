@@ -2,22 +2,25 @@
 <html lang="en" class="dark">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="dark light">
   <title>Bento OS</title>
   <link rel="stylesheet" href="/assets/app.css">
   <link rel="stylesheet" href="/vendor/katex.min.css">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8D%B1%3C/text%3E%3C/svg%3E">
 </head>
-<body class="p-2 sm:p-4 md:p-6">
+<body class="p-0 sm:p-4 md:p-6">
   <div class="wallpaper" aria-hidden="true"></div>
 
   <!-- Hidden until auth.js confirms a session (goal spec §5) -->
-  <div id="frame" style="display:none" class="mx-auto flex h-[calc(100dvh-1rem)] sm:h-[calc(100dvh-2rem)] md:h-[calc(100dvh-3rem)] max-w-[1500px] flex-col overflow-hidden rounded-frame border border-edge/80 bg-panel shadow-lift" data-focusmode="false">
+  <div id="frame" style="display:none" class="mx-auto flex h-[100dvh] sm:h-[calc(100dvh-2rem)] md:h-[calc(100dvh-3rem)] max-w-[1500px] flex-col overflow-hidden border-edge/80 bg-panel max-sm:border-0 sm:rounded-frame sm:border sm:shadow-lift" data-focusmode="false">
 
     <!-- ══ Title bar ══ -->
-    <header class="glass flex items-center gap-3 border-b px-3 py-2.5">
-      <div class="flex items-center gap-1.5">
+    <header class="glass flex flex-wrap items-center gap-x-3 gap-y-2 border-b px-3 py-2.5">
+      <!-- Window chrome is a desktop metaphor: minimize-to-dock and fullscreen
+           mean nothing on a handset, so the phone header spends that room on
+           the wordmark and the account menu instead. -->
+      <div class="flex items-center gap-1.5 max-sm:hidden">
         <button id="tl-red" class="tl" style="--tl-color:#ff5f57" aria-label="Minimize current tool to dock">
           <svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2 5h6"/></svg>
         </button>
@@ -29,20 +32,30 @@
         </button>
       </div>
 
-      <nav role="tablist" aria-label="Tools" class="ml-2 flex items-center gap-1">
-        <button id="tab-logbook" role="tab" aria-selected="true" aria-controls="view-logbook"
-          class="btn btn-ghost text-sm data-[active=true]:bg-panel-2 data-[active=true]:border-edge" data-active="true">
+      <!-- Phone-only wordmark: fills the row the traffic lights vacate so the
+           account menu isn't floating alone against the edge. -->
+      <div class="flex items-center gap-1.5 sm:hidden">
+        <span class="text-base leading-none" aria-hidden="true">🍱</span>
+        <span class="text-sm font-semibold">Bento OS</span>
+      </div>
+
+      <!-- On phones the tablist drops to its own full-width row and the three
+           tabs split it evenly: all destinations stay reachable and each one
+           clears the 44px touch floor. -->
+      <nav role="tablist" aria-label="Tools" class="flex items-center gap-1 max-sm:order-last max-sm:w-full sm:ml-2">
+        <button id="tab-logbook" role="tab" aria-selected="true" aria-controls="view-logbook" aria-label="Docs LogBook"
+          class="btn btn-ghost text-sm data-[active=true]:bg-panel-2 data-[active=true]:border-edge max-sm:flex-1 max-sm:justify-center" data-active="true">
           <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-          Docs LogBook
+          <span class="max-lg:hidden">Docs LogBook</span><span class="lg:hidden">LogBook</span>
           <span id="dirty-dot" class="hidden h-1.5 w-1.5 rounded-full bg-warn-hue" title="Unsaved changes"></span>
         </button>
-        <button id="tab-prompts" role="tab" aria-selected="false" aria-controls="view-prompts" class="btn btn-ghost text-sm data-[active=true]:bg-panel-2 data-[active=true]:border-edge" data-active="false">
+        <button id="tab-prompts" role="tab" aria-selected="false" aria-controls="view-prompts" aria-label="Prompt Library" class="btn btn-ghost text-sm data-[active=true]:bg-panel-2 data-[active=true]:border-edge max-sm:flex-1 max-sm:justify-center" data-active="false">
           <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7 8-4 4 4 4"/><path d="m17 8 4 4-4 4"/><path d="m14 4-4 16"/></svg>
-          Prompt Library
+          <span class="max-lg:hidden">Prompt Library</span><span class="lg:hidden">Prompts</span>
         </button>
-        <button id="tab-snippets" role="tab" aria-selected="false" aria-controls="view-snippets" class="btn btn-ghost text-sm data-[active=true]:bg-panel-2 data-[active=true]:border-edge" data-active="false">
+        <button id="tab-snippets" role="tab" aria-selected="false" aria-controls="view-snippets" aria-label="Code Snippets" class="btn btn-ghost text-sm data-[active=true]:bg-panel-2 data-[active=true]:border-edge max-sm:flex-1 max-sm:justify-center" data-active="false">
           <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m6 9 3 3-3 3"/><path d="M12 15h5"/></svg>
-          Code Snippets
+          <span class="max-lg:hidden">Code Snippets</span><span class="lg:hidden">Snippets</span>
         </button>
       </nav>
 
@@ -54,7 +67,7 @@
         <div id="nav-user" class="relative hidden">
           <button id="nav-user-btn" class="btn btn-ghost text-xs" aria-haspopup="menu" aria-expanded="false" aria-label="Account menu">
             <svg class="icon !h-4 !w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-            <span id="nav-username" class="max-w-[10rem] truncate font-medium">—</span>
+            <span id="nav-username" class="max-w-[6rem] truncate font-medium sm:max-w-[10rem]">—</span>
             <span id="nav-role-badge" class="hidden rounded-full border border-edge px-1.5 py-0.5 text-[10px] text-ink-muted"></span>
           </button>
           <div id="user-menu" role="menu" aria-label="Account" class="glass absolute right-0 top-full z-50 mt-1 hidden w-52 rounded-card border p-1 shadow-lift">
@@ -116,7 +129,9 @@
         <div id="lb-workspace" class="flex min-w-0 flex-1 flex-col" data-mode="read">
 
           <!-- Entry header: title + actions -->
-          <div class="flex items-center gap-2 border-b border-edge px-3 py-2">
+          <!-- Six controls plus a title don't fit a phone row: the title drops
+               to its own full-width line rather than being squeezed to ~60px. -->
+          <div class="flex flex-wrap items-center gap-2 border-b border-edge px-3 py-2">
             <button id="lb-drawer-open" class="icon-btn btn-ghost lg:hidden" aria-label="Open entries list">
               <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
             </button>
@@ -126,7 +141,7 @@
               <svg class="icon sidebar-icon-hidden hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/><path d="m12 10 2 2-2 2"/></svg>
             </button>
             <label for="lb-title" class="sr-only">Entry title</label>
-            <input id="lb-title" class="input min-w-0 flex-1 border-transparent bg-transparent text-base font-semibold focus:border-accent" placeholder="Untitled entry" maxlength="300">
+            <input id="lb-title" class="input min-w-0 flex-1 border-transparent bg-transparent text-base font-semibold focus:border-accent max-sm:order-last max-sm:w-full max-sm:flex-none" placeholder="Untitled entry" maxlength="300">
             <span id="lb-edited-hint" class="hidden whitespace-nowrap text-xs text-ink-muted">Edited</span>
             <!-- Reading / Editor mode toggle (icon swaps with mode; label shows on hover) -->
             <button id="lb-mode-toggle" class="icon-btn btn-ghost" title="Reading mode — click to edit" aria-label="Reading mode (switch to editor)" aria-pressed="true">

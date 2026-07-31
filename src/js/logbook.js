@@ -1078,19 +1078,23 @@ function initNarrowToggle() {
 
 function initDrawer() {
   let scrim = null;
+  // The overlay surface lives in CSS (#lb-sidebar[data-drawer="open"]), not in
+  // utility classes: bg-panel-2/50 from the desktop column outranks a bg-panel
+  // utility on source order, which left the drawer see-through.
   const open = () => {
     el.sidebar.classList.remove('max-lg:hidden');
-    el.sidebar.classList.add('fixed', 'inset-y-0', 'left-0', 'z-40', 'w-72', 'shadow-lift', 'bg-panel');
+    el.sidebar.dataset.drawer = 'open';
     scrim = document.createElement('div');
-    scrim.className = 'fixed inset-0 z-30 bg-black/50';
+    scrim.className = 'scrim';
     scrim.addEventListener('click', close);
     document.body.appendChild(scrim);
     el.search.focus();
   };
   const close = () => {
+    if (!scrim) return;
     el.sidebar.classList.add('max-lg:hidden');
-    el.sidebar.classList.remove('fixed', 'inset-y-0', 'left-0', 'z-40', 'w-72', 'shadow-lift', 'bg-panel');
-    scrim?.remove();
+    delete el.sidebar.dataset.drawer;
+    scrim.remove();
     scrim = null;
     el.drawerOpen.focus();
   };
@@ -1099,9 +1103,25 @@ function initDrawer() {
     if (e.key === 'Escape' && scrim) close();
   });
   // Selecting an entry on mobile closes the drawer
-  el.list.addEventListener('click', () => {
-    if (scrim) close();
-  });
+  el.list.addEventListener('click', () => close());
+
+  // Swipe the drawer away — the gesture that opened it, reversed.
+  let startX = null;
+  let startY = null;
+  el.sidebar.addEventListener('touchstart', (e) => {
+    if (!scrim || e.touches.length !== 1) return;
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+  }, { passive: true });
+  el.sidebar.addEventListener('touchend', (e) => {
+    if (startX === null) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - startX;
+    const dy = t.clientY - startY;
+    startX = null;
+    startY = null;
+    if (dx < -60 && Math.abs(dx) > Math.abs(dy) * 1.5) close();
+  }, { passive: true });
 }
 
 /* ── init ───────────────────────────────────────────────────── */
