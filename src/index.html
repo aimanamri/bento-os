@@ -252,11 +252,15 @@
                 <input id="meta-modified" type="datetime-local" step="1" class="input font-mono text-xs">
               </div>
             </div>
-            <details id="meta-urls-wrap" open>
-              <summary class="cursor-pointer text-xs font-medium text-ink-muted">URL list <span class="font-normal">(comma-separated)</span></summary>
-              <textarea id="meta-urls" class="input mt-1.5 min-h-[60px] resize-y font-mono text-xs" placeholder="https://…, https://…"></textarea>
-              <div id="meta-url-items" class="mt-1.5 flex flex-col gap-1 text-xs"></div>
-            </details>
+            <!-- The <details> collapses the *editor* only; the rendered links
+                 below it stay visible either way (they are the useful part). -->
+            <div>
+              <details id="meta-urls-wrap" open>
+                <summary class="cursor-pointer text-xs font-medium text-ink-muted">URL list <span class="font-normal">(comma-separated)</span><span id="meta-url-count" class="url-count hidden"></span></summary>
+                <textarea id="meta-urls" class="input mt-1.5 min-h-[60px] resize-y font-mono text-xs" placeholder="https://…, https://…"></textarea>
+              </details>
+              <div id="meta-url-items" class="url-list mt-1.5"></div>
+            </div>
             <button id="lb-delete" class="btn btn-ghost justify-start text-xs text-danger hidden">
               <svg class="icon !h-4 !w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
               Delete entry

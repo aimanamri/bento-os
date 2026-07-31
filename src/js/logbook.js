@@ -54,6 +54,7 @@ const el = {
   modified: document.getElementById('meta-modified'),
   urls: document.getElementById('meta-urls'),
   urlItems: document.getElementById('meta-url-items'),
+  urlCount: document.getElementById('meta-url-count'),
 };
 
 const state = {
@@ -209,22 +210,60 @@ function syncMetaWidgets() {
   el.sublabel.placeholder = hasLabel ? 'optional' : 'needs a label first';
   if (!hasLabel) el.sublabel.value = '';
 
+  renderUrlItems();
+}
+
+// Small inline icon for a URL chip — built as SVG nodes, never innerHTML.
+function chipIcon(path) {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', 'currentColor');
+  svg.setAttribute('stroke-width', '1.8');
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('stroke-linejoin', 'round');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.setAttribute('class', 'url-chip-icon');
+  const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  p.setAttribute('d', path);
+  svg.appendChild(p);
+  return svg;
+}
+
+const ICON_LINK = 'M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71';
+const ICON_WARN = 'M12 9v4m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z';
+
+// The rendered list lives outside the collapsible <details>, so it stays on
+// screen whether the editor is open or shut. Long URLs wrap to at most two
+// lines (full value in the tooltip) — one chip per row reads the same on a
+// 288px desktop panel and on a phone.
+function renderUrlItems() {
+  const items = el.urls.value.split(',').map((s) => s.trim()).filter(Boolean);
+
+  el.urlCount.textContent = String(items.length);
+  el.urlCount.classList.toggle('hidden', items.length === 0);
+  el.urlCount.title = `${items.length} link${items.length === 1 ? '' : 's'}`;
+
   el.urlItems.textContent = '';
-  for (const item of el.urls.value.split(',').map((s) => s.trim()).filter(Boolean)) {
-    const row = document.createElement('span');
-    if (/^https?:\/\/\S+$/i.test(item)) {
-      const a = document.createElement('a');
-      a.href = item;
-      a.textContent = item;
-      a.target = '_blank';
-      a.rel = 'noopener noreferrer';
-      a.className = 'text-accent underline break-all';
-      row.appendChild(a);
+  for (const item of items) {
+    const valid = /^https?:\/\/\S+$/i.test(item);
+    const row = document.createElement(valid ? 'a' : 'span');
+    row.className = valid ? 'url-chip' : 'url-chip url-chip-bad';
+    if (valid) {
+      row.href = item;
+      row.target = '_blank';
+      row.rel = 'noopener noreferrer';
+      row.title = item;
     } else {
-      row.className = 'text-ink-muted break-all';
-      row.textContent = `⚠ ${item}`;
-      row.title = 'Not a valid http(s) URL — kept as a note';
+      row.title = `${item}\nNot a valid http(s) URL — kept as a note`;
     }
+    row.appendChild(chipIcon(valid ? ICON_LINK : ICON_WARN));
+    const text = document.createElement('span');
+    text.className = 'url-chip-text';
+    // Drop the scheme (and any trailing slash) so the meaningful part of the
+    // URL wins the limited width; the tooltip and href keep the original.
+    text.textContent = valid ? item.replace(/^https?:\/\//i, '').replace(/\/$/, '') : item;
+    row.appendChild(text);
     el.urlItems.appendChild(row);
   }
 }
