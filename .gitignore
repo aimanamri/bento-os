@@ -1,3 +1,15 @@
+# Environment files in every form — .env, .env.dev, .env.local,
+# .env.production.local, prod.env… Secrets belong in your shell, your CI, or
+# Compose's own .env on the host — never in a commit (SECURITY.md §5).
+# A committed .env.example template is the one exception.
+.env
+.env.*
+*.env
+!.env.example
+# direnv, which is where an exported service-role key would otherwise land
+.envrc
+.envrc.*
+
 node_modules/
 dist/
 data/
