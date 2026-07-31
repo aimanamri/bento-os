@@ -141,6 +141,7 @@ editable, no mode switch required.
 | 8.4 | `prefers-reduced-motion` | All transitions (focus mode collapse, card flip, dock) drop to instant state changes. |
 | 8.5 | System clock skew between devices | Conflict copy (3.2/3.3) shows both timestamps but decisions compare **server** `updated_at` values only — client clocks are never compared against server clocks. Manually editing Modified time (§ 11) is a deliberate exception the user opts into per-entry; it does not affect how *conflicts* are detected. |
 | 8.6 | Two browser tabs open on the same device | They behave as two devices (3.x rows apply). Draft key collision: last dirty tab wins the draft slot — acceptable, documented. |
+| 8.7 | Metadata panel toggled open on a phone | Renders as a right-edge overlay sheet (scrim, close button, Esc, swipe-right), never as an in-flow column — in flow its `w-72` takes 288 of ~390 px and the workspace collapses until the entry header stacks vertically. Crossing the 1024 px line while it is open (rotation) re-resolves it into the form that fits rather than leaving a fixed sheet over a roomy layout. |
 
 ## 9. Reading / Editor Mode
 
