@@ -2,7 +2,8 @@
 #
 # Bento OS — production image (multi-stage)
 #   deps    → production-only node_modules (express, and nothing else)
-#   build   → full deps, compiles CSS + copies static/vendor assets into dist/
+#   build   → full deps; compiles CSS, copies static/vendor/PWA assets into
+#             dist/, and stamps the service worker with that build's precache
 #   runtime → minimal, non-root, read-only; ships dist/ + server/ only
 #
 # The app is a static host — all data lives in Supabase, so the image carries
@@ -27,7 +28,15 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY . .
-RUN npm run build
+# The PWA assets come from the build context (src/assets, src/manifest.…) and
+# from build:sw, so a .dockerignore change or a missing file degrades the app
+# silently: it still boots, it just stops being installable or offline-capable.
+# Fail the image build instead.
+RUN npm run build \
+ && test -s dist/sw.js \
+ && test -s dist/manifest.webmanifest \
+ && test -s dist/assets/icons/icon-512.png \
+ && test -s dist/assets/icons/icon-maskable-512.png
 
 # ---- runtime ----
 FROM node:20-alpine AS runtime

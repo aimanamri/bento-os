@@ -19,6 +19,10 @@ services:
     # Published on loopback by default; front it with `tailscale serve` for
     # remote access. Override per machine in .env — e.g. BENTO_BIND=0.0.0.0 to
     # reach it from the LAN (read DOCKER.md § Exposing it first).
+    # Note for the PWA: `http://localhost:<port>` is a secure context and
+    # installs/works offline; `http://<lan-ip>:<port>` is not, and the service
+    # worker silently never registers there. Reach it over the HTTPS Tailscale
+    # serve to keep the installable, offline-capable build.
     ports:
       - "${BENTO_BIND:-127.0.0.1}:${BENTO_HOST_PORT:-8481}:3000"
     environment:

@@ -4,6 +4,12 @@
 # Meant to run with the source bind-mounted (see the `dev` profile in
 # docker-compose.yml). `npm run dev` rebuilds assets then starts the server;
 # there is no file watcher, so restart the container to pick up changes.
+#
+# Service-worker gotcha while iterating: a rebuilt dist means a new worker,
+# but the running one keeps serving its cached assets until every tab is
+# closed (it waits by design — src/sw.js). If a change doesn't show up after
+# a restart + reload, tick DevTools → Application → Service Workers →
+# "Update on reload", or use a private window.
 FROM node:20-alpine
 ENV NODE_ENV=development
 WORKDIR /app
