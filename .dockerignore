@@ -1,8 +1,13 @@
 # Dependencies / build output (reinstalled + regenerated inside the image)
 node_modules/
+**/node_modules/
 dist/
 npm-debug.log
 .npm
+
+# Sibling checkouts of the other variant branches — hundreds of MB of build
+# context that would otherwise be uploaded to the daemon on every build.
+.worktrees/
 
 # VCS / editor / OS cruft
 .git

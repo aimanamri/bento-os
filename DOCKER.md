@@ -7,8 +7,100 @@ Bento OS ships two images:
 | `bento-os:latest`| `Dockerfile`    | Production — small, hardened, non-root, read-only. |
 | `bento-os:dev`   | `Dockerfile.dev`| Development — source bind-mounted, no hardening.   |
 
-Data lives in `./data` on the host (SQLite database + WAL files) and is bind-mounted
-into the container, so it survives rebuilds and image deletes.
+**The container owns your data.** This is the local-SQLite variant: the database
+(plus its WAL files) lives in `./data` on the host and is bind-mounted into the
+container, so it survives rebuilds and image deletes. Nothing leaves the
+machine — and nothing follows you to another one unless you carry `./data`
+with it.
+
+> The Supabase variant (`main` / `dev-supabase`) is stateless instead: the
+> browser talks to a hosted Postgres, the container mounts no volume, and
+> moving machines is just a clone. Its Docker files mirror this structure —
+> see that branch's DOCKER.md.
+
+---
+
+## Running it on another machine
+
+```bash
+git clone <your-repo-url> BentoOS
+cd BentoOS
+docker compose up -d          # build (first run) + start in the background
+```
+
+That gives you an **empty** Bento OS with a fresh `admin` / `bentoos` bootstrap
+(see § First login). To bring your existing content along, copy the database
+over before the first start:
+
+```bash
+# on the old machine — stop first so the WAL is checkpointed into the .db file
+docker compose down
+tar czf bento-data.tgz data/
+
+# on the new machine, from the repo root
+tar xzf bento-data.tgz          # restores ./data
+sudo chown -R 1001:1001 ./data  # Linux hosts only — the container runs as UID 1001
+docker compose up -d
+```
+
+Your accounts and passwords come with it — the users table is inside that same
+database.
+
+---
+
+## Where the app writes data
+
+Everything the server writes goes to one place:
+
+```
+browser ──HTTP──▶ bento-os container ──▶ /app/data/bento.db   ← bind-mounted to ./data
+                  (read-only rootfs)      + bento.db-wal / -shm
+```
+
+The root filesystem is mounted **read-only**; `./data` is the single exception
+and the only path the app can write. Two things must hold or writes fail:
+
+- **The host dir must be writable by UID 1001** (the container's `nodejs`
+  user). Docker Desktop on macOS/Windows handles this; on Linux run
+  `sudo chown -R 1001:1001 ./data`. Otherwise the server exits at boot —
+  `server/db.js` opens the database while the module loads.
+- **Shut down gracefully** so SQLite checkpoints its WAL. `docker compose down`
+  and `restart` both send SIGTERM, which `tini` forwards to Node;
+  `stop_grace_period: 15s` gives the checkpoint room to finish.
+
+Confirm it's actually writing:
+
+```bash
+docker compose exec bento ls -l /app/data     # bento.db + -wal, owned by nodejs
+```
+
+---
+
+## Configuration
+
+Compose reads a `.env` file sitting next to `docker-compose.yml`, so per-machine
+settings never need a file edit:
+
+| Variable             | Default     | What it does                                                       |
+| -------------------- | ----------- | ------------------------------------------------------------------ |
+| `BENTO_BIND`         | `127.0.0.1` | Host interface the port is published on. `0.0.0.0` exposes the LAN. |
+| `BENTO_HOST_PORT`    | `8481`      | Host port. The in-container port stays `3000`.                      |
+| `BENTO_OPEN_SIGNUP`  | `1`         | Self-signup for new accounts; `0` locks it to admin-created only.    |
+| `DOCKER_UID` / `DOCKER_GID` | `1001` | **Dev profile only.** Host user the container writes as. On Linux set these to your `id -u` / `id -g`. |
+
+### Exposing it
+
+The port is published on **loopback only** by default — nothing is reachable
+from your LAN. The recommended route to other devices is Tailscale, which keeps
+the listener private and adds identity and TLS:
+
+```bash
+tailscale serve --bg https / http://127.0.0.1:8481
+```
+
+Setting `BENTO_BIND=0.0.0.0` publishes to every interface on the host. Bento OS
+serves plain HTTP with cookie-based sessions, so only do that behind a reverse
+proxy that terminates TLS.
 
 ---
 
@@ -20,14 +112,8 @@ into the container, so it survives rebuilds and image deletes.
 docker compose up -d          # build (first run) + start in the background
 ```
 
-Open **http://127.0.0.1:8481**.
-
-The port is published on **loopback only** (`127.0.0.1:8481`). Nothing is exposed to
-your LAN. To reach it from other devices, front it with Tailscale:
-
-```bash
-tailscale serve --bg https / http://127.0.0.1:8481
-```
+Open **http://127.0.0.1:8481** (change the host port with `BENTO_HOST_PORT` —
+see § Configuration).
 
 ### First login
 
@@ -39,8 +125,8 @@ password: bentoos
 ```
 
 A password change is forced on that first login. Self-signup for additional
-accounts is on by default (`role: user`) — set `BENTO_OPEN_SIGNUP=0` in
-`docker-compose.yml` to make new accounts admin-created only.
+accounts is on by default (`role: user`) — set `BENTO_OPEN_SIGNUP=0` in `.env`
+to make new accounts admin-created only.
 
 ### Everyday commands
 
@@ -86,6 +172,16 @@ docker compose --profile dev up bento-dev      # build + run with live source mo
 Open **http://127.0.0.1:3000**. First login is the same bootstrapped admin as
 production (`admin` / `bentoos`, password change forced) unless `./data` already
 holds a database from a previous run.
+
+This container writes more than production does: `npm run dev` regenerates
+`dist/` inside the bind mount, on top of the usual `./data`. Docker Desktop
+(macOS/Windows) remaps ownership so that just works. **On a Linux host** the
+container's UID must match yours or the build fails with `EACCES`:
+
+```bash
+printf 'DOCKER_UID=%s\nDOCKER_GID=%s\n' "$(id -u)" "$(id -g)" >> .env
+docker compose --profile dev up -d bento-dev
+```
 
 Your working tree is bind-mounted into the container. `node_modules` is **not** —
 the container keeps its own Linux-built copy (via an anonymous volume) so the native

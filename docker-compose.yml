@@ -1,4 +1,11 @@
 # Compose Spec — no top-level `version:` key is needed anymore.
+#
+# This is the LOCAL-SQLITE variant: the container owns your data. The database
+# lives in ./data on the host (bind-mounted), which is the only writable path
+# and the only thing you need to carry to another machine.
+#
+# Per-machine overrides go in a `.env` file next to this one (Compose reads it
+# automatically) — see DOCKER.md § Configuration.
 
 services:
   # ---- Production ----
@@ -8,17 +15,22 @@ services:
       dockerfile: Dockerfile
     image: bento-os:latest
     container_name: bento-os-prod
-    # Bind to loopback only; front it with `tailscale serve` for remote access.
+    # Published on loopback by default; front it with `tailscale serve` for
+    # remote access. Override per machine in .env — e.g. BENTO_BIND=0.0.0.0 to
+    # reach it from the LAN (read DOCKER.md § Exposing it first).
     ports:
-      - "127.0.0.1:8481:3000"
+      - "${BENTO_BIND:-127.0.0.1}:${BENTO_HOST_PORT:-8481}:3000"
     environment:
       - BENTO_PORT=3000
       - BENTO_HOST=0.0.0.0            # 0.0.0.0 *inside* the container so Docker can forward
       - NODE_ENV=production
       - NODE_OPTIONS=--max-old-space-size=384   # cap V8 heap under the 512m limit
-      - BENTO_OPEN_SIGNUP=1           # set to 0 to make accounts admin-created only
+      - BENTO_OPEN_SIGNUP=${BENTO_OPEN_SIGNUP:-1}   # 0 = accounts are admin-created only
     volumes:
-      - ./data:/app/data             # SQLite db + WAL live here (only writable path)
+      # SQLite db + WAL live here — the only writable path in the container.
+      # The app runs as UID 1001; on a Linux host this dir must be writable by
+      # it (`sudo chown -R 1001:1001 ./data`) or the server exits at boot.
+      - ./data:/app/data
     restart: unless-stopped
     stop_grace_period: 15s           # allow the WAL checkpoint on shutdown
 
@@ -61,12 +73,19 @@ services:
       dockerfile: Dockerfile.dev
     image: bento-os:dev
     container_name: bento-os-dev
+    # `npm run dev` writes dist/ back into the bind-mounted source tree, and the
+    # server writes ./data, so the container's user must own both on the host.
+    # Docker Desktop (macOS/Windows) remaps ownership for you; on Linux set
+    # DOCKER_UID and DOCKER_GID in .env to your own `id -u` / `id -g` or the
+    # build fails with EACCES. See DOCKER.md § Development.
+    user: "${DOCKER_UID:-1001}:${DOCKER_GID:-1001}"
     ports:
       - "127.0.0.1:3000:3000"
     environment:
       - BENTO_PORT=3000
       - BENTO_HOST=0.0.0.0
       - NODE_ENV=development
+      - npm_config_cache=/tmp/.npm    # writable cache for the non-root user
     volumes:
       - .:/app                       # live source
       - /app/node_modules            # keep the image's linux-built node_modules
