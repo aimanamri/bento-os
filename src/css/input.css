@@ -120,6 +120,36 @@
       px-2 py-0.5 text-xs font-medium;
   }
 
+  /* URL list: one chip per row, always visible (the <details> above it only
+     collapses the comma-separated editor). */
+  .url-list { @apply flex flex-col gap-1; }
+  .url-list:empty { display: none; }
+  .url-chip {
+    @apply flex items-start gap-1.5 rounded-md border border-edge bg-panel
+      px-2 py-1.5 text-xs text-accent transition-colors duration-150
+      hover:border-accent/60 hover:bg-accent/10;
+    min-width: 0;
+  }
+  .url-chip-icon { @apply mt-px h-3.5 w-3.5 flex-none opacity-70; }
+  /* Long URLs wrap to two lines instead of overflowing a 288px panel or a
+     phone; the full value stays in the title tooltip and the href. */
+  .url-chip-text {
+    @apply min-w-0 leading-snug;
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .url-chip-bad { @apply text-ink-muted border-warn-hue/40 bg-warn-hue/5 hover:border-warn-hue/60 hover:bg-warn-hue/10; }
+  /* Link count on the summary row — the one bit of the list that has to read
+     at a glance while the editor is collapsed. */
+  .url-count {
+    @apply ml-1.5 inline-block rounded-full bg-accent/15 text-accent
+      px-1.5 text-[10px] font-semibold align-middle;
+    min-width: 1.25rem; line-height: 1.25rem; text-align: center;
+  }
+
   /* Traffic lights: 44px hit areas around 13px dots (UX-SPEC §2) */
   .tl {
     @apply relative flex items-center justify-center cursor-pointer;
@@ -253,6 +283,23 @@
 .md-preview ol { list-style: decimal; padding-left: 1.4em; }
 .md-preview li { margin: 0.25em 0; }
 .md-preview a { color: rgb(var(--c-accent)); text-decoration: underline; text-underline-offset: 2px; }
+/* In-document jumps scroll the pane rather than opening a tab; the dotted
+   underline is the tell that this link stays inside the note. */
+.md-preview a.md-anchor { text-decoration-style: dotted; text-underline-offset: 3px; cursor: pointer; }
+/* Room under the sticky-ish top edge so a jumped-to heading isn't flush */
+.md-preview :is(h1, h2, h3, h4, h5, h6) { scroll-margin-top: 0.75rem; }
+/* Landing tint — the URL never changes, so this is the only "you are here" */
+.md-preview .anchor-flash {
+  animation: anchor-flash 1.2s ease-out;
+  border-radius: 4px;
+}
+@keyframes anchor-flash {
+  0%, 25% { background: rgb(var(--c-accent) / 0.22); box-shadow: 0 0 0 4px rgb(var(--c-accent) / 0.22); }
+  100% { background: transparent; box-shadow: 0 0 0 4px transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .md-preview .anchor-flash { animation-duration: 0.01ms; }
+}
 .md-preview code {
   font-family: theme('fontFamily.mono'); font-size: 0.85em;
   background: rgb(var(--c-panel-2)); border: 1px solid rgb(var(--c-edge) / 0.7);
@@ -424,6 +471,10 @@
   .entry-row { min-height: 44px; }
   /* Markdown task checkboxes render at 13px — unhittable with a thumb */
   .md-preview input[type="checkbox"] { width: 1.15rem; height: 1.15rem; }
+  .url-chip { min-height: 40px; align-items: center; }
+  /* Inline anchors sit in running text, so give the tap target height
+     without disturbing the line box around them */
+  .md-preview a.md-anchor { padding-block: 0.25rem; }
 }
 
 /* Phone: the frame goes edge-to-edge (see index.html), so the safe-area

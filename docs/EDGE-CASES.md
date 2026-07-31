@@ -72,7 +72,8 @@
 | 4.9 | Checkbox lists in preview | Rendered checkboxes are display-only (clicking does not mutate source). Cursor: default, not pointer — don't imply interactivity. |
 | 4.10 | Math delimiters inside code spans/fences (`` `$x$` ``) | Must NOT be KaTeX-rendered — `ignoredTags` on the auto-render call skips `pre`/`code`/etc. |
 | 4.11 | `<sup>2</sup>` / `<sub>2</sub>` typed literally in a note | Renders as a real superscript/subscript element — but **only** the bare tag (no attributes); `<sup class=… onclick=…>` does not match the whitelist rule and renders as literal escaped text instead (SECURITY.md § 2). Math like `$a^2+b^2$` is entirely unaffected — the `^`/`~` markdown-it superscript/subscript *syntax* was deliberately never enabled. |
-| 4.12 | Mermaid diagram with 2+ node/edge labels | All label text must be visible (not blank shapes) — labels are extracted from Mermaid's `foreignObject` output into plain SVG `<text>` before sanitization (SECURITY.md § 2). HTML formatting *inside* a label (bold, links) is not supported — it renders as flattened plain text, which is an accepted trade-off, not a bug. |
+| 4.12 | In-document link (`[Setup](#setup-steps)`) | Scrolls the rendered surface to that heading **in place** — same tab, and `location.hash` is never written (the note is not a routable page). Headings get GitHub-style slug `id`s (duplicates → `-1`, `-2`); a link whose target does not exist is swallowed (no navigation, no URL change). The landed-on heading flashes briefly, since the URL gives no feedback. Modifier/middle clicks are left to the browser. |
+| 4.13 | Mermaid diagram with 2+ node/edge labels | All label text must be visible (not blank shapes) — labels are extracted from Mermaid's `foreignObject` output into plain SVG `<text>` before sanitization (SECURITY.md § 2). HTML formatting *inside* a label (bold, links) is not supported — it renders as flattened plain text, which is an accepted trade-off, not a bug. |
 
 ## 5. Prompt Library — `{{Variable}}` Engine (directly editable in place)
 
@@ -106,7 +107,7 @@ editable, no mode switch required.
 | 6.1 | Tags: `"a,, b , a ,"` | Normalize: split, trim, drop empties, case-insensitive dedupe → `["a","b"]`. Same normalization server-side. |
 | 6.2 | Tag containing a comma | Impossible by construction (comma is the delimiter) — Guide documents it; input strips them. |
 | 6.3 | Labels blank | Map to `Uncategorized` (client default + DB `DEFAULT`). Sub-label without label → also `Uncategorized/`+sublabel is forbidden; sublabel select disabled until label chosen. |
-| 6.4 | URL list: `"https://a.com, not a url, ftp://x"` | Parse per-item; valid `http(s)` items become links; invalid items kept as plain text with a subtle ⚠ marker — never silently dropped (they may be paths/notes). |
+| 6.4 | URL list: `"https://a.com, not a url, ftp://x"` | Parse per-item; valid `http(s)` items become link chips (one per row, scheme stripped for width, wrapping to at most 2 lines, full value in the tooltip and `href`); invalid items kept as a warning-toned chip with a ⚠ icon — never silently dropped (they may be paths/notes). The chips render **outside** the `<details>`, so collapsing the comma-separated editor hides the raw text but never the links; the summary carries a link-count badge. |
 | 6.5 | Search: `" OR 1=1 --`, `title:x`, lone `"` | Safe (SECURITY.md § 3 quoting); returns literal-match results or empty; never 500. |
 | 6.6 | Search with 0 results | Empty state with the query echoed (safely) + "Clear search" action. |
 | 6.7 | Unicode: emoji in titles/tags, CJK, RTL text | Stored and searched correctly (FTS `unicode61`); no mojibake; RTL renders with `dir="auto"` on title/body containers. |

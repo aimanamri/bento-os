@@ -229,6 +229,7 @@ export const GUIDE_MD = `
 | Subscript | \`H<sub>2</sub>O\` → H<sub>2</sub>O |
 | Inline code | \`\` \`code\` \`\` |
 | Link | \`[label](https://url)\` |
+| Jump to a heading | \`[label](#heading-title)\` |
 | Heading | \`# H1\` … \`### H3\` |
 | Bulleted list | \`- item\` |
 | Numbered list | \`1. item\` |
@@ -279,6 +280,7 @@ Start a quote with a \`[!TYPE]\` marker on its own line:
 
 ## Good to know
 
+- **Links** to \`https://…\` open in a new tab. A link to \`#a-heading-in-this-note\` scrolls you to that heading instead — same tab, same note. Write the heading in lowercase with hyphens for spaces (*Setup Steps* → \`#setup-steps\`).
 - **Tags** are comma-separated — a tag can't contain a comma.
 - **Labels** left blank file under *Uncategorized*; sub-labels need a label first.
 - **Fields** are your own name/value metadata (e.g. \`os_platform: macOS\`, \`is_valid: true\`). Values are plain text and searchable from the sidebar.

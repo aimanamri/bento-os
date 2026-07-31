@@ -62,7 +62,7 @@ would both miss anything those libraries emit and break their output.
 {
   USE_PROFILES: { html: true, svg: true, svgFilters: true, mathMl: true },
   ADD_TAGS: ['semantics', 'annotation', 'input'],
-  ADD_ATTR: ['aria-hidden', 'data-line', 'type', 'checked', 'disabled'],
+  ADD_ATTR: ['aria-hidden', 'data-line', 'type', 'checked', 'disabled', 'id'],
   FORBID_TAGS: ['foreignObject', 'form', 'iframe', 'object', 'embed', 'base', 'link', 'meta', 'script'],
   FORBID_ATTR: ['onerror', 'onload', 'onclick', 'formaction'],
   // NOTE: no custom ALLOWED_URI_REGEXP — see "Lesson learned" below.
@@ -70,8 +70,13 @@ would both miss anything those libraries emit and break their output.
 ```
 
 Plus a DOMPurify hook (`afterSanitizeAttributes`) that:
-- adds `target="_blank" rel="noopener noreferrer"` to every kept `<a href>`
-  (notes link out to the web; no reverse-tabnabbing);
+- adds `target="_blank" rel="noopener noreferrer"` to every kept **outbound**
+  `<a href>` (notes link out to the web; no reverse-tabnabbing);
+- marks `<a href="#…">` as an in-document anchor (`class="md-anchor"`, no
+  `target`/`rel`) — a delegated click handler scrolls the rendered surface
+  itself and always calls `preventDefault()`, so a hash link can neither open
+  a tab nor rewrite the URL (EDGE-CASES § 4.12). Heading `id`s are slugs
+  generated from `textContent`, so they carry no user markup;
 - force-disables any surviving `<input type="checkbox">` and **removes**
   any other input type outright (task-list checkboxes are the only
   legitimate `<input>` this pipeline should ever emit).

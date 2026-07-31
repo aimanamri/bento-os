@@ -35,7 +35,8 @@ const PURIFY_CONFIG = {
   // 'input' is not in the html profile; the hook below constrains any that
   // appear to disabled checkboxes (task lists) — everything else is removed.
   ADD_TAGS: ['semantics', 'annotation', 'input'],
-  ADD_ATTR: ['aria-hidden', 'data-line', 'type', 'checked', 'disabled'],
+  // 'id' carries the heading slugs that in-document anchors jump to.
+  ADD_ATTR: ['aria-hidden', 'data-line', 'type', 'checked', 'disabled', 'id'],
   // foreignObject is the classic SVG sanitizer bypass — strict-mode Mermaid
   // doesn't emit it; we enforce what the renderer promises.
   FORBID_TAGS: ['foreignObject', 'form', 'iframe', 'object', 'embed', 'base', 'link', 'meta', 'script'],
@@ -50,10 +51,20 @@ const PURIFY_CONFIG = {
 };
 
 DOMPurify.addHook('afterSanitizeAttributes', (node) => {
-  // Notes link out to the web: no reverse-tabnabbing.
   if (node.tagName === 'A' && node.hasAttribute('href')) {
-    node.setAttribute('target', '_blank');
-    node.setAttribute('rel', 'noopener noreferrer');
+    if (node.getAttribute('href').startsWith('#')) {
+      // In-document jump (a table of contents, a "see below" link): stays in
+      // this tab and never touches location.hash — the click handler below
+      // scrolls the surface itself. target/rel are cleared so a stale
+      // attribute from earlier markup can't reopen it in a new tab.
+      node.setAttribute('class', `${node.getAttribute('class') || ''} md-anchor`.trim());
+      node.removeAttribute('target');
+      node.removeAttribute('rel');
+    } else {
+      // Notes link out to the web: no reverse-tabnabbing.
+      node.setAttribute('target', '_blank');
+      node.setAttribute('rel', 'noopener noreferrer');
+    }
   }
   // Task-list checkboxes are display-only (EDGE-CASES §4.9); any other
   // input type that survives is removed outright.
@@ -200,6 +211,91 @@ function collapseForeignObjectLabels(root) {
   }
 }
 
+/* ── in-document anchors (heading links) ────────────────────── */
+
+// GitHub-style slug: lowercase, punctuation/emoji dropped, spaces → hyphens.
+// `[Setup](#setup-steps)` and `[Setup](#Setup Steps)` both resolve to the
+// heading "## Setup Steps".
+function slugify(text) {
+  return String(text)
+    .trim()
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\p{M}\s_-]/gu, '')
+    .replace(/\s+/g, '-')
+    .replace(/-{2,}/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+// markdown-it emits bare <h1>…<h6>; without ids there is nothing for a
+// `#section` link to land on. Duplicate headings get -1, -2, … like GitHub.
+function assignHeadingIds(host) {
+  const seen = new Map();
+  for (const h of host.querySelectorAll('h1, h2, h3, h4, h5, h6')) {
+    const base = slugify(h.textContent) || 'section';
+    const n = seen.get(base) || 0;
+    seen.set(base, n + 1);
+    h.setAttribute('id', n === 0 ? base : `${base}-${n}`);
+  }
+}
+
+// The rendered surface scrolls, not the window — find the pane that actually
+// owns the overflow so we scroll that one and leave the page put.
+function scrollParent(node) {
+  let p = node.parentElement;
+  while (p && p !== document.body) {
+    const overflowY = getComputedStyle(p).overflowY;
+    if (/(auto|scroll|overlay)/.test(overflowY) && p.scrollHeight > p.clientHeight) return p;
+    p = p.parentElement;
+  }
+  return null;
+}
+
+function findAnchorTarget(host, hash) {
+  let raw = hash;
+  try { raw = decodeURIComponent(hash); } catch { /* malformed %-escape: use as typed */ }
+  // Matched by walking [id] rather than a selector — slugs come from user
+  // headings and would need escaping to be safe inside one.
+  for (const node of host.querySelectorAll('[id]')) {
+    if (node.id === raw) return node;
+  }
+  // Fall back to slug matching so links written with the heading's literal
+  // text (spaces, caps, punctuation) still find their section.
+  const wanted = slugify(raw);
+  if (!wanted) return null;
+  for (const h of host.querySelectorAll('h1, h2, h3, h4, h5, h6')) {
+    if (h.id === wanted || slugify(h.textContent) === wanted) return h;
+  }
+  return null;
+}
+
+// One delegated listener for every markdown surface (preview lane, reading
+// mode, the guide dialog). preventDefault is unconditional for `#…` links:
+// a missing target must not fall through to the browser and rewrite the URL.
+document.addEventListener('click', (e) => {
+  const a = e.target.closest?.('a.md-anchor[href^="#"]');
+  if (!a || e.defaultPrevented || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+  e.preventDefault();
+
+  const host = a.closest('.md-preview') || a.getRootNode();
+  const target = findAnchorTarget(host, a.getAttribute('href').slice(1));
+  if (!target) return;
+
+  const behavior = matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+  const pane = scrollParent(target);
+  if (pane) {
+    const top = target.getBoundingClientRect().top - pane.getBoundingClientRect().top + pane.scrollTop;
+    pane.scrollTo({ top: Math.max(0, top - 12), behavior });
+  } else {
+    target.scrollIntoView({ behavior, block: 'start' });
+  }
+
+  // Brief tint so the eye catches where it landed (the URL gives no clue).
+  target.classList.remove('anchor-flash');
+  void target.offsetWidth; // restart the animation on repeat clicks
+  target.classList.add('anchor-flash');
+  setTimeout(() => target.classList.remove('anchor-flash'), 1200);
+});
+
 let seq = 0;
 
 /**
@@ -212,6 +308,7 @@ export async function renderMarkdown(source) {
 
   transformTaskLists(host);
   transformAlerts(host);
+  assignHeadingIds(host);
 
   // KaTeX — auto-render skips code/pre so `$x$` in code spans stays literal
   // (EDGE-CASES §4.10). throwOnError:false renders the bad TeX inline in the

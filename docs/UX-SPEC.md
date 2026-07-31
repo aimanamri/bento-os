@@ -215,8 +215,9 @@ Collapsible right-edge panel (auto-collapsed by Focus Mode), top to bottom:
    `color-scheme` is set per theme (`:root{color-scheme:light}` /
    `.dark{color-scheme:dark}`) so the native browser date/time picker
    itself matches dark mode rather than always rendering light-chrome.
-6. **URL list** — collapsible container, comma-separated input, per-item
-   validity marker (§ EDGE-CASES 6.4).
+6. **URL list** — the `<details>` collapses the comma-separated *input* only;
+   the parsed link chips sit below it and stay visible either way, with a
+   count badge on the summary row (§ EDGE-CASES 6.4).
 7. **Delete entry** — destructive action, visually separated (danger color,
    own row) from everything above it.
 
