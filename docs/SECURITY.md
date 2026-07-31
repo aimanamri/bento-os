@@ -264,6 +264,27 @@ just asserted) in the app's Playwright suites.
 | Dependencies | Lockfile committed; `npm audit --omit=dev` script available; the 5 runtime lib files (markdown-it, DOMPurify, KaTeX + its auto-render addon, Mermaid) vendored at pinned versions into `dist/vendor/` (CSP forbids CDNs anyway) |
 | Tailscale hygiene | Key expiry left enabled; app host tagged; ACL restricting the serve port to the owner's devices; Tailnet lock optional |
 
+## 4a. Service Worker & Offline Cache
+
+The PWA service worker (`src/sw.js`, stamped into `dist/sw.js` by
+`scripts/build-sw.js`) caches **the application, never the data**:
+
+| Control | Setting |
+|---|---|
+| Scope | `/` — same-origin only. Cross-origin requests return from the `fetch` handler *before* `respondWith`, so they are never read, stored or replayed by the worker. |
+| Data layer | **`/api/*` is skipped explicitly, and on this variant that is the load-bearing rule** — the Express API is same-origin, so without it a `GET /api/entries` would put a signed-in user's rows into CacheStorage. (On the Supabase variant the same line is redundant belt-and-braces, since that traffic is cross-origin. The two variants share `src/sw.js`, so the rule lives in the file rather than in a branch.) |
+| What is cached | `index.html`, `assets/app.css`, the icons, `js/*.js` and `vendor/*` — files that are already public to anyone who can load the login page. No response carrying a user's rows or JWT ever enters CacheStorage. |
+| Methods | GET only; a POST/PATCH/DELETE is never intercepted, so no write can be silently served from cache. |
+| Cache naming | `bento-shell-<build>` / `bento-runtime-<build>`, where `<build>` is a SHA-256 of the precached bytes. A new build lands in new caches and `activate` deletes every other `bento-*` cache — a poisoned or stale generation cannot outlive one deploy. |
+| Document strategy | Network-first: online, a deploy is picked up on the next load; the cached copy is a fallback, not the source of truth. |
+| Update model | The incoming worker **waits** rather than calling `skipWaiting()` on its own — a running session with an unsaved draft is never swapped mid-edit. It takes over on the next launch. |
+| Transport | Registration requires a secure context (HTTPS, or `localhost` for development) — over the Tailscale HTTPS serve this holds; over plain-HTTP LAN it silently no-ops and the app runs online-only. |
+
+**Shared-device note:** the cache is app code only, so signing out leaves
+nothing user-identifying in CacheStorage. The existing localStorage draft
+buffer (§5) remains the only client-side store of user content, and its
+rules are unchanged.
+
 ## 5. Data Safety
 
 - **WAL specifics**: `synchronous=NORMAL` is safe under WAL (worst crash
@@ -314,3 +335,4 @@ just asserted) in the app's Playwright suites.
 - [ ] Import: 3 MB file → 413; NUL-byte content renamed `.md` → 400; huge single-line md → renders or degrades, no hang
 - [ ] Server unreachable via LAN IP; reachable via `ts.net` HTTPS; Clipboard API works there
 - [ ] Restore-from-backup drill performed at least once
+- [ ] After a build, DevTools → Application → Cache Storage contains **only** `bento-shell-<build>`/`bento-runtime-<build>`, and no entry under either is a Supabase URL (regression check for § 4a)

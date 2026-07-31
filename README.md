@@ -21,6 +21,24 @@ new password before the dashboard opens. The server binds to loopback **only**
 
 `npm start` skips the build and just starts the server.
 
+## Install it as an app (PWA)
+
+Bento OS ships a web app manifest and a service worker, so it can be
+installed to the dock/home screen and launched in its own window: open it in
+the browser and choose **Install Bento OS…** from the account menu (or the
+browser's own install control; on iOS, *Share → Add to Home Screen*).
+
+The service worker precaches the app shell — HTML, CSS, JS and the vendored
+render libraries — so an installed Bento OS **opens offline** instead of
+showing a browser error. It caches the application only: entries, prompts and
+snippets come from the Express API and are never cached, so offline you get
+the workspace with an *offline* chip and empty lists until the host is
+reachable again. See [docs/SECURITY.md](docs/SECURITY.md) §4a.
+
+Registration needs a secure context — `localhost` in development, or the
+HTTPS Tailscale serve below. Over plain-HTTP LAN the app runs online-only.
+Regenerate the icon set with `npm run icons` after changing the mark.
+
 ## Accounts & roles
 
 - **Global admin** (one only): can reset normal-user passwords and promote
@@ -55,8 +73,8 @@ which only exists in secure contexts (there is a manual-copy fallback otherwise)
 
 ```
 server/          Express API, SQLite layer, migrations
-src/             Frontend source (index.html, css/input.css, js/)
-scripts/         Build helpers (static + vendor copy)
+src/             Frontend source (index.html, css/input.css, js/, sw.js, manifest)
+scripts/         Build helpers (static + vendor copy, service worker, icons)
 dist/            Build output (generated; served by Express)
 docs/            Implementation plan, security spec, edge-case matrix, UX spec
 ```

@@ -56,6 +56,10 @@
 | 3.5 | Network drop mid-save (tailnet roaming, laptop asleep) | `fetch` timeout 10 s → **(toast)** "Couldn't reach Bento host — draft is safe locally"; dirty state and draft retained; retry button. |
 | 3.6 | Server restarted / schema migrated between visits | `GET /api/health` on boot returns schema version; mismatch with cached client → hard reload prompt. |
 | 3.7 | Laptop host asleep when phone connects | Same as 3.5 (connection refused) — friendly host-unreachable screen, not a blank page. |
+| 3.8 | Installed PWA launched with **no network**, session still valid | The service worker serves the cached shell, so the app boots to its normal layout rather than a browser error page. The offline chip in the title bar appears immediately (`navigator.onLine`, not after the 10 s request timeout). Entries/prompts/snippets are **not** cached — lists render empty and each read reports the usual NETWORK error. |
+| 3.9 | Installed PWA launched offline, session cookie expired | The session cannot be re-established without the host, so the login screen shows. Signing in requires connectivity — this is the one offline state the app cannot paper over, and it must fail with the normal auth error rather than hanging. |
+| 3.10 | New build deployed while a tab is open | The incoming worker installs and waits; a toast says the update applies at next launch. The running session is never swapped mid-edit, so an unsaved draft cannot be lost to a deploy. |
+| 3.11 | Connectivity returns while the app is open | The `online` event re-runs the health check immediately (the 60 s poll is only a backstop), clearing the offline chip without a reload. |
 
 ## 4. Rendering (Markdown / KaTeX / Mermaid)
 

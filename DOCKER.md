@@ -275,6 +275,11 @@ for exactly this purpose (see the `Dockerfile`'s runtime stage).
 - **`permission denied` on `./data` (Linux hosts):** the container runs as UID 1001.
   Give it ownership of the host dir: `sudo chown -R 1001:1001 ./data`. (On macOS/Docker
   Desktop this is handled automatically.)
+- **No install option / the app doesn't work offline:** service workers need a
+  secure context. Reaching the container at `http://localhost:3000` counts as
+  one; reaching it at `http://<lan-ip>:3000` does not, and the app silently
+  runs online-only. Put it behind the HTTPS Tailscale serve (README) to get
+  the installable, offline-capable build over the network.
 - **Container is `unhealthy`:** `docker compose logs bento` — the healthcheck probes
   `/api/health` every 30s after a 10s grace period.
 - **Port already in use:** change the host side of the mapping in `docker-compose.yml`

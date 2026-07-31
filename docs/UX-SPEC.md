@@ -306,6 +306,22 @@ label + "Edited" hint near Save — always visible, never only in the tab
 title. Editing a dynamic field or the Modified time counts as "dirty" the
 same as editing the body.
 
+## 6a. Installed App (PWA)
+
+- **Install** is offered from the account menu ("Install Bento OS…"), shown
+  only once the browser reports the app is installable — Bento OS never
+  interrupts with an install banner of its own.
+- Installed, it opens in a standalone window with no browser chrome; the
+  title bar's traffic lights and dock keep working as the app's own window
+  metaphor. Manifest shortcuts jump straight to a tool (`?tool=prompts`).
+- **Offline** the app shell loads normally and the title-bar chip reads
+  *offline* immediately. What offline gives you is the application, not the
+  library: entries, prompts and snippets come from the Express API and are
+  not cached (SECURITY.md § 4a), so lists come up empty until the host is
+  reachable again — an honest empty state, never a fake one.
+- Updates install in the background and apply on the next launch, announced
+  by a toast. Nothing is force-reloaded under an open editor.
+
 ## 7. First-Run & Empty States
 
 - Fresh database: LogBook opens with a pre-seeded **welcome entry** that is
