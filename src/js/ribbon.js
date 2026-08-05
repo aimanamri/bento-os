@@ -278,6 +278,22 @@ Start a quote with a \`[!TYPE]\` marker on its own line:
 > [!CAUTION]
 > Advises about risks or negative outcomes of certain actions.
 
+## Frontmatter
+
+A \`---\` fence at the very top of a note — closed by \`---\` or \`...\` — renders as a key/value table instead of a rule:
+
+\`\`\`
+---
+title: Release notes
+tags: [ops, deploy]
+owner:
+  team: platform
+  oncall: rotating
+---
+\`\`\`
+
+Values show exactly as typed — markdown and math inside them stay literal. Nested keys and lists become tables of their own. A \`---\` anywhere else in the note is still a horizontal rule.
+
 ## Good to know
 
 - **Links** to \`https://…\` open in a new tab. A link to \`#a-heading-in-this-note\` scrolls you to that heading instead — same tab, same note. Write the heading in lowercase with hyphens for spaces (*Setup Steps* → \`#setup-steps\`).
@@ -285,7 +301,7 @@ Start a quote with a \`[!TYPE]\` marker on its own line:
 - **Labels** left blank file under *Uncategorized*; sub-labels need a label first.
 - **Fields** are your own name/value metadata (e.g. \`os_platform: macOS\`, \`is_valid: true\`). Values are plain text and searchable from the sidebar.
 - **Created** is set once and can't be changed. **Modified** updates automatically on every save, but you can set it by hand — an edited value is kept instead of bumping to now.
-- **Import** takes \`.md\` files up to 2 MB. The first \`# H1\` becomes the title; YAML frontmatter is kept as plain text.
+- **Import** takes \`.md\` files up to 2 MB. The first \`# H1\` becomes the title; YAML frontmatter is kept, and renders as a table.
 - **Autosave** snapshots your draft every 10 seconds; you'll be offered a restore after a crash or refresh.
 - **Install Bento OS** from the account menu to run it in its own window. Installed, it still opens when you're offline — but your entries live on the server, so you'll see the workspace with an *offline* chip and empty lists until you're back online.
 - In prompts, \`{{Variable}}\` fill-ins match literally — \`{{A}}{{B}}\` is two variables, \`{{}}\` is plain text.
