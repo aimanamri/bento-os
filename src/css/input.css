@@ -355,6 +355,20 @@
 .md-preview table { border-collapse: collapse; display: block; overflow-x: auto; max-width: 100%; }
 .md-preview th, .md-preview td { border: 1px solid rgb(var(--c-edge)); padding: 0.4rem 0.7rem; }
 .md-preview th { background: rgb(var(--c-panel-2)); }
+
+/* YAML frontmatter, shown as a key/value table the way GitHub shows it.
+   A real `display: table` rather than the scrolling `display: block` above,
+   so long values wrap inside the cell instead of pushing out a scrollbar. */
+.md-preview .md-frontmatter,
+.md-preview .md-frontmatter table { display: table; width: 100%; table-layout: fixed; }
+.md-preview .md-frontmatter table { margin: 0; }
+.md-preview .md-frontmatter th { width: 25%; text-align: center; font-weight: 600; }
+/* pre-wrap keeps the line breaks of a `|` block scalar; anywhere stops a long
+   URL or token from widening the column past the pane. */
+.md-preview .md-frontmatter :is(th, td) {
+  vertical-align: middle; overflow-wrap: anywhere; white-space: pre-wrap;
+}
+
 .md-preview hr { border: none; border-top: 1px solid rgb(var(--c-edge)); margin: 1.5em 0; }
 .md-preview img { max-width: 100%; border-radius: 8px; }
 .md-preview input[type="checkbox"] { accent-color: rgb(var(--c-accent)); margin-right: 0.4em; cursor: default; }

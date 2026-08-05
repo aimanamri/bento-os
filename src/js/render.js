@@ -211,6 +211,288 @@ function collapseForeignObjectLabels(root) {
   }
 }
 
+/* ── YAML frontmatter → key/value table ─────────────────────── */
+
+// A `---` fence on the very first line, closed by `---` or `...`. Anything
+// else — no fence, or one that never closes — falls through to markdown-it,
+// which keeps rendering a leading `---` as the horizontal rule it always was.
+function splitFrontmatter(source) {
+  const lines = source.split('\n').map((l) => l.replace(/\r$/, ''));
+  if (!/^---[ \t]*$/.test(lines[0] || '')) return null;
+  for (let i = 1; i < lines.length; i++) {
+    if (/^(?:---|\.\.\.)[ \t]*$/.test(lines[i])) {
+      return { yaml: lines.slice(1, i), body: lines.slice(i + 1).join('\n') };
+    }
+  }
+  return null;
+}
+
+// A deliberately small YAML subset — the shapes note frontmatter actually
+// uses: scalars, nested maps, sequences, block scalars and inline flow
+// collections. Whatever it can't read stays the literal text it was written
+// as, so a table always renders instead of an error.
+
+const indentOf = (line) => line.length - line.trimStart().length;
+
+function skipFiller(s) {
+  while (s.i < s.lines.length && (!s.lines[s.i].trim() || /^\s*#/.test(s.lines[s.i]))) s.i++;
+}
+
+// `#` opens a comment only at a word boundary and only outside quotes, so
+// `color: "#fff"` and `id: a#b` keep their values.
+function stripComment(text) {
+  let quote = null;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (quote) {
+      if (quote === '"' && c === '\\') i++;
+      else if (c === quote) quote = null;
+    } else if (c === '"' || c === "'") quote = c;
+    else if (c === '#' && (i === 0 || /\s/.test(text[i - 1]))) return text.slice(0, i);
+  }
+  return text;
+}
+
+// `key: value`, `"quoted key": value`, or a bare `key:` whose value is the
+// block below it. A colon needs trailing space to open a mapping, so
+// `url: https://x` keeps its whole value and `10:30` stays a scalar.
+const MAP_ENTRY_RE = /^(?:"((?:[^"\\]|\\.)*)"|'((?:[^']|'')*)'|([^:#]+?))\s*:(?:\s+([\s\S]*))?$/;
+
+function matchEntry(text) {
+  const m = MAP_ENTRY_RE.exec(text);
+  if (!m) return null;
+  let key;
+  if (m[1] !== undefined) key = unquote(`"${m[1]}"`);
+  else if (m[2] !== undefined) key = m[2].replace(/''/g, "'");
+  else key = m[3].trim();
+  return { key, value: (m[4] || '').trim() };
+}
+
+function unquote(v) {
+  if (/^"(?:[^"\\]|\\.)*"$/.test(v)) {
+    return v.slice(1, -1).replace(/\\(.)/g, (_, c) => ({ n: '\n', r: '\r', t: '\t' }[c] || c));
+  }
+  if (/^'(?:[^']|'')*'$/.test(v)) return v.slice(1, -1).replace(/''/g, "'");
+  return v;
+}
+
+// `complete` is false when the parser stopped early — a line it doesn't
+// understand (an anchor, a `!!tag`, a second document). The caller shows the
+// raw block in that case rather than a table that quietly drops the rest.
+function parseYaml(lines) {
+  const s = { lines: lines.slice(), i: 0 };
+  skipFiller(s);
+  if (s.i >= s.lines.length) return { data: new Map(), complete: true };
+  const data = parseBlock(s, indentOf(s.lines[s.i]));
+  skipFiller(s);
+  return { data, complete: s.i >= s.lines.length };
+}
+
+function parseBlock(s, indent) {
+  return /^-(\s|$)/.test(s.lines[s.i].trim()) ? parseSeq(s, indent) : parseMap(s, indent);
+}
+
+function parseMap(s, indent) {
+  const map = new Map(); // ordered, and unbothered by keys like __proto__
+  for (;;) {
+    skipFiller(s);
+    const line = s.lines[s.i];
+    if (line === undefined || indentOf(line) !== indent) break;
+    const entry = matchEntry(stripComment(line).trim());
+    if (!entry) break;
+    s.i++;
+    map.set(entry.key, parseValue(s, indent, entry.value));
+  }
+  return map;
+}
+
+function parseSeq(s, indent) {
+  const items = [];
+  for (;;) {
+    skipFiller(s);
+    const line = s.lines[s.i];
+    if (line === undefined || indentOf(line) !== indent) break;
+    const m = /^-(?:\s+([\s\S]*))?$/.exec(stripComment(line).trim());
+    if (!m) break;
+    const rest = (m[1] || '').trim();
+    if (!rest) {
+      s.i++;
+      items.push(parseNested(s, indent));
+    } else if (matchEntry(rest)) {
+      // `- key: value`: the item is a map whose first key sits just past the
+      // dash and whose sibling keys line up under it. Rewriting the dash away
+      // — on our own copy of the lines — lets parseMap read them in one pass.
+      const col = line.indexOf(rest);
+      s.lines[s.i] = ' '.repeat(col) + rest;
+      items.push(parseMap(s, col));
+    } else {
+      s.i++;
+      items.push(parseScalar(rest));
+    }
+  }
+  return items;
+}
+
+function parseValue(s, indent, raw) {
+  // Block scalar. The chomping/indent indicators are consumed but ignored —
+  // in a table cell only the text itself shows.
+  const block = /^([|>])[+-]?\d*$/.exec(raw);
+  if (block) return parseBlockScalar(s, indent, block[1]);
+  return raw ? parseScalar(raw) : parseNested(s, indent);
+}
+
+function parseNested(s, indent) {
+  skipFiller(s);
+  const line = s.lines[s.i];
+  if (line === undefined) return '';
+  const childIndent = indentOf(line);
+  if (childIndent > indent) return parseBlock(s, childIndent);
+  // A sequence may sit in its parent key's own column: `tags:` then `- a`.
+  if (childIndent === indent && /^-(\s|$)/.test(line.trim())) return parseSeq(s, indent);
+  return '';
+}
+
+function parseBlockScalar(s, indent, style) {
+  const collected = [];
+  while (s.i < s.lines.length && (!s.lines[s.i].trim() || indentOf(s.lines[s.i]) > indent)) {
+    collected.push(s.lines[s.i++]);
+  }
+  while (collected.length && !collected[collected.length - 1].trim()) collected.pop();
+  if (!collected.length) return '';
+  const base = Math.min(...collected.filter((l) => l.trim()).map(indentOf));
+  const text = collected.map((l) => l.slice(base));
+  if (style === '|') return text.join('\n');
+  // Folded: newlines inside a paragraph become spaces, blank lines stay breaks.
+  return text.reduce((out, line) => {
+    if (!line.trim()) return `${out}\n`;
+    return out && !out.endsWith('\n') ? `${out} ${line}` : out + line;
+  }, '');
+}
+
+function parseScalar(v) {
+  if (v.startsWith('[') || v.startsWith('{')) {
+    const flow = parseFlow(v);
+    if (flow !== null) return flow;
+  }
+  return unquote(v);
+}
+
+// `[a, b]` / `{k: v}` on one line. Returns null the moment the syntax stops
+// making sense, so a half-parsed value never displaces the raw text.
+function parseFlow(src) {
+  let i = 0;
+  const skipWs = () => { while (i < src.length && /\s/.test(src[i])) i++; };
+
+  function readToken() {
+    skipWs();
+    const quote = src[i] === '"' || src[i] === "'" ? src[i] : null;
+    const start = i;
+    if (quote) {
+      for (i++; i < src.length; i++) {
+        if (quote === '"' && src[i] === '\\') i++;
+        else if (src[i] === quote) { i++; break; }
+      }
+      return unquote(src.slice(start, i));
+    }
+    while (i < src.length && !/[,:\]}]/.test(src[i])) i++;
+    return src.slice(start, i).trim();
+  }
+
+  function readCollection(close, onPair) {
+    i++; // past the opening bracket
+    for (;;) {
+      skipWs();
+      if (i >= src.length) return false;
+      if (src[i] === close) { i++; return true; }
+      if (!onPair()) return false;
+      skipWs();
+      if (src[i] === ',') i++;
+      else if (src[i] !== close) return false;
+    }
+  }
+
+  function readValue() {
+    skipWs();
+    if (src[i] === '[') {
+      const items = [];
+      return readCollection(']', () => {
+        const v = readValue();
+        if (v === null) return false;
+        items.push(v);
+        return true;
+      }) ? items : null;
+    }
+    if (src[i] === '{') {
+      const map = new Map();
+      return readCollection('}', () => {
+        const key = readToken();
+        skipWs();
+        if (src[i] !== ':') return false;
+        i++;
+        const v = readValue();
+        if (v === null) return false;
+        map.set(key, v);
+        return true;
+      }) ? map : null;
+    }
+    return readToken();
+  }
+
+  const out = readValue();
+  skipWs();
+  return i === src.length ? out : null;
+}
+
+const sizeOf = (node) => (node instanceof Map ? node.size : node.length);
+
+// GitHub renders frontmatter as a two-column table — key on the left, value on
+// the right — with nested maps and sequences as tables of their own.
+function frontmatterTable(node) {
+  const table = document.createElement('table');
+  table.className = 'md-frontmatter';
+  const tbody = document.createElement('tbody');
+  const rows = node instanceof Map ? [...node] : node.map((v) => [null, v]);
+  for (const [key, value] of rows) {
+    const tr = document.createElement('tr');
+    if (key !== null) {
+      const th = document.createElement('th');
+      th.setAttribute('scope', 'row');
+      th.textContent = key;
+      tr.appendChild(th);
+    }
+    const td = document.createElement('td');
+    // Values are the literal text they were written as — no markdown, no math
+    // (GitHub does the same), and textContent means they can carry no markup.
+    if (value instanceof Map || Array.isArray(value)) {
+      if (sizeOf(value)) td.appendChild(frontmatterTable(value));
+    } else {
+      td.textContent = String(value);
+    }
+    tr.appendChild(td);
+    tbody.appendChild(tr);
+  }
+  table.appendChild(tbody);
+  return table;
+}
+
+// The table for a note's frontmatter — or a plain <pre> of the source when
+// the block is something this parser can't read. The fence is stripped from
+// the body either way, so anything it can't turn into rows still has to be
+// shown; text the user typed never just disappears.
+function frontmatterNode(yamlLines) {
+  let parsed;
+  try {
+    parsed = parseYaml(yamlLines);
+  } catch {
+    parsed = { data: new Map(), complete: false };
+  }
+  if (parsed.complete && sizeOf(parsed.data)) return frontmatterTable(parsed.data);
+  if (!yamlLines.some((l) => l.trim())) return null; // `---\n---`: nothing to show
+  const pre = document.createElement('pre');
+  pre.textContent = yamlLines.join('\n');
+  return pre;
+}
+
 /* ── in-document anchors (heading links) ────────────────────── */
 
 // GitHub-style slug: lowercase, punctuation/emoji dropped, spaces → hyphens.
@@ -304,7 +586,8 @@ let seq = 0;
  */
 export async function renderMarkdown(source) {
   const host = document.createElement('div');
-  host.innerHTML = md.render(source); // html:false ⇒ markdown-generated markup only
+  const fm = splitFrontmatter(source);
+  host.innerHTML = md.render(fm ? fm.body : source); // html:false ⇒ markdown-generated markup only
 
   transformTaskLists(host);
   transformAlerts(host);
@@ -354,6 +637,14 @@ export async function renderMarkdown(source) {
       document.getElementById('d' + id)?.remove();
       document.getElementById(id)?.remove();
     }
+  }
+
+  // Prepended after the transforms above have run, so none of them reach into
+  // it: a `$…$` in a field stays the text it was, and a `#` heading in
+  // frontmatter doesn't become an anchor target.
+  if (fm) {
+    const table = frontmatterNode(fm.yaml);
+    if (table) host.insertBefore(table, host.firstChild);
   }
 
   return DOMPurify.sanitize(host.innerHTML, PURIFY_CONFIG);
