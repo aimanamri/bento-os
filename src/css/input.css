@@ -512,6 +512,27 @@
   padding: 1.5rem 1.25rem 4rem;
 }
 
+/* ── Closed-entry mode (LogBook) ──
+   Nothing is open, so every per-entry control goes away — including the
+   metadata panel, which is a sibling of the workspace rather than a child.
+   What's left is the sidebar toggles and the face card. */
+#lb-workspace[data-mode="empty"] #lb-title,
+#lb-workspace[data-mode="empty"] #lb-edited-hint,
+#lb-workspace[data-mode="empty"] #lb-mode-toggle,
+#lb-workspace[data-mode="empty"] #lb-save,
+#lb-workspace[data-mode="empty"] #lb-meta-toggle,
+#lb-workspace[data-mode="empty"] #lb-close,
+#lb-workspace[data-mode="empty"] #lb-summary-wrap,
+#lb-workspace[data-mode="empty"] #lb-body-header,
+#lb-workspace[data-mode="empty"] #lb-ribbon,
+#lb-workspace[data-mode="empty"] #lb-split,
+#lb-workspace[data-mode="empty"] ~ #lb-meta {
+  display: none !important;
+}
+#lb-workspace[data-mode="empty"] #lb-empty {
+  display: flex;
+}
+
 /* ── Touch & small-screen adaptation ──
    Screen size doesn't tell you input method, so the hit-area floor keys off
    the pointer, not a width breakpoint: a touchscreen laptop gets the same

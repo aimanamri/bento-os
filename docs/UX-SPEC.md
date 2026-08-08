@@ -56,9 +56,10 @@ in the dots on hover (macOS convention).
 
 ### Reading vs Editor mode (primary content-area concept)
 
-The main content area of the LogBook has exactly two modes, controlled by
-one icon toggle button in the entry header (`#lb-mode-toggle`) — full
-behavior spec in EDGE-CASES.md § 9:
+The main content area of the LogBook has two working modes, controlled by
+one icon toggle button in the entry header (`#lb-mode-toggle`), plus a
+third at-rest state when nothing is open — full behavior spec in
+EDGE-CASES.md § 9:
 
 - **Reading mode** (the default when you open an existing note): only the
   rendered preview is shown, centered at a ~46rem comfortable reading
@@ -68,6 +69,12 @@ behavior spec in EDGE-CASES.md § 9:
 - **Editor mode** (the default for a brand-new note): the full authoring
   view described below — Summary, Body header, ribbon, and the split
   editor/preview.
+- **Closed** (after the × in the entry header): no entry is open, so the
+  workspace shows the reactive face card — the same one that greets the
+  Prompt Library and Code Snippets tabs — centered, with a "New Entry"
+  button under it. Every per-entry control goes away, including the
+  metadata panel. Closing a note should look like a closed note, not like
+  a blank one you're being asked to fill in.
 
 The toggle icon itself swaps between an open-book glyph (currently Reading
 — click to switch to Editor) and a pencil glyph (currently Editor — click
@@ -354,6 +361,7 @@ same as editing the body.
 - [x] Bulb menu keyboard-navigable; injected LaTeX/Mermaid boilerplate renders immediately in preview
 - [x] Card flip, pill filters pass; every prompt variable-engine row in EDGE-CASES § 5 passes (inline editing, no toggle)
 - [x] Reading mode is the default on opening an existing note; Editor mode is the default for a new note; toggle icon + hover label work in both directions (EDGE-CASES § 9)
+- [x] Closing an entry lands in Closed mode with the face card centered, per-entry chrome and metadata panel gone, ⌘S inert; New Entry and sidebar rows both exit it (EDGE-CASES § 9.9–9.10)
 - [x] Dynamic Fields: add/edit/delete/duplicate-name-rejection/search-by-value all pass (EDGE-CASES § 10)
 - [x] Modified time: manual edit persists verbatim, auto-bump still works on the next plain save, Created never becomes editable, conflict detection unaffected (EDGE-CASES § 11)
 - [ ] axe scan: zero critical/serious findings on both tabs, both themes *(not yet run as an automated CI step — manual spot checks only so far)*

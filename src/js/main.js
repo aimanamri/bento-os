@@ -288,3 +288,4 @@ initPrompts();
 initSnippets();
 initFaceCard('pr-face-card');
 initFaceCard('sn-face-card');
+initFaceCard('lb-face-card'); // LogBook's closed-entry state
