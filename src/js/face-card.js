@@ -72,6 +72,14 @@ export function initFaceCard(hostId) {
   function update() {
     rafId = null;
     if (!lastEvent) return;
+    // The card can sit in a hidden pane — an inactive tab, or the LogBook
+    // workspace while an entry is open. A hidden element measures 0×0 at the
+    // origin, which reads as "the cursor is right on top of it", so sit out
+    // and stay idle until it's actually on screen.
+    if (wrap.offsetParent === null) {
+      reset();
+      return;
+    }
     // Measure from `wrap`, not `card` — the card itself carries the
     // transform, so reading its own rect would feed the flee/tilt offset
     // back into the next frame's center and drift.

@@ -221,6 +221,19 @@
               <div id="lb-preview" class="md-preview p-4" dir="auto" aria-label="Rendered preview" aria-live="off"></div>
             </div>
           </div>
+
+          <!-- Closed-entry state: no entry is open, so the workspace shows the
+               reactive face card instead of a blank form pretending to be one. -->
+          <div id="lb-empty" class="hidden min-h-0 flex-1 flex-col items-center justify-center gap-6 p-6">
+            <div id="lb-face-card"></div>
+            <div class="flex flex-col items-center gap-3 text-center">
+              <p class="text-sm text-ink-muted">No entry open — pick one from the list, or start a new one.</p>
+              <button id="lb-empty-new" class="btn btn-primary text-xs">
+                <svg class="icon !h-3.5 !w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                New Entry
+              </button>
+            </div>
+          </div>
         </div>
 
         <!-- Metadata panel -->

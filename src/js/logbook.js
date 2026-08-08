@@ -29,6 +29,8 @@ const el = {
   divider: document.getElementById('lb-divider'),
   saveBtn: document.getElementById('lb-save'),
   closeBtn: document.getElementById('lb-close'),
+  empty: document.getElementById('lb-empty'),
+  emptyNewBtn: document.getElementById('lb-empty-new'),
   deleteBtn: document.getElementById('lb-delete'),
   editedHint: document.getElementById('lb-edited-hint'),
   workspace: document.getElementById('lb-workspace'),
@@ -71,6 +73,9 @@ const state = {
   lastFocusSync: 0,
   saving: false,
 };
+
+// Set by initMetaPanel — closes the narrow-screen metadata sheet, if it's up.
+let dismissMetaSheet = () => {};
 
 /* ── dirty tracking ─────────────────────────────────────────── */
 
@@ -164,9 +169,10 @@ function fillForm(data) {
 
 // Opening an entry lands in Reading mode (rendered preview only); the toggle
 // or "New Entry" switches to Editor mode. Icon + hover label reflect the
-// current mode.
+// current mode. 'empty' is the third mode — no entry open at all.
 function setMode(mode) {
   el.workspace.dataset.mode = mode;
+  if (mode === 'empty') return; // the toggle is hidden; nothing to describe
   const reading = mode === 'read';
   el.modeToggle.querySelector('.mode-icon-read').classList.toggle('hidden', !reading);
   el.modeToggle.querySelector('.mode-icon-edit').classList.toggle('hidden', reading);
@@ -730,6 +736,19 @@ function newEntry() {
   el.title.focus();
 }
 
+// Closing puts the workspace at rest rather than dropping the user into a
+// blank form they never asked for. The form is still reset behind the face
+// card, so the next "New Entry" starts clean.
+function closeEntry() {
+  state.current = null;
+  fillForm({});
+  setDirty(false);
+  clearBanner();
+  dismissMetaSheet();
+  setMode('empty');
+  renderList(); // no row is active any more
+}
+
 /** Unsaved-changes guard: Save / Discard / Cancel — three explicit choices (§1.2). */
 async function guardThen(fn) {
   if (!state.dirty) return fn();
@@ -1158,6 +1177,12 @@ function initMetaPanel() {
     else if (!open && wasSheet) el.metaToggle.focus();
   }
 
+  // Closing an entry hides the whole panel from CSS; the sheet's scrim lives
+  // on <body> and would outlive it, so give closeEntry a way to dismiss it.
+  dismissMetaSheet = () => {
+    if (scrim) setOpen(false);
+  };
+
   el.metaToggle.addEventListener('click', () => setOpen(!isOpen()));
   el.metaClose.addEventListener('click', () => setOpen(false));
   document.addEventListener('keydown', (e) => {
@@ -1297,7 +1322,8 @@ export async function initLogbook() {
   });
 
   el.newBtn.addEventListener('click', () => guardThen(newEntry));
-  el.closeBtn.addEventListener('click', () => guardThen(newEntry));
+  el.closeBtn.addEventListener('click', () => guardThen(closeEntry));
+  el.emptyNewBtn.addEventListener('click', () => newEntry());
   el.saveBtn.addEventListener('click', save);
   el.deleteBtn.addEventListener('click', deleteEntry);
 
@@ -1348,6 +1374,8 @@ export async function initLogbook() {
   // ⌘S / Ctrl+S saves while the LogBook is visible (§ ribbon tooltips)
   document.addEventListener('keydown', (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
+      // Nothing to save with no entry open — let the browser keep the key
+      if (el.workspace.dataset.mode === 'empty') return;
       if (!document.getElementById('view-logbook').hidden) {
         e.preventDefault();
         save();
