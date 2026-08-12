@@ -116,8 +116,9 @@ BentoOS/
 │       ├── logbook.js          # Docs LogBook: sidebar, editor, metadata, autosave, sync, guards
 │       └── prompts.js          # Prompt Library: cards, filters, inline variable-editing engine
 ├── scripts/
-│   ├── copy-static.js        # Copies src/index.html + src/js/ into dist/
-│   └── copy-vendor.js        # Vendors the 5 runtime lib files into dist/vendor/ (CSP forbids CDNs)
+│   ├── copy-static.js        # Copies src/index.html + PWA assets into dist/ (not src/js/)
+│   ├── copy-vendor.js        # Vendors the 5 runtime lib files into dist/vendor/ (CSP forbids CDNs)
+│   └── build-js.js           # Bundles src/js/ into one obfuscated dist/js/app.js
 ├── dist/                     # Build output (gitignored)
 ├── data/                     # bento.db + -wal/-shm (gitignored)
 ├── backups/                  # .backup snapshots (gitignored)
@@ -125,9 +126,11 @@ BentoOS/
 └── package.json
 ```
 
-There is deliberately no framework, no bundler, and no per-feature folder
-nesting — one file per concern, loaded as native ES modules
-(`<script type="module" src="/js/main.js">`).
+There is deliberately no framework and no per-feature folder nesting — one
+file per concern, authored as native ES modules. The only build step over them
+is `scripts/build-js.js`, which bundles the graph from `main.js` into a single
+obfuscated `dist/js/app.js` (`<script type="module" src="/js/app.js">`) so the
+deployed app is not its own source listing.
 
 ---
 

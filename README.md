@@ -21,6 +21,17 @@ new password before the dashboard opens. The server binds to loopback **only**
 
 `npm start` skips the build and just starts the server.
 
+### Build output
+
+`npm run build` bundles everything under `src/js/` into a single obfuscated
+`dist/js/app.js` — the readable modules are never copied into `dist/`, so the
+deployed app doesn't double as its own source listing. For a debuggable build
+with real names and an inline source map, run `npm run build:readable` (or set
+`BENTO_OBFUSCATE=0`); never deploy that one — the source map contains the full
+source. Obfuscation raises the cost of reading the client, but it is not a
+security control: keep secrets server-side (see
+[docs/SECURITY.md](docs/SECURITY.md)).
+
 ## Install it as an app (PWA)
 
 Bento OS ships a web app manifest and a service worker, so it can be
