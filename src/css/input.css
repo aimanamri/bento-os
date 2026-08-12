@@ -342,11 +342,13 @@
 }
 /* Inline code carries its own ink so a `Stop-Transcript` mid-sentence is
    spotted without reading it — the chip alone is too quiet against prose.
-   Its own token rather than --c-danger: this is emphasis, not an error. */
+   Its own token rather than --c-danger: this is emphasis, not an error.
+   The colour stays on the text; the border is neutral --c-edge like every
+   other hairline, so the chip reads as a chip and not as a status pill. */
 .md-preview code {
   font-family: theme('fontFamily.mono'); font-size: 0.85em;
   color: rgb(var(--c-code));
-  background: rgb(var(--c-panel-2)); border: 1px solid rgb(var(--c-code) / 0.28);
+  background: rgb(var(--c-panel-2)); border: 1px solid rgb(var(--c-edge) / 0.7);
   border-radius: 4px; padding: 0.1em 0.35em;
 }
 .md-preview pre {
