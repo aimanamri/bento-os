@@ -1,6 +1,8 @@
 // Shared {{Variable}} fill-in engine — used by both the Prompt Library and
 // Code Snippets tabs (EDGE-CASES §5 grammar).
 
+import { highlightInto } from './highlight.js';
+
 // Single scan, non-greedy, no nesting: {{ Name }} — §5 grammar.
 const VAR_RE = /\{\{\s*([^{}]+?)\s*\}\}/g;
 
@@ -32,11 +34,29 @@ export function composeBody(body, values) {
  * slot so typing immediately replaces the placeholder, matching how a normal
  * form field behaves. Values are written straight into `values` on every
  * edit, so Copy always reflects what's on screen.
+ *
+ * `language` is optional and only the Snippets tab passes it (prompt bodies
+ * are prose): the literal text around the slots is syntax-coloured, while the
+ * slots themselves stay plain, editable, and visually distinct. Each run
+ * between two slots is tokenized on its own, so a construct that a placeholder
+ * splits in half — `"{{URL}}/path"` — colours by what is left of it rather
+ * than bleeding across the slot.
  */
-export function buildEditableBody(container, body, values) {
+export function buildEditableBody(container, body, values, language = null) {
   container.textContent = '';
   const slotsByName = new Map(); // name -> span[], for live duplicate mirroring
   let last = 0;
+
+  const appendLiteral = (text) => {
+    if (!text) return;
+    if (!language) {
+      container.appendChild(document.createTextNode(text));
+      return;
+    }
+    const run = document.createElement('span');
+    highlightInto(run, text, language);
+    while (run.firstChild) container.appendChild(run.firstChild);
+  };
 
   const applyState = (span, placeholder) => {
     const text = span.textContent;
@@ -46,7 +66,7 @@ export function buildEditableBody(container, body, values) {
   };
 
   for (const m of body.matchAll(VAR_RE)) {
-    if (m.index > last) container.appendChild(document.createTextNode(body.slice(last, m.index)));
+    if (m.index > last) appendLiteral(body.slice(last, m.index));
     const name = m[1];
     const placeholder = m[0];
     const stored = values.get(name);
@@ -112,5 +132,5 @@ export function buildEditableBody(container, body, values) {
     container.appendChild(span);
     last = m.index + placeholder.length;
   }
-  if (last < body.length) container.appendChild(document.createTextNode(body.slice(last)));
+  if (last < body.length) appendLiteral(body.slice(last));
 }

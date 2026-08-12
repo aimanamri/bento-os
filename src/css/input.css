@@ -349,6 +349,38 @@
 }
 .md-preview pre code { background: none; border: none; padding: 0; font-size: 0.83rem; }
 
+/* ── Syntax highlighting ──────────────────────────────────────────────
+   Prism token classes, mapped onto the app's own palette rather than a
+   vendored theme: every colour below is a theme token, so light and dark
+   follow the rest of the UI instead of needing a second stylesheet. Applies
+   to both surfaces — LogBook fences and the Snippets body well — so it is
+   deliberately not scoped to .md-preview. */
+.token.comment, .token.prolog, .token.cdata, .token.doctype {
+  color: rgb(var(--c-ink-muted)); font-style: italic;
+}
+.token.punctuation, .token.operator { color: rgb(var(--c-ink-muted)); }
+.token.keyword, .token.atrule, .token.rule, .token.important, .token.control {
+  color: rgb(var(--c-purple)); font-weight: 600;
+}
+.token.number, .token.boolean, .token.constant, .token.unit { color: rgb(var(--c-warn)); }
+.token.string, .token.char, .token.attr-value, .token.regex, .token.url, .token.inserted {
+  color: rgb(var(--c-ok));
+}
+.token.function, .token.class-name, .token.title { color: rgb(var(--c-accent)); }
+.token.tag, .token.selector, .token.property, .token.attr-name, .token.builtin, .token.symbol {
+  color: rgb(var(--c-info));
+}
+.token.variable, .token.parameter, .token.entity, .token.interpolation {
+  color: rgb(var(--c-info));
+}
+.token.deleted { color: rgb(var(--c-danger)); }
+.token.namespace { opacity: 0.7; }
+.token.bold { font-weight: 700; }
+.token.italic { font-style: italic; }
+/* A slot is an editable field sitting in coloured code — it keeps the ink
+   colour so it never reads as one more token. */
+.var-slot .token { color: inherit; font-weight: inherit; font-style: inherit; }
+
 /* Fenced code blocks get a copy button (render.js addCopyButtons). The
    wrapper only positions it — the <pre> keeps the styling above, with room
    reserved on the right so a long first line never slides under the button. */

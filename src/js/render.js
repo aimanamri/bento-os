@@ -6,6 +6,7 @@
 
 import { copyText } from './clipboard.js';
 import { announce } from './ui.js';
+import { highlightInto } from './highlight.js';
 
 const md = markdownit({
   html: false, // raw HTML in markdown is escaped, never passed through
@@ -581,6 +582,18 @@ document.addEventListener('click', (e) => {
   setTimeout(() => target.classList.remove('anchor-flash'), 1200);
 });
 
+/**
+ * Colour every fence that named a language markdown-it recognised as a class.
+ * A fence with no infostring, or one naming something Prism doesn't have,
+ * keeps its plain text — highlightInto handles that itself.
+ */
+function highlightCodeBlocks(host) {
+  for (const code of host.querySelectorAll('pre > code[class*="language-"]')) {
+    const lang = [...code.classList].find((c) => c.startsWith('language-'))?.slice(9);
+    if (lang) highlightInto(code, code.textContent, lang);
+  }
+}
+
 let seq = 0;
 
 /**
@@ -641,6 +654,11 @@ export async function renderMarkdown(source) {
       document.getElementById(id)?.remove();
     }
   }
+
+  // After the Mermaid pass, so ```mermaid fences are diagrams by now and never
+  // reach the highlighter, and before DOMPurify, which vets the token spans
+  // like any other markup.
+  highlightCodeBlocks(host);
 
   // Prepended after the transforms above have run, so none of them reach into
   // it: a `$…$` in a field stays the text it was, and a `#` heading in

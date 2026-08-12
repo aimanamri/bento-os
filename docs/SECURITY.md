@@ -48,6 +48,7 @@ markdown-it ({ html: false })          ← raw HTML in markdown is escaped, not 
   → transformTaskLists() / transformAlerts()  (DOM-tree transforms, no new markup sources)
   → KaTeX renderMathInElement (per-call try/catch)
   → Mermaid render (per-fence async, try/catch)
+  → highlightCodeBlocks() (Prism.tokenize → createElement/textContent, no markup)
     → collapseForeignObjectLabels() (see below)
   → DOMPurify.sanitize(html, PURIFY_CONFIG)   ← LAST, so it sees final HTML
   → mount
@@ -261,7 +262,7 @@ just asserted) in the app's Playwright suites.
 | Headers | CSP (§ 2), `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `Permissions-Policy: camera=(), microphone=(), geolocation=()` |
 | Static serving | `express.static(dist)` with `dotfiles: 'deny'`; no directory listing; API and DB files (`data/`) live outside `dist/` |
 | Cross-origin | No CORS headers at all → browsers block cross-origin reads; API is same-origin-only by default. No cookies → nothing for CSRF to ride. |
-| Dependencies | Lockfile committed; `npm audit --omit=dev` script available; the 5 runtime lib files (markdown-it, DOMPurify, KaTeX + its auto-render addon, Mermaid) vendored at pinned versions into `dist/vendor/` (CSP forbids CDNs anyway) |
+| Dependencies | Lockfile committed; `npm audit --omit=dev` script available; the runtime lib files (markdown-it, DOMPurify, KaTeX + its auto-render addon, Mermaid, Prism) vendored at pinned versions into `dist/vendor/` (CSP forbids CDNs anyway) |
 | Tailscale hygiene | Key expiry left enabled; app host tagged; ACL restricting the serve port to the owner's devices; Tailnet lock optional |
 
 ## 4a. Service Worker & Offline Cache
