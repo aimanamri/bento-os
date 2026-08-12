@@ -9,7 +9,10 @@ const dist = path.join(root, 'dist');
 
 fs.mkdirSync(dist, { recursive: true });
 fs.copyFileSync(path.join(src, 'index.html'), path.join(dist, 'index.html'));
-fs.cpSync(path.join(src, 'js'), path.join(dist, 'js'), { recursive: true });
+
+// src/js is deliberately NOT copied: build:js bundles it into a single
+// obfuscated dist/js/app.js. Copying it here would republish the readable
+// modules next to the bundle and undo that step.
 
 // PWA: the manifest and the apple-touch icon are referenced from the document
 // head, so they have to sit at the paths index.html names.

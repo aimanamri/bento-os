@@ -32,11 +32,16 @@ COPY . .
 # from build:sw, so a .dockerignore change or a missing file degrades the app
 # silently: it still boots, it just stops being installable or offline-capable.
 # Fail the image build instead.
+# The last two assertions guard the obfuscation step (scripts/build-js.js):
+# the image must ship exactly one bundle and none of the readable modules it
+# was built from, or a build regression quietly republishes the source.
 RUN npm run build \
  && test -s dist/sw.js \
  && test -s dist/manifest.webmanifest \
  && test -s dist/assets/icons/icon-512.png \
- && test -s dist/assets/icons/icon-maskable-512.png
+ && test -s dist/assets/icons/icon-maskable-512.png \
+ && test -s dist/js/app.js \
+ && test "$(ls dist/js | wc -l)" -eq 1
 
 # ---- runtime ----
 FROM node:20-alpine AS runtime

@@ -67,7 +67,19 @@ if (worker.includes('__BUILD_ID__') || worker.includes('__PRECACHE_URLS__')) {
   process.exit(1);
 }
 
-fs.writeFileSync(path.join(dist, 'sw.js'), worker);
+// Minified for the same reason app.js is (scripts/build-js.js): the worker is
+// served to browsers, so its comments and structure are public otherwise. It
+// keeps the lighter treatment — no control flow flattening — because a broken
+// worker installs itself and then serves a broken shell from cache.
+const shipped = process.env.BENTO_OBFUSCATE === '0'
+  ? worker
+  : require('esbuild').transformSync(worker, {
+      minify: true,
+      target: 'es2022',
+      legalComments: 'none',
+    }).code;
+
+fs.writeFileSync(path.join(dist, 'sw.js'), shipped);
 // Note on the size: install re-requests these files, but the page has just
 // loaded them and express serves max-age=0 + ETag, so it costs a handful of
 // 304s rather than the megabytes below. The number is CacheStorage usage.
