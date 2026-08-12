@@ -18,6 +18,7 @@
     --c-warn: 158 106 22;
     --c-danger: 200 52 44;
     --c-purple: 124 58 237;
+    --c-code: 183 40 62;
     --glass-tint: 255 255 255;
   }
   .dark {
@@ -33,6 +34,7 @@
     --c-warn: 227 179 65;
     --c-danger: 240 98 93;
     --c-purple: 167 139 250;
+    --c-code: 244 135 130;
     --glass-tint: 23 27 33;
   }
 
@@ -338,16 +340,25 @@
 @media (prefers-reduced-motion: reduce) {
   .md-preview .anchor-flash { animation-duration: 0.01ms; }
 }
+/* Inline code carries its own ink so a `Stop-Transcript` mid-sentence is
+   spotted without reading it — the chip alone is too quiet against prose.
+   Its own token rather than --c-danger: this is emphasis, not an error. */
 .md-preview code {
   font-family: theme('fontFamily.mono'); font-size: 0.85em;
-  background: rgb(var(--c-panel-2)); border: 1px solid rgb(var(--c-edge) / 0.7);
+  color: rgb(var(--c-code));
+  background: rgb(var(--c-panel-2)); border: 1px solid rgb(var(--c-code) / 0.28);
   border-radius: 4px; padding: 0.1em 0.35em;
 }
 .md-preview pre {
   background: rgb(var(--c-panel-2)); border: 1px solid rgb(var(--c-edge));
   border-radius: 8px; padding: 0.9rem 1.1rem; overflow-x: auto; margin: 0.9em 0;
 }
-.md-preview pre code { background: none; border: none; padding: 0; font-size: 0.83rem; }
+/* Fences opt back out — Prism owns their colour, and untokenised text there
+   should read as ink, not as one long inline span. */
+.md-preview pre code {
+  background: none; border: none; padding: 0; font-size: 0.83rem;
+  color: rgb(var(--c-ink));
+}
 
 /* ── Syntax highlighting ──────────────────────────────────────────────
    Prism token classes, mapped onto the app's own palette rather than a
