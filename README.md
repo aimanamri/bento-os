@@ -111,9 +111,10 @@ dist/            Build output (generated; served by Express)
 docs/            Implementation plan, security spec, edge cases, UX, database
 ```
 
-The rendering libraries (markdown-it, KaTeX, Mermaid, DOMPurify) and
+The rendering libraries (markdown-it, KaTeX, Mermaid, DOMPurify, Prism) and
 supabase-js are vendored into `dist/vendor/` at build time — the CSP forbids
-CDNs by design.
+CDNs by design. Prism is assembled from its core plus the grammars listed in
+`scripts/copy-vendor.js`; add a language by adding its name there.
 
 ## Testing
 

@@ -5,6 +5,7 @@ import { api } from './api.js';
 import { toast, confirmModal } from './ui.js';
 import { copyText } from './clipboard.js';
 import { parseVars, composeBody, buildEditableBody } from './vars.js';
+import { highlightInto, languageOf } from './highlight.js';
 
 const el = {
   search: document.getElementById('sn-search'),
@@ -242,10 +243,14 @@ function renderCard(s, hue) {
   const well = document.createElement('pre');
   well.className =
     'max-h-56 overflow-y-auto whitespace-pre-wrap rounded-md border border-edge bg-panel-2 p-3 font-mono text-xs leading-relaxed';
+  // `category` doubles as the language/tool label (004-snippets.sql), so it is
+  // what the highlighter gets; anything it doesn't recognise ("GENERAL") comes
+  // back as plain text.
+  const lang = languageOf(s.category);
   if (vars.length) {
-    buildEditableBody(well, s.body, fillValues);
+    buildEditableBody(well, s.body, fillValues, lang);
   } else {
-    well.textContent = s.body;
+    highlightInto(well, s.body, lang);
   }
   front.appendChild(well);
 
