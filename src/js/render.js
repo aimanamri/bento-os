@@ -4,6 +4,9 @@
 
 /* global markdownit, DOMPurify, katex, renderMathInElement, mermaid */
 
+import { copyText } from './clipboard.js';
+import { announce } from './ui.js';
+
 const md = markdownit({
   html: false, // raw HTML in markdown is escaped, never passed through
   linkify: true,
@@ -650,7 +653,72 @@ export async function renderMarkdown(source) {
   return DOMPurify.sanitize(host.innerHTML, PURIFY_CONFIG);
 }
 
+// Static markup, never user content — the only strings these two ever hold
+// (SECURITY.md §2 allows innerHTML in render.js; this is not a note's markup).
+const ICON_COPY =
+  '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+  '<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+const ICON_DONE =
+  '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+  '<path d="M20 6 9 17l-5-5"/></svg>';
+
+async function copyCodeBlock(btn, code) {
+  if (btn.dataset.busy) return;
+  btn.dataset.busy = '1';
+  // copyText falls back to execCommand and then to a manual-copy modal, so a
+  // false return means the user was already handed the text (EDGE-CASES §5.9).
+  const ok = await copyText(code.textContent);
+  delete btn.dataset.busy;
+  if (!ok) return;
+
+  btn.classList.add('is-copied');
+  btn.innerHTML = ICON_DONE;
+  btn.setAttribute('aria-label', 'Code copied');
+  announce('Code copied');
+  clearTimeout(Number(btn.dataset.resetTimer));
+  btn.dataset.resetTimer = String(setTimeout(() => {
+    btn.classList.remove('is-copied');
+    btn.innerHTML = ICON_COPY;
+    btn.setAttribute('aria-label', btn.dataset.copyLabel);
+  }, 1500));
+}
+
+/**
+ * Give every fenced code block a copy button.
+ *
+ * Runs on the mounted DOM *after* DOMPurify, and builds the button with DOM
+ * APIs rather than markup: nothing in a note can forge one, and the sanitizer
+ * never has to allow <button> (which would let a note ship its own).
+ *
+ * `pre > code` is what markdown-it emits for a fence. Mermaid fences are gone
+ * by now (replaced by their diagram) and errorChip's <pre> holds no <code>,
+ * so neither picks up a button.
+ */
+function addCopyButtons(root) {
+  for (const code of root.querySelectorAll('pre > code')) {
+    const pre = code.parentElement;
+    const lang = [...code.classList].find((c) => c.startsWith('language-'))?.slice(9);
+    const label = lang ? `Copy ${lang} code` : 'Copy code';
+
+    const wrap = document.createElement('div');
+    wrap.className = 'code-block';
+    pre.replaceWith(wrap);
+    wrap.appendChild(pre);
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'code-copy';
+    btn.title = label;
+    btn.dataset.copyLabel = label;
+    btn.setAttribute('aria-label', label);
+    btn.innerHTML = ICON_COPY;
+    btn.addEventListener('click', () => copyCodeBlock(btn, code));
+    wrap.appendChild(btn);
+  }
+}
+
 /** Render into a target element (the single mount point per surface). */
 export async function renderInto(el, source) {
   el.innerHTML = await renderMarkdown(source);
+  addCopyButtons(el);
 }

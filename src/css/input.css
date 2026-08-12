@@ -348,6 +348,30 @@
   border-radius: 8px; padding: 0.9rem 1.1rem; overflow-x: auto; margin: 0.9em 0;
 }
 .md-preview pre code { background: none; border: none; padding: 0; font-size: 0.83rem; }
+
+/* Fenced code blocks get a copy button (render.js addCopyButtons). The
+   wrapper only positions it — the <pre> keeps the styling above, with room
+   reserved on the right so a long first line never slides under the button. */
+.md-preview .code-block { position: relative; }
+.md-preview .code-block pre { padding-right: 3.25rem; }
+.md-preview .code-copy {
+  position: absolute; top: 0.5rem; right: 0.5rem;
+  display: inline-flex; align-items: center; justify-content: center;
+  height: 1.9rem; width: 1.9rem; border-radius: 6px;
+  border: 1px solid rgb(var(--c-edge)); background: rgb(var(--c-panel));
+  color: rgb(var(--c-ink-muted));
+  opacity: 0; transition: opacity 120ms ease, color 120ms ease, background-color 120ms ease;
+}
+.md-preview .code-copy .icon { width: 0.95rem; height: 0.95rem; }
+.md-preview .code-block:hover .code-copy,
+.md-preview .code-copy:focus-visible { opacity: 1; }
+.md-preview .code-copy:hover { color: rgb(var(--c-ink)); background: rgb(var(--c-panel-2)); }
+.md-preview .code-copy.is-copied { opacity: 1; color: rgb(var(--c-ok)); border-color: rgb(var(--c-ok) / 0.5); }
+/* Touch has no hover to reveal it, so it stays visible and gets a real target. */
+@media (hover: none) {
+  .md-preview .code-copy { opacity: 1; height: 2.25rem; width: 2.25rem; }
+  .md-preview .code-block pre { padding-right: 3.6rem; }
+}
 .md-preview blockquote {
   border-left: 3px solid rgb(var(--c-edge)); margin: 0.8em 0; padding: 0.1em 1em;
   color: rgb(var(--c-ink-muted));
