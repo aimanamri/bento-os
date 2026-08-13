@@ -220,6 +220,13 @@
      .collapse-x's transition/overflow). */
   #lb-sidebar[data-hidden="true"]:not([data-drawer="open"]) { width: 0 !important; border-width: 0 !important; opacity: 0; visibility: hidden; }
 
+  /* Metadata Hide/Show — the same trigger the sidebar has, mirrored to the
+     right edge. It governs the panel at every width: a collapsing column on
+     a desktop, the open/close switch for the sheet on a phone. Below xl the
+     resolved default is hidden (three columns don't fit), which is why the
+     markup ships with data-hidden="true" — JS re-resolves it on boot. */
+  #lb-meta[data-hidden="true"]:not([data-drawer="open"]) { width: 0 !important; border-width: 0 !important; opacity: 0; visibility: hidden; }
+
   /* ── Mobile entries drawer ────────────────────────────────────
      On desktop #lb-sidebar is a translucent column (bg-panel-2/50) sitting
      on the frame. Promoted to an overlay it kept that translucency and the

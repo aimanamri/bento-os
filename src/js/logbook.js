@@ -1135,21 +1135,40 @@ function initNarrowToggle() {
   });
 }
 
-/* ── metadata panel: column on a tablet, sheet on a phone ────
+/* ── metadata panel: collapsible column, sheet on a phone ────
    The panel is `w-72 flex-none`. Shown in flow on a phone that is 288 of
    ~390 available pixels, which squeezed the workspace until the entry
    header wrapped into a column of buttons — so below lg it is promoted to
    an overlay sheet instead (EDGE-CASES §8.5). Between lg and xl there is
-   room for the column, and that behaviour is unchanged. */
+   room for the column, and that behaviour is unchanged.
+
+   #lb-meta-toggle drives all three forms from one control, sitting next to
+   the Reading/Editor toggle as the right-edge mirror of the sidebar's
+   Hide/Show. Two sources decide whether the panel is open:
+     • the viewport — xl and up has room for a third column, below it does not;
+     • the user's own click, remembered in `bento.metaHidden`.
+   The click wins wherever it exists, so a panel closed on a desktop stays
+   closed; with no stored preference the viewport keeps deciding, and
+   widening a tablet into desktop territory still reveals the column. */
 function initMetaPanel() {
   const asSheet = window.matchMedia('(max-width: 1023px)');
+  const asColumn = window.matchMedia('(min-width: 1280px)');
   let scrim = null;
+  // null = never toggled, so the viewport default still applies.
+  let pref = null;
+  if (state.lsAvailable) {
+    try {
+      const stored = localStorage.getItem('bento.metaHidden');
+      if (stored === 'true' || stored === 'false') pref = stored !== 'true';
+    } catch (e) {
+      // ignore — the viewport default is a fine fallback
+    }
+  }
 
   function apply(open) {
     const sheet = open && asSheet.matches;
 
-    el.metaPanel.classList.toggle('max-xl:hidden', !open);
-    el.metaPanel.classList.toggle('max-xl:block', open && !sheet);
+    el.metaPanel.dataset.hidden = String(!open);
     if (sheet) el.metaPanel.dataset.drawer = 'open';
     else delete el.metaPanel.dataset.drawer;
 
@@ -1162,10 +1181,16 @@ function initMetaPanel() {
       scrim.remove();
       scrim = null;
     }
+
+    el.metaToggle.querySelector('.meta-icon-shown').classList.toggle('hidden', !open);
+    el.metaToggle.querySelector('.meta-icon-hidden').classList.toggle('hidden', open);
+    const label = open ? 'Hide metadata' : 'Show metadata';
+    el.metaToggle.title = label;
+    el.metaToggle.setAttribute('aria-label', label);
     el.metaToggle.setAttribute('aria-pressed', String(open));
   }
 
-  const isOpen = () => !el.metaPanel.classList.contains('max-xl:hidden');
+  const isOpen = () => el.metaPanel.dataset.hidden !== 'true';
 
   function setOpen(open) {
     const wasSheet = !!scrim;
@@ -1177,24 +1202,54 @@ function initMetaPanel() {
     else if (!open && wasSheet) el.metaToggle.focus();
   }
 
+  /** A deliberate toggle — records the preference the viewport then defers to. */
+  function choose(open) {
+    pref = open;
+    setOpen(open);
+    if (state.lsAvailable) {
+      try {
+        localStorage.setItem('bento.metaHidden', String(!open));
+      } catch (e) {
+        // best-effort — not worth surfacing a toast for a preference write
+      }
+    }
+  }
+
   // Closing an entry hides the whole panel from CSS; the sheet's scrim lives
   // on <body> and would outlive it, so give closeEntry a way to dismiss it.
   dismissMetaSheet = () => {
     if (scrim) setOpen(false);
   };
 
-  el.metaToggle.addEventListener('click', () => setOpen(!isOpen()));
+  // Only the toggle records a preference. Dismissing the sheet — its ✕, the
+  // scrim, Escape, a swipe — means "not right now", not "never on any
+  // screen"; making it sticky would boot the desktop column closed because
+  // of a tap on a phone.
+  el.metaToggle.addEventListener('click', () => choose(!isOpen()));
   el.metaClose.addEventListener('click', () => setOpen(false));
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && scrim) setOpen(false);
   });
 
   // Rotating a phone into landscape can cross the lg line: re-resolve the
-  // open panel into whichever form fits rather than leaving a fixed sheet
-  // floating over a layout that has room for the column.
-  asSheet.addEventListener('change', () => {
-    if (isOpen()) apply(true);
+  // open panel into whichever form fits. Shrinking *into* phone territory
+  // would turn a column the user never asked to overlay into a scrim-backed
+  // sheet, so that direction closes it instead of promoting it.
+  asSheet.addEventListener('change', (e) => {
+    if (!isOpen()) return;
+    if (e.matches) setOpen(false);
+    else apply(true);
   });
+
+  // Crossing xl only re-resolves while the user has expressed no preference.
+  asColumn.addEventListener('change', (e) => {
+    if (pref === null) setOpen(e.matches);
+  });
+
+  // Boot: a remembered "open" must not throw a scrim-backed sheet over the
+  // app on a phone before the user has asked for anything, so sheet widths
+  // always start closed.
+  apply(!asSheet.matches && (pref === null ? asColumn.matches : pref));
 
   // Swipe the sheet away — the entries drawer's gesture, mirrored.
   let startX = null;

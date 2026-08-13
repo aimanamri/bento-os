@@ -158,6 +158,12 @@
             <label for="lb-title" class="sr-only">Entry title</label>
             <input id="lb-title" class="input min-w-0 flex-1 border-transparent bg-transparent text-base font-semibold focus:border-accent max-sm:order-last max-sm:w-full max-sm:flex-none" placeholder="Untitled entry" maxlength="300">
             <span id="lb-edited-hint" class="hidden whitespace-nowrap text-xs text-ink-muted">Edited</span>
+            <!-- Metadata Hide/Show — mirror of the sidebar toggle on the left
+                 edge; chevron direction flips with state. -->
+            <button id="lb-meta-toggle" class="icon-btn btn-ghost" title="Hide metadata" aria-label="Hide metadata" aria-pressed="true">
+              <svg class="icon meta-icon-shown" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/><path d="m10 10 2 2-2 2"/></svg>
+              <svg class="icon meta-icon-hidden hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/><path d="m12 10-2 2 2 2"/></svg>
+            </button>
             <!-- Reading / Editor mode toggle (icon swaps with mode; label shows on hover) -->
             <button id="lb-mode-toggle" class="icon-btn btn-ghost" title="Reading mode — click to edit" aria-label="Reading mode (switch to editor)" aria-pressed="true">
               <svg class="icon mode-icon-read" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
@@ -166,9 +172,6 @@
             <button id="lb-save" class="btn btn-primary text-xs">
               <span class="save-label">Save Entry</span>
               <span class="save-spinner hidden" aria-hidden="true">…</span>
-            </button>
-            <button id="lb-meta-toggle" class="icon-btn max-xl:flex hidden" aria-label="Toggle metadata panel" aria-pressed="false">
-              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
             </button>
             <button id="lb-close" class="icon-btn btn-ghost" aria-label="Close entry">
               <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
@@ -237,7 +240,7 @@
         </div>
 
         <!-- Metadata panel -->
-        <aside id="lb-meta" class="collapse-x w-72 flex-none overflow-y-auto border-l border-edge bg-panel-2/50 max-xl:hidden">
+        <aside id="lb-meta" class="collapse-x w-72 flex-none overflow-y-auto border-l border-edge bg-panel-2/50" data-hidden="true">
           <div class="flex flex-col gap-4 p-4 text-sm">
             <div class="flex items-center justify-between gap-2">
               <h2 class="text-xs font-semibold uppercase tracking-wider text-ink-muted">Metadata</h2>
