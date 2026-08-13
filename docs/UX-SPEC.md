@@ -107,13 +107,13 @@ plain hover tooltip — no separate tooltip widget is used.
 - Sidebar becomes an overlay drawer (hamburger in title bar) with a scrim;
   swipe/Esc/scrim-tap closes. Focus trapped while open.
 - Metadata panel becomes the same kind of overlay, mirrored to the right
-  edge (gear in the entry header), with its own close button in the sheet
-  header — the scrim is not a discoverable exit on a phone, and the toggle
-  that opened it sits behind the overlay. It is **never** shown in flow at
-  this width: at `w-72` it would leave a 390 px viewport about 100 px of
-  workspace and wrap the entry header into a column of buttons
-  (EDGE-CASES § 8.7). Between 1024 px and 1280 px there is room, and it
-  stays an in-flow column there.
+  edge (panel toggle in the entry header, § "Metadata panel"), with its own
+  close button in the sheet header — the scrim is not a discoverable exit on
+  a phone, and the toggle that opened it sits behind the overlay. It is
+  **never** shown in flow at this width: at `w-72` it would leave a 390 px
+  viewport about 100 px of workspace and wrap the entry header into a column
+  of buttons (EDGE-CASES § 8.7). Between 1024 px and 1280 px there is room,
+  and it stays an in-flow column there.
 
 ### Sidebar
 - Live search box filters as-you-type (input debounced 200 ms → FTS query).
@@ -207,6 +207,18 @@ editor, distinct from the Summary above it.
 ### Metadata panel (visible in both Reading and Editor mode)
 
 Collapsible right-edge panel (auto-collapsed by Focus Mode), top to bottom:
+
+**Hide/Show** — a `#lb-meta-toggle` icon button in the entry header, sitting
+immediately before the Reading/Editor toggle: the right-edge mirror of the
+sidebar's Hide/Show, chevron flipping with state. It governs the panel at
+every width — a collapsing column on a desktop or tablet, the open/close
+switch for the sheet on a phone. Two sources decide the state: the viewport
+(≥ 1280 px has room for a third column, below it does not) and the user's
+own click, remembered in `bento.metaHidden`. An explicit click wins wherever
+it exists; with no stored preference the viewport keeps deciding, so
+widening a tablet into desktop territory still reveals the column. Only the
+toggle records a preference — dismissing the sheet (its ×, the scrim, Esc, a
+swipe) means "not right now", not "never on any screen".
 
 1. **Label** / **Sub-label** — text inputs; sub-label is disabled until a
    label is set; blank label displays and stores as `Uncategorized`.
