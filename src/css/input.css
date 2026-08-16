@@ -658,6 +658,26 @@
 .tour-card { @apply rounded-md border border-edge bg-panel p-3; }
 .tour-body { @apply whitespace-pre-wrap break-words text-xs leading-relaxed; }
 
+/* ── Card-back prose ("Why this works", "Notes") ──
+   Same pipeline output as the LogBook, but that measure and type scale are
+   sized for a full page. Tighten it for a card without forking the renderer.
+   Must stay after the .md-preview block: equal specificity, source order
+   decides. */
+.card-prose { font-size: 0.8125rem; line-height: 1.65; color: rgb(var(--c-ink-muted)); }
+.card-prose > :first-child { margin-top: 0; }
+.card-prose > :last-child { margin-bottom: 0; }
+.card-prose h1, .card-prose h2, .card-prose h3, .card-prose h4 {
+  margin: 1em 0 0.35em; font-size: 0.875rem; color: rgb(var(--c-ink));
+}
+.card-prose h1 { border-bottom: 0; padding-bottom: 0; }
+.card-prose p, .card-prose ul, .card-prose ol, .card-prose table { margin: 0.55em 0; }
+.card-prose ul, .card-prose ol { padding-left: 1.15rem; }
+.card-prose pre { margin: 0.55em 0; padding: 0.5rem 0.6rem; font-size: 0.6875rem; }
+.card-prose table { font-size: 0.6875rem; }
+.card-prose blockquote { margin: 0.55em 0; padding: 0.4rem 0.6rem; }
+/* The copy button the pipeline adds to code blocks is page-sized too */
+.card-prose .code-copy { transform: scale(0.85); transform-origin: top right; }
+
 /* Collapsible Summary section above the body editor */
 #lb-summary-wrap > summary { list-style: none; }
 #lb-summary-wrap > summary::-webkit-details-marker { display: none; }
