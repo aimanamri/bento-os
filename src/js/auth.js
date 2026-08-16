@@ -14,6 +14,7 @@
 import { sb, usernameToEmail, validUsername } from './supabase.js';
 import { toast, confirmModal, announce } from './ui.js';
 import { initFaceCard } from './face-card.js';
+import { initTour } from './tour.js';
 
 const DEFAULT_PASSWORD = 'bentoos';
 const PASSWORD_MIN = 8;
@@ -53,8 +54,6 @@ function flinch() {
 let clockTimer = null;
 
 function startClock() {
-  // Matches the CSS gate: only the installed app draws a clock.
-  if (!window.matchMedia('(display-mode: standalone)').matches) return;
   const time = document.getElementById('auth-clock-time');
   const date = document.getElementById('auth-clock-date');
   if (!time || !date) return;
@@ -577,15 +576,8 @@ function wireAdminPanel() {
 
 /* ── pre-auth tour ──────────────────────────────────────────── */
 
-// Both the sheet's "New here?" link and the dock pills open this: logged out
-// there is no tool to restore, so the pills explain instead of navigating.
-function wireAboutTour() {
-  const dlg = document.getElementById('dlg-about');
-  if (!dlg) return;
-  document.querySelectorAll('[data-auth-about]').forEach((btn) => {
-    btn.addEventListener('click', () => dlg.showModal());
-  });
-}
+// Lives in tour.js: the dock pills and the "New here?" link each open the
+// dialog on their own tab, since logged out there is no tool to restore.
 
 /* ── boot ───────────────────────────────────────────────────── */
 
@@ -602,7 +594,7 @@ export async function initAuth() {
   wireChangePasswordForm();
   wireUserMenu();
   wireAdminPanel();
-  wireAboutTour();
+  initTour();
 
   sb.auth.onAuthStateChange((event) => {
     if (event === 'SIGNED_OUT') location.reload();
