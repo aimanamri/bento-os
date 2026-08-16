@@ -701,6 +701,9 @@ async function createUser(username) {
     username: data.user.username,
     role: data.user.role,
     requires_password_change: true,
+    // The Edge Function doesn't echo created_at back, and the account is
+    // milliseconds old — stamping it here beats a blank date or a refetch.
+    created_at: data.user.created_at ?? new Date().toISOString(),
   };
   adminState.users.push(created);
   adminState.users.sort((a, b) => a.username.localeCompare(b.username));
