@@ -740,3 +740,15 @@ export async function renderInto(el, source) {
   el.innerHTML = await renderMarkdown(source);
   addCopyButtons(el);
 }
+
+/**
+ * Render markdown into `el` the first time it is asked for, and never again.
+ * Card backs stay hidden until flipped, so running the full pipeline for
+ * every card in a list — before anyone has asked to read one — is waste, and
+ * Mermaid in particular measures badly in an element that was never shown.
+ */
+export function renderProseOnce(el, source) {
+  if (!el || el.dataset.rendered === 'true') return undefined;
+  el.dataset.rendered = 'true';
+  return renderInto(el, source || '');
+}

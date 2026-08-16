@@ -5,6 +5,7 @@ import { api } from './api.js';
 import { toast, confirmModal } from './ui.js';
 import { copyText } from './clipboard.js';
 import { parseVars, composeBody, buildEditableBody } from './vars.js';
+import { renderProseOnce } from './render.js';
 
 export { parseVars, composeBody };
 
@@ -257,6 +258,7 @@ function renderCard(p) {
     actions.appendChild(
       actionBtn('Why this works', () => {
         scene.dataset.flipped = 'true';
+        renderProseOnce(prose, p.why_this_works);
         back.querySelector('button')?.focus();
       }, 'btn-ghost')
     );
@@ -272,9 +274,11 @@ function renderCard(p) {
   backTitle.className = 'text-sm font-semibold text-accent';
   backTitle.textContent = 'Why this works';
   backHead.append(backTitle, actionBtn('Back', () => (scene.dataset.flipped = 'false'), 'btn-ghost'));
-  const prose = document.createElement('p');
-  prose.className = 'overflow-y-auto text-sm leading-relaxed text-ink-muted';
-  prose.textContent = p.why_this_works || '';
+  // Markdown, through the same sanitize-then-render pipeline the LogBook
+  // uses (SECURITY.md §2). A <div>, not a <p>: the pipeline emits block
+  // elements, and a <p> would be closed early by the parser.
+  const prose = document.createElement('div');
+  prose.className = 'md-preview card-prose overflow-y-auto';
   back.append(backHead, prose);
 
   inner.append(front, back);
