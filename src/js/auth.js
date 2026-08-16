@@ -352,12 +352,22 @@ function wireUserMenu() {
 // In-memory mirror of the user list so actions can patch a single row
 // (row.replaceWith / row.remove) instead of a full re-fetch + re-render —
 // the dialog stays open and the search filter survives every action.
-const adminState = { users: [], filter: '' };
+// Role sections only start paying for themselves once the roster is long
+// enough that scanning it is work; below this a flat list reads faster.
+const GROUP_AT = 8;
+
+const ROLE_LABEL = { global_admin: 'global admin', admin: 'admin', user: 'user' };
+const ROLE_ORDER = ['global_admin', 'admin', 'user'];
+const ROLE_SECTION = { global_admin: 'Global admin', admin: 'Admins', user: 'Users' };
+
+const adminState = { users: [], filter: '', openId: null };
 
 async function openAdminPanel() {
   const dlg = document.getElementById('dlg-admin');
   document.getElementById('admin-search').value = '';
   adminState.filter = '';
+  adminState.openId = null;
+  hideCreateForm();
   dlg.showModal();
   await loadAdminUsers();
 }
@@ -367,7 +377,9 @@ async function loadAdminUsers() {
   list.textContent = 'Loading…';
 
   const [{ data: profiles, error: pErr }, { data: roles }] = await Promise.all([
-    sb.from('profiles').select('id, username').order('username'),
+    // created_at has been on the row since the first migration; admins already
+    // pass profiles_select, so surfacing it costs nothing but asking for it.
+    sb.from('profiles').select('id, username, created_at').order('username'),
     sb.from('user_roles').select('user_id, role, requires_password_change'),
   ]);
   if (pErr) {
@@ -378,6 +390,7 @@ async function loadAdminUsers() {
   adminState.users = profiles.map((p) => ({
     id: p.id,
     username: p.username,
+    created_at: p.created_at,
     role: roleById.get(p.id)?.role || 'user',
     requires_password_change: !!roleById.get(p.id)?.requires_password_change,
   }));
@@ -390,98 +403,239 @@ function visibleAdminUsers() {
   return adminState.users.filter((u) => u.username.toLowerCase().includes(term));
 }
 
+function joinedLabel(value) {
+  if (!value) return '';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+/**
+ * Every action this admin may take on this user, and what each one does.
+ * The single source of truth for the row's affordances — an empty list means
+ * the row has nothing to offer and must not pretend otherwise by expanding.
+ * Mirrors the RPC and Edge Function rules; the backend still enforces them.
+ */
+function actionsFor(u) {
+  const actions = [];
+  const isSelf = u.id === state.user.id;
+  const isGlobalAdmin = state.role === 'global_admin';
+
+  // Any admin, but only on normal users, and never on themselves.
+  if (u.role === 'user' && !isSelf) {
+    actions.push({
+      label: 'Reset password',
+      button: 'Reset',
+      description: `Sets their password back to the default and forces a change at their next sign-in.`,
+      run: (btn) => resetPassword(u, btn),
+    });
+  }
+  if (isGlobalAdmin && u.role === 'user') {
+    actions.push({
+      label: 'Make admin',
+      button: 'Promote',
+      description: 'Lets them create users and reset passwords. They still cannot read anyone else\'s notes.',
+      run: (btn) => changeRole(u, 'promote', btn),
+    });
+  }
+  if (isGlobalAdmin && u.role === 'admin') {
+    actions.push({
+      label: 'Remove admin',
+      button: 'Demote',
+      description: 'Returns them to a normal user. Their own entries and prompts are untouched.',
+      run: (btn) => changeRole(u, 'demote', btn),
+    });
+  }
+  if (isGlobalAdmin && u.role !== 'global_admin' && !isSelf) {
+    actions.push({
+      danger: true,
+      label: 'Delete account',
+      button: 'Delete…',
+      description: 'Erases the account and every entry, prompt and snippet they own. This cannot be undone.',
+      run: () => deleteUser(u),
+    });
+  }
+  return actions;
+}
+
 function renderAdminList() {
   const list = document.getElementById('admin-user-list');
+  const count = document.getElementById('admin-count');
   list.textContent = '';
+
   const visible = visibleAdminUsers();
+  const total = adminState.users.length;
+  count.textContent = total ? `${total} ${total === 1 ? 'person' : 'people'}` : '';
+
   if (visible.length === 0) {
     const empty = document.createElement('p');
     empty.className = 'py-6 text-center text-sm text-ink-muted';
-    empty.textContent = adminState.users.length === 0 ? 'No users yet.' : `Nothing matches “${adminState.filter.trim()}”.`;
+    empty.textContent = total === 0 ? 'No users yet.' : `Nothing matches “${adminState.filter.trim()}”.`;
     list.appendChild(empty);
     return;
   }
-  for (const u of visible) list.appendChild(renderAdminRow(u));
+
+  // Below the threshold a flat list reads faster than three labelled sections.
+  if (visible.length < GROUP_AT) {
+    for (const u of visible) list.appendChild(renderAdminRow(u));
+    return;
+  }
+
+  for (const role of ROLE_ORDER) {
+    const members = visible.filter((u) => u.role === role);
+    if (members.length === 0) continue;
+
+    const heading = document.createElement('div');
+    heading.className = 'flex items-center gap-2 pt-1 text-[11px] uppercase tracking-wider text-ink-muted';
+    heading.append(ROLE_SECTION[role]);
+    const badge = document.createElement('span');
+    badge.className = 'rounded-full border border-edge px-1.5';
+    badge.textContent = String(members.length);
+    heading.appendChild(badge);
+    list.appendChild(heading);
+
+    const group = document.createElement('div');
+    group.className = 'flex flex-col gap-1.5';
+    for (const u of members) group.appendChild(renderAdminRow(u));
+    list.appendChild(group);
+  }
+}
+
+function rolePill(role) {
+  const pill = document.createElement('span');
+  const tone =
+    role === 'global_admin' ? 'border-purple/55 text-purple'
+    : role === 'admin' ? 'border-accent/55 text-accent'
+    : 'border-edge text-ink-muted';
+  pill.className = `rounded-full border px-2 py-0.5 text-[11px] ${tone}`;
+  pill.textContent = ROLE_LABEL[role] || role;
+  return pill;
 }
 
 function renderAdminRow(u) {
+  const actions = actionsFor(u);
+  const expandable = actions.length > 0;
+  const open = expandable && adminState.openId === u.id;
+
   const row = document.createElement('div');
-  row.className = 'flex items-center gap-2 rounded-md border border-edge bg-panel-2/50 px-3 py-2';
+  row.className = `overflow-hidden rounded-md border ${open ? 'border-accent/40 bg-panel-2' : 'border-edge bg-panel-2/50'}`;
   row.dataset.userId = u.id;
+
+  // The header is a button only when there is something behind it.
+  const head = document.createElement(expandable ? 'button' : 'div');
+  head.className = 'flex w-full items-center gap-2 px-3 py-2 text-left';
+  if (expandable) {
+    head.type = 'button';
+    head.setAttribute('aria-expanded', String(open));
+    head.classList.add('cursor-pointer', 'hover:bg-panel-2');
+  }
+
+  const avatar = document.createElement('span');
+  const avatarTone =
+    u.role === 'global_admin' ? 'border-purple/50 text-purple'
+    : u.role === 'admin' ? 'border-accent/50 text-accent'
+    : 'border-edge text-ink-muted';
+  avatar.className = `flex h-7 w-7 flex-none items-center justify-center rounded-md border bg-panel text-xs font-semibold uppercase ${avatarTone}`;
+  avatar.setAttribute('aria-hidden', 'true');
+  avatar.textContent = u.username.slice(0, 1);
+  head.appendChild(avatar);
 
   const name = document.createElement('span');
   name.className = 'min-w-0 flex-1 truncate text-sm font-medium';
   name.textContent = u.username;
-  row.appendChild(name);
+  head.appendChild(name);
 
-  const badge = document.createElement('span');
-  badge.className = 'rounded-full border border-edge px-2 py-0.5 text-[11px] text-ink-muted';
-  badge.textContent = u.role === 'global_admin' ? 'global admin' : u.role;
-  row.appendChild(badge);
+  head.appendChild(rolePill(u.role));
+
+  if (u.id === state.user.id) {
+    const you = document.createElement('span');
+    you.className = 'rounded-full border border-ok-hue/50 px-2 py-0.5 text-[11px] text-ok-hue';
+    you.textContent = 'you';
+    // Half the actions are withheld on your own row; say so rather than
+    // leaving an admin to wonder why it does nothing.
+    you.title = 'You cannot change your own role or delete your own account here';
+    head.appendChild(you);
+  }
 
   if (u.requires_password_change) {
     const flag = document.createElement('span');
-    flag.className = 'text-[11px] text-warn-hue';
-    flag.title = 'Must change password on next login';
-    flag.textContent = 'pw reset pending';
-    row.appendChild(flag);
+    flag.className = 'rounded-full border border-warn-hue/55 px-2 py-0.5 text-[11px] text-warn-hue';
+    flag.title = 'Must change password at next sign-in';
+    flag.textContent = 'reset pending';
+    head.appendChild(flag);
   }
 
-  // Admins (and the global admin) may reset Normal User passwords only.
-  if (u.role === 'user' && u.id !== state.user.id) {
-    const resetBtn = document.createElement('button');
-    resetBtn.className = 'btn text-xs !py-1';
-    resetBtn.textContent = 'Reset password';
-    resetBtn.addEventListener('click', () => resetPassword(u, resetBtn));
-    row.appendChild(resetBtn);
+  const joined = joinedLabel(u.created_at);
+  if (joined) {
+    const when = document.createElement('span');
+    when.className = 'whitespace-nowrap text-[11px] tabular-nums text-ink-muted';
+    when.title = 'Account created';
+    when.textContent = joined;
+    head.appendChild(when);
   }
 
-  // Only the global admin can elevate a Normal User to admin.
-  if (state.role === 'global_admin' && u.role === 'user') {
-    const promoteBtn = document.createElement('button');
-    promoteBtn.className = 'btn text-xs !py-1';
-    promoteBtn.textContent = 'Make admin';
-    promoteBtn.addEventListener('click', async () => {
-      promoteBtn.disabled = true;
-      const { error } = await sb.rpc('promote_to_admin', { target_user_id: u.id });
-      if (error) {
-        promoteBtn.disabled = false;
-        return toast('Promotion failed', 'err');
-      }
-      u.role = 'admin';
-      row.replaceWith(renderAdminRow(u));
-      toast(`${u.username} is now an admin`);
+  if (expandable) {
+    const chevron = document.createElement('span');
+    chevron.className = `text-ink-muted transition-transform duration-150 ${open ? 'rotate-90' : ''}`;
+    chevron.setAttribute('aria-hidden', 'true');
+    chevron.textContent = '›';
+    head.appendChild(chevron);
+    head.addEventListener('click', () => {
+      // One row open at a time: a long roster shouldn't turn into a wall.
+      adminState.openId = adminState.openId === u.id ? null : u.id;
+      renderAdminList();
     });
-    row.appendChild(promoteBtn);
-  }
-  if (state.role === 'global_admin' && u.role === 'admin') {
-    const demoteBtn = document.createElement('button');
-    demoteBtn.className = 'btn text-xs !py-1';
-    demoteBtn.textContent = 'Remove admin';
-    demoteBtn.addEventListener('click', async () => {
-      demoteBtn.disabled = true;
-      const { error } = await sb.rpc('demote_to_user', { target_user_id: u.id });
-      if (error) {
-        demoteBtn.disabled = false;
-        return toast('Demotion failed', 'err');
-      }
-      u.role = 'user';
-      row.replaceWith(renderAdminRow(u));
-      toast(`${u.username} is a normal user again`);
-    });
-    row.appendChild(demoteBtn);
   }
 
-  // Delete: global_admin only, never self, never another global admin.
-  if (state.role === 'global_admin' && u.role !== 'global_admin' && u.id !== state.user.id) {
-    const deleteBtn = document.createElement('button');
-    deleteBtn.className = 'btn text-xs !py-1 text-danger';
-    deleteBtn.textContent = 'Delete';
-    deleteBtn.addEventListener('click', () => deleteUser(u, row));
-    row.appendChild(deleteBtn);
-  }
-
+  row.appendChild(head);
+  if (open) row.appendChild(renderAdminActions(u, actions));
   return row;
+}
+
+function renderAdminActions(u, actions) {
+  const drop = document.createElement('div');
+  drop.className = 'flex flex-col gap-2.5 border-t border-edge bg-panel px-3 py-3';
+
+  for (const action of actions) {
+    const line = document.createElement('div');
+    line.className = 'flex items-center justify-between gap-3';
+
+    const text = document.createElement('div');
+    text.className = 'min-w-0';
+    const label = document.createElement('div');
+    label.className = `text-xs font-semibold ${action.danger ? 'text-danger' : ''}`;
+    label.textContent = action.label;
+    const desc = document.createElement('p');
+    desc.className = 'text-[11px] leading-snug text-ink-muted';
+    desc.textContent = action.description;
+    text.append(label, desc);
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `btn flex-none text-xs !py-1 ${action.danger ? 'text-danger border-danger/40' : ''}`;
+    btn.textContent = action.button;
+    btn.addEventListener('click', () => action.run(btn));
+
+    line.append(text, btn);
+    drop.appendChild(line);
+  }
+  return drop;
+}
+
+async function changeRole(u, direction, btn) {
+  const promote = direction === 'promote';
+  btn.disabled = true;
+  const { error } = await sb.rpc(promote ? 'promote_to_admin' : 'demote_to_user', {
+    target_user_id: u.id,
+  });
+  if (error) {
+    btn.disabled = false;
+    return toast(promote ? 'Promotion failed' : 'Demotion failed', 'err');
+  }
+  u.role = promote ? 'admin' : 'user';
+  // The permitted actions change with the role, so re-render rather than patch.
+  renderAdminList();
+  toast(promote ? `${u.username} is now an admin` : `${u.username} is a normal user again`);
 }
 
 async function resetPassword(profile, btn) {
@@ -502,11 +656,11 @@ async function resetPassword(profile, btn) {
   btn.disabled = false;
   if (error) return toast('Reset failed — you may be rate limited', 'err');
   profile.requires_password_change = true;
-  btn.closest('[data-user-id]')?.replaceWith(renderAdminRow(profile));
+  renderAdminList();
   toast(`${profile.username}'s password was reset to the default`);
 }
 
-async function deleteUser(profile, row) {
+async function deleteUser(profile) {
   const choice = await confirmModal({
     title: `Delete ${profile.username}?`,
     body: 'This permanently erases their account and every LogBook entry, prompt and snippet they own. There is no undo.',
@@ -521,7 +675,8 @@ async function deleteUser(profile, row) {
   });
   if (error) return toast('Deletion failed — you may be rate limited', 'err');
   adminState.users = adminState.users.filter((u) => u.id !== profile.id);
-  row.remove();
+  if (adminState.openId === profile.id) adminState.openId = null;
+  renderAdminList();
   toast(`${profile.username} was deleted`);
 }
 
@@ -553,11 +708,34 @@ async function createUser(username) {
   toast(`${created.username} created — default password is "${DEFAULT_PASSWORD}"`);
 }
 
+function showCreateForm(show) {
+  const form = document.getElementById('admin-create-form');
+  const toggle = document.getElementById('admin-new-toggle');
+  form.classList.toggle('hidden', !show);
+  form.classList.toggle('flex', show);
+  toggle.setAttribute('aria-expanded', String(show));
+  if (show) document.getElementById('admin-create-username').focus();
+}
+
+function hideCreateForm() {
+  const input = document.getElementById('admin-create-username');
+  if (input) input.value = '';
+  showCreateForm(false);
+}
+
 function wireAdminPanel() {
   document.getElementById('admin-search').addEventListener('input', (e) => {
     adminState.filter = e.target.value;
+    // A filtered-out row shouldn't stay open behind the filter.
+    adminState.openId = null;
     renderAdminList();
   });
+
+  document.getElementById('admin-new-toggle').addEventListener('click', () => {
+    const hidden = document.getElementById('admin-create-form').classList.contains('hidden');
+    showCreateForm(hidden);
+  });
+  document.getElementById('admin-create-cancel').addEventListener('click', hideCreateForm);
 
   document.getElementById('admin-create-form').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -570,7 +748,7 @@ function wireAdminPanel() {
     btn.disabled = true;
     await createUser(username);
     btn.disabled = false;
-    input.value = '';
+    hideCreateForm();
   });
 }
 
