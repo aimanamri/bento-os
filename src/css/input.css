@@ -607,6 +607,14 @@
 }
 .auth-link:hover { @apply decoration-accent; }
 
+/* Sits above the grid layer, clear of the clock and the sheet below it. */
+#auth-theme-toggle {
+  position: absolute;
+  top: max(0.75rem, env(safe-area-inset-top));
+  right: max(0.75rem, env(safe-area-inset-right));
+  z-index: 2;
+}
+
 #auth-dock { padding-bottom: max(0.5rem, env(safe-area-inset-bottom)); }
 @media (max-width: 639px) {
   /* Three labelled pills won't fit a phone; the glyphs still say enough */
