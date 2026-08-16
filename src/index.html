@@ -348,52 +348,256 @@
 
   <!-- Bulb menu lives at body level: a backdrop-filter ancestor (the glass
        ribbon) would become the containing block for position:fixed -->
-  <!-- ══ Auth portal: login + forced change-password (IMPLEMENTATION-LOCAL §7) ══ -->
-  <div id="auth-screen" style="display:none" class="fixed inset-0 z-40 flex items-center justify-center p-4">
-    <div class="glass w-full max-w-sm rounded-frame border border-edge/80 bg-panel p-6 shadow-lift">
-      <div class="mb-6 text-center">
-        <div class="text-3xl" aria-hidden="true">🍱</div>
-        <h1 class="mt-1 text-lg font-semibold">Bento OS</h1>
-        <p class="text-xs text-ink-muted">Sign in to your workspace</p>
+  <!-- ══ Auth portal: lock screen — login + forced change-password
+       (IMPLEMENTATION-LOCAL §7). No window frame here on purpose: you haven't
+       opened one yet. The face card fronts the sheet the way a lock screen
+       holds an avatar, and reacts to the auth outcome (auth.js). ══ -->
+  <div id="auth-screen" style="display:none" class="fixed inset-0 z-40 flex-col">
+    <div id="auth-grid" aria-hidden="true"></div>
+
+    <!-- Installed-app only: a standalone window has no browser chrome to
+         tell you the time. In a tab the OS already shows one. -->
+    <div id="auth-clock" aria-hidden="true">
+      <div id="auth-clock-time"></div>
+      <div id="auth-clock-date"></div>
+    </div>
+
+    <div class="relative flex min-h-0 flex-1 items-center justify-center p-4">
+      <div class="flex w-full max-w-sm flex-col items-center">
+        <div id="auth-face" class="relative z-10 -mb-9"></div>
+
+        <div id="auth-card" class="glass w-full rounded-frame border border-edge/80 px-6 pb-6 pt-14 shadow-lift">
+          <div class="mb-5 text-center">
+            <h1 class="text-lg font-semibold">Bento OS</h1>
+            <p id="auth-sub" class="text-xs text-ink-muted">Sign in to your workspace</p>
+          </div>
+
+          <form id="auth-login-form" class="flex flex-col gap-3" novalidate>
+            <div>
+              <label for="auth-username" class="mb-1 block text-xs font-medium text-ink-muted">User ID</label>
+              <input id="auth-username" class="input" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+            </div>
+            <div>
+              <label for="auth-password" class="mb-1 block text-xs font-medium text-ink-muted">Password</label>
+              <input id="auth-password" type="password" class="input" autocomplete="current-password" required>
+            </div>
+            <p id="auth-error" class="hidden text-xs text-danger" role="alert"></p>
+            <button id="auth-submit" type="submit" class="btn btn-primary justify-center">Sign in</button>
+            <button id="auth-mode-toggle" type="button" class="btn btn-ghost justify-center text-xs text-ink-muted">Create an account</button>
+          </form>
+
+          <form id="auth-cp-form" class="hidden flex-col gap-3" novalidate>
+            <p class="text-xs text-ink-muted">
+              Choose a new password before continuing. Default or reset passwords
+              must be replaced before the dashboard opens.
+            </p>
+            <div id="cp-current-wrap">
+              <label for="cp-current" class="mb-1 block text-xs font-medium text-ink-muted">Current password</label>
+              <input id="cp-current" type="password" class="input" autocomplete="current-password">
+            </div>
+            <div>
+              <label for="cp-new" class="mb-1 block text-xs font-medium text-ink-muted">New password</label>
+              <input id="cp-new" type="password" class="input" autocomplete="new-password" minlength="8" required>
+            </div>
+            <div>
+              <label for="cp-confirm" class="mb-1 block text-xs font-medium text-ink-muted">Confirm new password</label>
+              <input id="cp-confirm" type="password" class="input" autocomplete="new-password" minlength="8" required>
+            </div>
+            <p id="cp-error" class="hidden text-xs text-danger" role="alert"></p>
+            <button id="cp-submit" type="submit" class="btn btn-primary justify-center">Set new password</button>
+            <button id="cp-cancel" type="button" class="btn btn-ghost hidden justify-center text-xs text-ink-muted">Back to the app</button>
+          </form>
+
+          <p id="auth-about-line" class="mt-4 text-center text-xs text-ink-muted">
+            New here?
+            <button type="button" class="auth-link" data-tour="logbook">See what Bento OS does</button>
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Logged out there is nothing to restore, so these open the tour
+         rather than a tool. -->
+    <footer id="auth-dock" class="glass relative flex items-center justify-center gap-2 border-t px-3 py-2">
+      <button type="button" class="dock-pill" data-tour="logbook" aria-label="About the Docs LogBook">
+        <span aria-hidden="true">📓</span><span class="auth-dock-label">Docs LogBook</span>
+      </button>
+      <button type="button" class="dock-pill" data-tour="prompts" aria-label="About the Prompt Library">
+        <span aria-hidden="true">💬</span><span class="auth-dock-label">Prompt Library</span>
+      </button>
+      <button type="button" class="dock-pill" data-tour="snippets" aria-label="About Code Snippets">
+        <span aria-hidden="true">🧩</span><span class="auth-dock-label">Code Snippets</span>
+      </button>
+    </footer>
+  </div>
+
+  <!-- ══ Pre-auth tour ══
+       One dialog, one pane per tab, opened from the dock pills. Each pane
+       shows two plain claims and one live demo of the thing a picture can't
+       convey — wired in tour.js. -->
+  <dialog id="dlg-tour" class="modal-wide" aria-labelledby="dlg-tour-title">
+    <div class="flex max-h-[85dvh] flex-col">
+      <div class="flex items-center justify-between gap-3 border-b border-edge px-5 py-3">
+        <h2 id="dlg-tour-title" class="text-base font-semibold">What Bento OS does</h2>
+        <button class="icon-btn btn-ghost" data-close-dialog aria-label="Close">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
       </div>
 
-      <form id="auth-login-form" class="flex flex-col gap-3" novalidate>
-        <div>
-          <label for="auth-username" class="mb-1 block text-xs font-medium text-ink-muted">User ID</label>
-          <input id="auth-username" class="input" autocomplete="username" autocapitalize="none" spellcheck="false" required>
-        </div>
-        <div>
-          <label for="auth-password" class="mb-1 block text-xs font-medium text-ink-muted">Password</label>
-          <input id="auth-password" type="password" class="input" autocomplete="current-password" required>
-        </div>
-        <p id="auth-error" class="hidden text-xs text-danger" role="alert"></p>
-        <button id="auth-submit" type="submit" class="btn btn-primary justify-center">Sign in</button>
-        <button id="auth-mode-toggle" type="button" class="btn btn-ghost justify-center text-xs text-ink-muted">Create an account</button>
-      </form>
+      <div role="tablist" aria-label="Tools" class="flex gap-1 border-b border-edge px-3 py-2">
+        <button role="tab" data-tour-tab="logbook" aria-selected="true" aria-controls="tour-pane-logbook"
+          class="btn btn-ghost flex-1 justify-center text-xs data-[active=true]:border-edge data-[active=true]:bg-panel-2" data-active="true">
+          <span aria-hidden="true">📓</span> Docs LogBook
+        </button>
+        <button role="tab" data-tour-tab="prompts" aria-selected="false" aria-controls="tour-pane-prompts"
+          class="btn btn-ghost flex-1 justify-center text-xs data-[active=true]:border-edge data-[active=true]:bg-panel-2" data-active="false">
+          <span aria-hidden="true">💬</span> Prompt Library
+        </button>
+        <button role="tab" data-tour-tab="snippets" aria-selected="false" aria-controls="tour-pane-snippets"
+          class="btn btn-ghost flex-1 justify-center text-xs data-[active=true]:border-edge data-[active=true]:bg-panel-2" data-active="false">
+          <span aria-hidden="true">🧩</span> Code Snippets
+        </button>
+      </div>
 
-      <form id="auth-cp-form" class="hidden flex-col gap-3" novalidate>
-        <p class="text-xs text-ink-muted">
-          Choose a new password before continuing. Default or reset passwords
-          must be replaced before the dashboard opens.
-        </p>
-        <div id="cp-current-wrap">
-          <label for="cp-current" class="mb-1 block text-xs font-medium text-ink-muted">Current password</label>
-          <input id="cp-current" type="password" class="input" autocomplete="current-password">
+      <div class="overflow-y-auto p-5">
+        <!-- ── Docs LogBook ── -->
+        <div id="tour-pane-logbook" role="tabpanel" data-tour-pane="logbook" class="flex flex-col gap-4">
+          <p class="text-sm text-ink-muted">Long-form notes in plain markdown — guides, write-ups, and anything you'll want to find again months from now.</p>
+
+          <div class="tour-row">
+            <div class="tour-thumb">
+              <div class="tour-bar w-4/5"></div>
+              <div class="tour-bar w-full"></div>
+              <div class="tour-bar w-3/5"></div>
+              <div class="tour-bar w-11/12"></div>
+            </div>
+            <div>
+              <h3 class="text-sm font-semibold">Read like a page, edit when you need to</h3>
+              <p class="text-xs text-ink-muted">Notes open as clean rendered prose at a comfortable reading width. One toggle switches to the side-by-side editor.</p>
+            </div>
+          </div>
+
+          <div class="tour-demo">
+            <p class="tour-demo-cap">Try it — edit the left side</p>
+            <div class="grid gap-2 sm:grid-cols-2">
+              <div class="tour-pane-box">
+                <div class="tour-pane-cap">You write</div>
+                <label class="sr-only" for="tour-md-in">Markdown to preview</label>
+                <textarea id="tour-md-in" class="tour-in" spellcheck="false" rows="7"></textarea>
+              </div>
+              <div class="tour-pane-box">
+                <div class="tour-pane-cap">Bento shows</div>
+                <div id="tour-md-out" class="md-preview tour-out" aria-live="polite"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="tour-row">
+            <div class="tour-thumb justify-center gap-1.5">
+              <div class="tour-mini-search">search</div>
+              <div class="flex flex-wrap gap-1">
+                <span class="tour-mini-pill">guide</span><span class="tour-mini-pill">setup</span>
+              </div>
+            </div>
+            <div>
+              <h3 class="text-sm font-semibold">Find it again in one search</h3>
+              <p class="text-xs text-ink-muted">Search covers the title, tags, your own metadata fields, the summary and the body at once. Group by label or year, or narrow down with tag pills.</p>
+            </div>
+          </div>
+
+          <p class="text-xs text-ink-muted">Drafts autosave every 10 seconds while you type, so a crash or a stray refresh offers to put your work back.</p>
         </div>
-        <div>
-          <label for="cp-new" class="mb-1 block text-xs font-medium text-ink-muted">New password</label>
-          <input id="cp-new" type="password" class="input" autocomplete="new-password" minlength="8" required>
+
+        <!-- ── Prompt Library ── -->
+        <div id="tour-pane-prompts" role="tabpanel" data-tour-pane="prompts" class="hidden flex-col gap-4">
+          <p class="text-sm text-ink-muted">The prompts you keep rewriting, saved once and grouped by category.</p>
+
+          <div class="tour-row">
+            <div class="tour-thumb justify-center gap-1.5">
+              <div class="tour-mini-search">search</div>
+              <div class="flex flex-wrap gap-1">
+                <span class="tour-mini-pill">writing</span><span class="tour-mini-pill">code</span>
+              </div>
+            </div>
+            <div>
+              <h3 class="text-sm font-semibold">A library, not a scratch file</h3>
+              <p class="text-xs text-ink-muted">Every prompt sits in a category with its own tags, so you can search the whole library or filter it down to one kind of work.</p>
+            </div>
+          </div>
+
+          <div class="tour-demo">
+            <p class="tour-demo-cap">Try it — type into the highlighted blanks</p>
+            <div class="tour-card">
+              <div id="tour-prompt-body" class="tour-body"></div>
+              <div class="mt-3 flex items-center justify-between gap-2">
+                <span class="text-[11px] text-ink-muted">Blanks you leave empty stay as placeholders.</span>
+                <button type="button" id="tour-prompt-copy" class="btn btn-primary text-xs">Copy</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="tour-row">
+            <div class="tour-thumb justify-center">
+              <div class="tour-bar w-5/6"></div>
+              <div class="tour-bar w-2/3"></div>
+              <div class="mt-1 self-start rounded-md bg-accent px-2 py-1 text-[10px] font-medium text-surface">Copy</div>
+            </div>
+            <div>
+              <h3 class="text-sm font-semibold">Copy the finished text, not the template</h3>
+              <p class="text-xs text-ink-muted">One click puts the composed prompt on your clipboard with the blanks filled in — nothing left to tidy up by hand.</p>
+            </div>
+          </div>
         </div>
-        <div>
-          <label for="cp-confirm" class="mb-1 block text-xs font-medium text-ink-muted">Confirm new password</label>
-          <input id="cp-confirm" type="password" class="input" autocomplete="new-password" minlength="8" required>
+
+        <!-- ── Code Snippets ── -->
+        <div id="tour-pane-snippets" role="tabpanel" data-tour-pane="snippets" class="hidden flex-col gap-4">
+          <p class="text-sm text-ink-muted">Commands and code you'd rather not look up twice.</p>
+
+          <div class="tour-row">
+            <div class="tour-thumb justify-center gap-1">
+              <div class="flex flex-wrap gap-1">
+                <span class="tour-mini-pill">BASH</span><span class="tour-mini-pill">GIT</span><span class="tour-mini-pill">SQL</span>
+              </div>
+              <div class="tour-bar w-3/4"></div>
+              <div class="tour-bar w-1/2"></div>
+            </div>
+            <div>
+              <h3 class="text-sm font-semibold">Grouped by language, coloured automatically</h3>
+              <p class="text-xs text-ink-muted">Whatever language or tool you type becomes its own group with a distinct accent — no palette to pick and nothing to configure.</p>
+            </div>
+          </div>
+
+          <div class="tour-demo">
+            <p class="tour-demo-cap">Try it — type into the highlighted blanks</p>
+            <div class="tour-card">
+              <div id="tour-snippet-body" class="tour-body font-mono"></div>
+              <div class="mt-3 flex items-center justify-between gap-2">
+                <span class="text-[11px] text-ink-muted">The same blanks as the Prompt Library.</span>
+                <button type="button" id="tour-snippet-copy" class="btn btn-primary text-xs">Copy</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="tour-row">
+            <div class="tour-thumb justify-center">
+              <div class="tour-bar w-2/3"></div>
+              <div class="tour-bar w-full"></div>
+              <div class="mt-1 self-end text-[10px] text-ink-muted">flip ↻</div>
+            </div>
+            <div>
+              <h3 class="text-sm font-semibold">Keep the why on the back</h3>
+              <p class="text-xs text-ink-muted">Flip a card over to store notes with the snippet — what it's for, and the part that bites you at 2am.</p>
+            </div>
+          </div>
         </div>
-        <p id="cp-error" class="hidden text-xs text-danger" role="alert"></p>
-        <button id="cp-submit" type="submit" class="btn btn-primary justify-center">Set new password</button>
-        <button id="cp-cancel" type="button" class="btn btn-ghost hidden justify-center text-xs text-ink-muted">Back to the app</button>
-      </form>
+      </div>
+
+      <div class="flex items-center justify-between gap-3 border-t border-edge px-5 py-3">
+        <p class="text-xs text-ink-muted">Everything you save belongs to your account alone — administrators included.</p>
+        <button class="btn btn-primary text-xs" data-close-dialog>Got it</button>
+      </div>
     </div>
-  </div>
+  </dialog>
 
   <!-- ══ User management (admins; usernames + roles only — no PII) ══ -->
   <dialog id="dlg-admin" class="modal-wide" aria-labelledby="dlg-admin-title">

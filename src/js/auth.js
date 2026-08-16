@@ -7,9 +7,13 @@
 
 import { api, ApiError, setAuthErrorHandler } from './api.js';
 import { toast, confirmModal, announce } from './ui.js';
+import { initFaceCard } from './face-card.js';
+import { initTour } from './tour.js';
 
 const PASSWORD_MIN = 8;
 const DEFAULT_PASSWORD = 'bentoos';
+const SUCCESS_HOLD_MS = 450; // let the greeting land before the app takes over
+const FLINCH_HOLD_MS = 1800; // how long a rejected sign-in keeps the sad face
 
 const authScreen = document.getElementById('auth-screen');
 const frame = document.getElementById('frame');
@@ -17,6 +21,59 @@ const loginForm = document.getElementById('auth-login-form');
 const cpForm = document.getElementById('auth-cp-form');
 const loginError = document.getElementById('auth-error');
 const cpError = document.getElementById('cp-error');
+const authCard = document.getElementById('auth-card');
+const authSub = document.getElementById('auth-sub');
+
+/* ── lock screen: greeter + clock ───────────────────────────── */
+
+let greeter = null; // face-card controller, created in initAuth
+
+const lockVisible = () => authScreen.style.display !== 'none';
+
+// A wrong password should be felt, not just read. The flinch is a reaction,
+// not a mood: it hands the face back to the cursor shortly after, so one typo
+// doesn't leave the greeter sulking for the rest of the session.
+let flinchTimer = null;
+
+function flinch() {
+  greeter?.setState('danger');
+  clearTimeout(flinchTimer);
+  flinchTimer = setTimeout(() => greeter?.release(), FLINCH_HOLD_MS);
+  if (!authCard) return;
+  authCard.classList.remove('shake');
+  void authCard.offsetWidth; // restart the animation on a repeat failure
+  authCard.classList.add('shake');
+}
+
+let clockTimer = null;
+
+// Follows the device: local time, and the device's own 12/24-hour and date
+// format (no locale is passed).
+function startClock() {
+  const time = document.getElementById('auth-clock-time');
+  const date = document.getElementById('auth-clock-date');
+  if (!time || !date) return;
+
+  const tick = () => {
+    const now = new Date();
+    time.textContent = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    date.textContent = now.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' });
+  };
+  // Wake on the minute boundary rather than polling every second.
+  const schedule = () => {
+    clockTimer = setTimeout(() => {
+      tick();
+      schedule();
+    }, 60_000 - (Date.now() % 60_000) + 50);
+  };
+  tick();
+  schedule();
+}
+
+function stopClock() {
+  clearTimeout(clockTimer);
+  clockTimer = null;
+}
 
 const state = { user: null };
 let booted = false;       // app shell has been shown at least once
@@ -40,11 +97,18 @@ function showAuthScreen(view, { forced = false } = {}) {
   loginForm.classList.toggle('flex', isLogin);
   cpForm.classList.toggle('hidden', isLogin);
   cpForm.classList.toggle('flex', !isLogin);
+  // The change-password view shares this sheet, so it gets the same greeter —
+  // it just isn't a greeting at that point.
+  authSub.textContent = isLogin ? 'Sign in to your workspace' : 'One more step';
+  greeter?.release();
+  startClock();
   location.hash = isLogin ? '#/login' : '#/change-password';
   (isLogin ? document.getElementById('auth-username') : document.getElementById('cp-new')).focus();
 }
 
 function showApp() {
+  stopClock();
+  clearTimeout(flinchTimer);
   authScreen.style.display = 'none';
   frame.style.display = '';
   booted = true;
@@ -54,6 +118,12 @@ function showApp() {
 function setError(el, message) {
   el.textContent = message || '';
   el.classList.toggle('hidden', !message);
+}
+
+// Every rejection on the lock screen: show the message, flinch the greeter.
+function rejectAuth(el, message) {
+  setError(el, message);
+  flinch();
 }
 
 /* ── navbar ─────────────────────────────────────────────────── */
@@ -71,11 +141,18 @@ function renderNavbar() {
 
 /* ── post-login routing ─────────────────────────────────────── */
 
-function finishLogin(user) {
+async function finishLogin(user) {
   state.user = user;
   if (user.requires_password_change) {
     showAuthScreen('change-password', { forced: true });
     return;
+  }
+  // Coming off the lock screen, let the greeter register the win before the
+  // workspace takes over. A restored session has no lock screen to hold.
+  if (lockVisible()) {
+    greeter?.setState('ok');
+    authSub.textContent = `Welcome back, ${user.username}`;
+    await new Promise((resolve) => setTimeout(resolve, SUCCESS_HOLD_MS));
   }
   renderNavbar();
   showApp();
@@ -103,10 +180,10 @@ function wireLoginForm() {
     setError(loginError, '');
     const username = document.getElementById('auth-username').value.trim();
     const password = document.getElementById('auth-password').value;
-    if (!username) return setError(loginError, 'User ID is required');
-    if (!password) return setError(loginError, 'Password is required');
+    if (!username) return rejectAuth(loginError, 'User ID is required');
+    if (!password) return rejectAuth(loginError, 'Password is required');
     if (signupMode && password.length < PASSWORD_MIN) {
-      return setError(loginError, `Password needs at least ${PASSWORD_MIN} characters`);
+      return rejectAuth(loginError, `Password needs at least ${PASSWORD_MIN} characters`);
     }
 
     submitBtn.disabled = true;
@@ -114,9 +191,9 @@ function wireLoginForm() {
       const path = signupMode ? '/api/auth/signup' : '/api/auth/login';
       const { user } = await api(path, { method: 'POST', body: { username, password } });
       loginForm.reset();
-      finishLogin(user);
+      await finishLogin(user);
     } catch (err) {
-      setError(loginError, err instanceof ApiError ? err.message : 'Sign-in failed');
+      rejectAuth(loginError, err instanceof ApiError ? err.message : 'Sign-in failed');
     } finally {
       submitBtn.disabled = false;
     }
@@ -140,10 +217,10 @@ function wireChangePasswordForm() {
     const next = document.getElementById('cp-new').value;
     const confirm = document.getElementById('cp-confirm').value;
 
-    if (next === DEFAULT_PASSWORD) return setError(cpError, 'The default password cannot be reused');
-    if (next.length < PASSWORD_MIN) return setError(cpError, `Password needs at least ${PASSWORD_MIN} characters`);
-    if (next !== confirm) return setError(cpError, 'Passwords do not match');
-    if (!cpForced && !current) return setError(cpError, 'Enter your current password');
+    if (next === DEFAULT_PASSWORD) return rejectAuth(cpError, 'The default password cannot be reused');
+    if (next.length < PASSWORD_MIN) return rejectAuth(cpError, `Password needs at least ${PASSWORD_MIN} characters`);
+    if (next !== confirm) return rejectAuth(cpError, 'Passwords do not match');
+    if (!cpForced && !current) return rejectAuth(cpError, 'Enter your current password');
 
     const btn = document.getElementById('cp-submit');
     btn.disabled = true;
@@ -152,9 +229,9 @@ function wireChangePasswordForm() {
       const { user } = await api('/api/auth/change-password', { method: 'POST', body });
       cpForm.reset();
       toast('Password updated', 'info');
-      finishLogin(user);
+      await finishLogin(user);
     } catch (err) {
-      setError(cpError, err instanceof ApiError ? err.message : 'Could not change password');
+      rejectAuth(cpError, err instanceof ApiError ? err.message : 'Could not change password');
     } finally {
       btn.disabled = false;
     }
@@ -434,10 +511,14 @@ function wireAdminPanel() {
 /* ── boot ───────────────────────────────────────────────────── */
 
 export async function initAuth() {
+  // The greeter fronts the sheet the way a lock screen holds an avatar. It
+  // tracks the cursor until an auth outcome pins its expression.
+  greeter = initFaceCard('auth-face', { compact: true }) || null;
   wireLoginForm();
   wireChangePasswordForm();
   wireUserMenu();
   wireAdminPanel();
+  initTour();
 
   // Mid-session reactions: an expired cookie (401) or a fresh forced-rotation
   // flag (403) on any later call bounces the whole app to the right screen.
@@ -451,7 +532,7 @@ export async function initAuth() {
 
   try {
     const { user } = await api('/api/auth/me');
-    finishLogin(user);
+    await finishLogin(user);
   } catch (err) {
     // 401 here is expected when signed out; the handler already showed login,
     // but call it explicitly in case the request failed some other way.
