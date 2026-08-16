@@ -31,11 +31,12 @@ function parseId(raw) {
   return Number.isInteger(n) && n > 0 ? n : null;
 }
 
-// Data blindness: usernames + roles + the reset flag only. No password_hash,
-// no session/IP data ever leaves the server.
+// Data blindness: usernames, roles, the reset flag and the join date only.
+// created_at is when the account was made — not activity, which is never
+// recorded. No password_hash, no session/IP data ever leaves the server.
 router.get('/', requireAdmin, (req, res) => {
   const users = db.prepare(
-    'SELECT id, username, role, requires_password_change FROM users ORDER BY username'
+    'SELECT id, username, role, requires_password_change, created_at FROM users ORDER BY username'
   ).all().map((u) => ({ ...u, requires_password_change: !!u.requires_password_change }));
   res.json({ users });
 });

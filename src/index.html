@@ -608,24 +608,42 @@
   </dialog>
 
   <!-- ══ User management (admins; usernames + roles only — no PII) ══ -->
+  <!-- ══ User management (admins; usernames, roles and join dates only — no PII) ══
+       Rows stay quiet until you open one: the actions a role actually permits
+       live inside, next to a line saying what each one does. A row with no
+       permitted actions doesn't open at all (auth.js actionsFor). -->
   <dialog id="dlg-admin" class="modal-wide" aria-labelledby="dlg-admin-title">
-    <div class="flex max-h-[80dvh] flex-col">
-      <div class="flex items-center justify-between border-b border-edge px-5 py-3">
-        <h2 id="dlg-admin-title" class="text-base font-semibold">User management</h2>
+    <div class="flex max-h-[85dvh] flex-col">
+      <div class="flex items-center justify-between gap-3 border-b border-edge px-5 py-3">
+        <h2 id="dlg-admin-title" class="text-base font-semibold">
+          User management <span id="admin-count" class="ml-1 text-xs font-normal text-ink-muted"></span>
+        </h2>
         <button class="icon-btn btn-ghost" data-close-dialog aria-label="Close user management">
           <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
         </button>
       </div>
-      <div class="flex flex-wrap items-center gap-2 border-b border-edge px-5 py-3">
+
+      <div class="flex items-center gap-2 border-b border-edge px-5 py-3">
         <label for="admin-search" class="sr-only">Filter users</label>
         <input id="admin-search" type="search" class="input min-w-0 flex-1 !py-1.5 text-sm" placeholder="Filter by User ID…" autocomplete="off">
-        <form id="admin-create-form" class="flex items-center gap-1.5">
-          <label for="admin-create-username" class="sr-only">New User ID</label>
-          <input id="admin-create-username" class="input !py-1.5 text-sm" placeholder="New User ID" maxlength="32" autocomplete="off">
-          <button type="submit" class="btn btn-primary whitespace-nowrap text-xs">Create user</button>
-        </form>
+        <button type="button" id="admin-new-toggle" class="btn btn-primary whitespace-nowrap text-xs" aria-expanded="false" aria-controls="admin-create-form">
+          + New user
+        </button>
       </div>
+
+      <!-- Revealed by the button above, so creating and filtering stop sharing a line -->
+      <form id="admin-create-form" class="hidden items-center gap-2 border-b border-edge bg-panel-2/50 px-5 py-3" novalidate>
+        <label for="admin-create-username" class="sr-only">New User ID</label>
+        <input id="admin-create-username" class="input min-w-0 flex-1 !py-1.5 text-sm" placeholder="New User ID" maxlength="32" autocomplete="off">
+        <button type="submit" class="btn btn-primary whitespace-nowrap text-xs">Create</button>
+        <button type="button" id="admin-create-cancel" class="btn btn-ghost text-xs text-ink-muted">Cancel</button>
+      </form>
+
       <div id="admin-user-list" class="flex flex-col gap-1.5 overflow-y-auto p-5 text-sm"></div>
+
+      <p class="border-t border-edge px-5 py-2.5 text-xs text-ink-muted">
+        New accounts start with the default password and must change it at first sign-in.
+      </p>
     </div>
   </dialog>
 

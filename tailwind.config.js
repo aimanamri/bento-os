@@ -14,6 +14,9 @@ module.exports = {
         'ink-muted': 'rgb(var(--c-ink-muted) / <alpha-value>)',
         edge: 'rgb(var(--c-edge) / <alpha-value>)',
         accent: 'rgb(var(--c-accent) / <alpha-value>)',
+        // --c-purple has existed since the alert blocks; the admin panel is
+        // the first place it's needed as a utility rather than raw CSS.
+        purple: 'rgb(var(--c-purple) / <alpha-value>)',
         'ok-hue': 'rgb(var(--c-ok) / <alpha-value>)',
         'info-hue': 'rgb(var(--c-info) / <alpha-value>)',
         'warn-hue': 'rgb(var(--c-warn) / <alpha-value>)',
