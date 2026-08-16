@@ -280,3 +280,12 @@ are documented side by side in
 
 API and UI test suites live in the session scratchpad during development; the
 security audit checklist is in [docs/SECURITY.md](docs/SECURITY.md) §6.
+
+## License
+
+[MIT](LICENSE) — use it, fork it, ship it.
+
+The libraries vendored into `dist/vendor/` keep their own licences (all MIT,
+except DOMPurify which is MPL-2.0 or Apache-2.0). The build stacks their notices
+into `dist/vendor/LICENSES.txt`, so any copy of `dist/` carries the attribution
+those licences require.

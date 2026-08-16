@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Personal knowledge base and prompt library with a macOS bento-glass UI, backed by Supabase (PostgreSQL + Auth).",
+  "license": "MIT",
   "type": "commonjs",
   "scripts": {
     "dev": "npm run build && node server/index.js",
