@@ -4,8 +4,8 @@
 import { api } from './api.js';
 import { emit, on } from './bus.js';
 import { toast, announce } from './ui.js';
-import { setMermaidTheme } from './render.js';
 import { initAuth } from './auth.js';
+import { initTheme } from './theme.js';
 import { initLogbook } from './logbook.js';
 import { initPrompts } from './prompts.js';
 import { initSnippets } from './snippets.js';
@@ -18,25 +18,6 @@ const TOOLS = {
   prompts: { tab: document.getElementById('tab-prompts'), view: document.getElementById('view-prompts'), name: 'Prompt Library' },
   snippets: { tab: document.getElementById('tab-snippets'), view: document.getElementById('view-snippets'), name: 'Code Snippets' },
 };
-
-/* ── theme (dark-first; UX-SPEC §1) ─────────────────────────── */
-
-function applyTheme(dark) {
-  document.documentElement.classList.toggle('dark', dark);
-  setMermaidTheme(dark);
-  emit('theme:changed', { dark });
-}
-
-function initTheme() {
-  const stored = localStorage.getItem('bento.theme');
-  const dark = stored ? stored === 'dark' : true; // dark is the design target
-  applyTheme(dark);
-  document.getElementById('theme-toggle').addEventListener('click', () => {
-    const nowDark = !document.documentElement.classList.contains('dark');
-    localStorage.setItem('bento.theme', nowDark ? 'dark' : 'light');
-    applyTheme(nowDark);
-  });
-}
 
 /* ── tabs (roving tablist; tabs hide, never unmount — §1.4) ─── */
 
@@ -257,7 +238,7 @@ async function healthCheck() {
 
 /* ── boot ───────────────────────────────────────────────────── */
 
-initTheme(); // login portal is themed too
+initTheme(); // wires both toggles: the title bar's and the lock screen's
 
 // Before the auth gate: `beforeinstallprompt` fires around page load, and
 // initAuth() blocks here for as long as the login screen is up — wiring the
