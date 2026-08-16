@@ -346,48 +346,121 @@
     <footer id="dock" class="glass flex items-center gap-2 border-t px-3 py-2" aria-label="Minimized tools"></footer>
   </div>
 
-  <!-- ══ Auth portal: login + forced change-password (goal spec §1/§2/§5) ══ -->
-  <div id="auth-screen" style="display:none" class="fixed inset-0 z-40 flex items-center justify-center p-4">
-    <div class="glass w-full max-w-sm rounded-frame border border-edge/80 bg-panel p-6 shadow-lift">
-      <div class="mb-6 text-center">
-        <div class="text-3xl" aria-hidden="true">🍱</div>
-        <h1 class="mt-1 text-lg font-semibold">Bento OS</h1>
-        <p class="text-xs text-ink-muted">Sign in to your workspace</p>
-      </div>
+  <!-- ══ Auth portal: lock screen — login + forced change-password
+       (goal spec §1/§2/§5). No window frame here on purpose: you haven't
+       opened one yet. The face card fronts the sheet the way a lock screen
+       holds an avatar, and reacts to the auth outcome (auth.js). ══ -->
+  <div id="auth-screen" style="display:none" class="fixed inset-0 z-40 flex-col">
+    <div id="auth-grid" aria-hidden="true"></div>
 
-      <form id="auth-login-form" class="flex flex-col gap-3" novalidate>
-        <div>
-          <label for="auth-username" class="mb-1 block text-xs font-medium text-ink-muted">User ID</label>
-          <input id="auth-username" class="input" autocomplete="username" autocapitalize="none" spellcheck="false" required>
-        </div>
-        <div>
-          <label for="auth-password" class="mb-1 block text-xs font-medium text-ink-muted">Password</label>
-          <input id="auth-password" type="password" class="input" autocomplete="current-password" required>
-        </div>
-        <p id="auth-error" class="hidden text-xs text-danger" role="alert"></p>
-        <button id="auth-submit" type="submit" class="btn btn-primary justify-center">Sign in</button>
-        <button id="auth-mode-toggle" type="button" class="btn btn-ghost justify-center text-xs text-ink-muted">Create an account</button>
-      </form>
-
-      <form id="auth-cp-form" class="hidden flex-col gap-3" novalidate>
-        <p class="text-xs text-ink-muted">
-          Choose a new password before continuing. Default or reset passwords
-          must be replaced before the dashboard opens.
-        </p>
-        <div>
-          <label for="cp-new" class="mb-1 block text-xs font-medium text-ink-muted">New password</label>
-          <input id="cp-new" type="password" class="input" autocomplete="new-password" minlength="8" required>
-        </div>
-        <div>
-          <label for="cp-confirm" class="mb-1 block text-xs font-medium text-ink-muted">Confirm new password</label>
-          <input id="cp-confirm" type="password" class="input" autocomplete="new-password" minlength="8" required>
-        </div>
-        <p id="cp-error" class="hidden text-xs text-danger" role="alert"></p>
-        <button id="cp-submit" type="submit" class="btn btn-primary justify-center">Set new password</button>
-        <button id="cp-cancel" type="button" class="btn btn-ghost hidden justify-center text-xs text-ink-muted">Back to the app</button>
-      </form>
+    <!-- Installed-app only: a standalone window has no browser chrome to
+         tell you the time. In a tab the OS already shows one. -->
+    <div id="auth-clock" aria-hidden="true">
+      <div id="auth-clock-time"></div>
+      <div id="auth-clock-date"></div>
     </div>
+
+    <div class="relative flex min-h-0 flex-1 items-center justify-center p-4">
+      <div class="flex w-full max-w-sm flex-col items-center">
+        <div id="auth-face" class="relative z-10 -mb-9"></div>
+
+        <div id="auth-card" class="glass w-full rounded-frame border border-edge/80 px-6 pb-6 pt-14 shadow-lift">
+          <div class="mb-5 text-center">
+            <h1 class="text-lg font-semibold">Bento OS</h1>
+            <p id="auth-sub" class="text-xs text-ink-muted">Sign in to your workspace</p>
+          </div>
+
+          <form id="auth-login-form" class="flex flex-col gap-3" novalidate>
+            <div>
+              <label for="auth-username" class="mb-1 block text-xs font-medium text-ink-muted">User ID</label>
+              <input id="auth-username" class="input" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+            </div>
+            <div>
+              <label for="auth-password" class="mb-1 block text-xs font-medium text-ink-muted">Password</label>
+              <input id="auth-password" type="password" class="input" autocomplete="current-password" required>
+            </div>
+            <p id="auth-error" class="hidden text-xs text-danger" role="alert"></p>
+            <button id="auth-submit" type="submit" class="btn btn-primary justify-center">Sign in</button>
+            <button id="auth-mode-toggle" type="button" class="btn btn-ghost justify-center text-xs text-ink-muted">Create an account</button>
+          </form>
+
+          <form id="auth-cp-form" class="hidden flex-col gap-3" novalidate>
+            <p class="text-xs text-ink-muted">
+              Choose a new password before continuing. Default or reset passwords
+              must be replaced before the dashboard opens.
+            </p>
+            <div>
+              <label for="cp-new" class="mb-1 block text-xs font-medium text-ink-muted">New password</label>
+              <input id="cp-new" type="password" class="input" autocomplete="new-password" minlength="8" required>
+            </div>
+            <div>
+              <label for="cp-confirm" class="mb-1 block text-xs font-medium text-ink-muted">Confirm new password</label>
+              <input id="cp-confirm" type="password" class="input" autocomplete="new-password" minlength="8" required>
+            </div>
+            <p id="cp-error" class="hidden text-xs text-danger" role="alert"></p>
+            <button id="cp-submit" type="submit" class="btn btn-primary justify-center">Set new password</button>
+            <button id="cp-cancel" type="button" class="btn btn-ghost hidden justify-center text-xs text-ink-muted">Back to the app</button>
+          </form>
+
+          <p id="auth-about-line" class="mt-4 text-center text-xs text-ink-muted">
+            New here?
+            <button type="button" class="auth-link" data-auth-about>See what Bento OS does</button>
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Logged out there is nothing to restore, so these open the tour
+         rather than a tool. -->
+    <footer id="auth-dock" class="glass relative flex items-center justify-center gap-2 border-t px-3 py-2">
+      <button type="button" class="dock-pill" data-auth-about>
+        <span aria-hidden="true">📓</span><span class="auth-dock-label">Docs LogBook</span>
+      </button>
+      <button type="button" class="dock-pill" data-auth-about>
+        <span aria-hidden="true">💬</span><span class="auth-dock-label">Prompt Library</span>
+      </button>
+      <button type="button" class="dock-pill" data-auth-about>
+        <span aria-hidden="true">🧩</span><span class="auth-dock-label">Code Snippets</span>
+      </button>
+    </footer>
   </div>
+
+  <!-- ══ Pre-auth tour: what the three tabs are, before you have an account ══ -->
+  <dialog id="dlg-about" aria-labelledby="dlg-about-title">
+    <div class="flex flex-col">
+      <div class="flex items-center justify-between border-b border-edge px-5 py-3">
+        <h2 id="dlg-about-title" class="text-base font-semibold">What Bento OS does</h2>
+        <button class="icon-btn btn-ghost" data-close-dialog aria-label="Close">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="flex flex-col gap-3 p-5 text-sm">
+        <p class="text-ink-muted">Three tools in one window. Everything you write belongs to your account and no one else's — administrators included.</p>
+        <div class="flex gap-3 rounded-card border border-edge bg-panel-2 p-3">
+          <span class="text-lg leading-none" aria-hidden="true">📓</span>
+          <div>
+            <h3 class="font-semibold">Docs LogBook</h3>
+            <p class="text-xs text-ink-muted">Markdown notes with math, diagrams and highlighted code. Search across every field, and pick up where a crash left off.</p>
+          </div>
+        </div>
+        <div class="flex gap-3 rounded-card border border-edge bg-panel-2 p-3">
+          <span class="text-lg leading-none" aria-hidden="true">💬</span>
+          <div>
+            <h3 class="font-semibold">Prompt Library</h3>
+            <p class="text-xs text-ink-muted">Reusable AI prompts. Write <code class="md-code">{{Topic}}</code> into a template, fill the blanks on the card, and copy the finished text in one click.</p>
+          </div>
+        </div>
+        <div class="flex gap-3 rounded-card border border-edge bg-panel-2 p-3">
+          <span class="text-lg leading-none" aria-hidden="true">🧩</span>
+          <div>
+            <h3 class="font-semibold">Code Snippets</h3>
+            <p class="text-xs text-ink-muted">Commands and code grouped by language, with the same fill-in-the-blanks copying.</p>
+          </div>
+        </div>
+        <p class="text-xs text-ink-muted">Sign in with the User ID an administrator gave you, or create an account to start empty.</p>
+      </div>
+    </div>
+  </dialog>
 
   <!-- ══ User management (admins; usernames + roles only — no PII) ══ -->
   <dialog id="dlg-admin" class="modal-wide" aria-labelledby="dlg-admin-title">
