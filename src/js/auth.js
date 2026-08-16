@@ -13,9 +13,12 @@
 
 import { sb, usernameToEmail, validUsername } from './supabase.js';
 import { toast, confirmModal, announce } from './ui.js';
+import { initFaceCard } from './face-card.js';
 
 const DEFAULT_PASSWORD = 'bentoos';
 const PASSWORD_MIN = 8;
+const SUCCESS_HOLD_MS = 450; // let the greeting land before the app takes over
+const FLINCH_HOLD_MS = 1800; // how long a rejected sign-in keeps the sad face
 
 const authScreen = document.getElementById('auth-screen');
 const frame = document.getElementById('frame');
@@ -23,6 +26,59 @@ const loginForm = document.getElementById('auth-login-form');
 const cpForm = document.getElementById('auth-cp-form');
 const loginError = document.getElementById('auth-error');
 const cpError = document.getElementById('cp-error');
+const authCard = document.getElementById('auth-card');
+const authSub = document.getElementById('auth-sub');
+
+/* ── lock screen: greeter + clock ───────────────────────────── */
+
+let greeter = null; // face-card controller, created in initAuth
+
+const lockVisible = () => authScreen.style.display !== 'none';
+
+// A wrong password should be felt, not just read. The flinch is a reaction,
+// not a mood: it hands the face back to the cursor shortly after, so one typo
+// doesn't leave the greeter sulking for the rest of the session.
+let flinchTimer = null;
+
+function flinch() {
+  greeter?.setState('danger');
+  clearTimeout(flinchTimer);
+  flinchTimer = setTimeout(() => greeter?.release(), FLINCH_HOLD_MS);
+  if (!authCard) return;
+  authCard.classList.remove('shake');
+  void authCard.offsetWidth; // restart the animation on a repeat failure
+  authCard.classList.add('shake');
+}
+
+let clockTimer = null;
+
+function startClock() {
+  // Matches the CSS gate: only the installed app draws a clock.
+  if (!window.matchMedia('(display-mode: standalone)').matches) return;
+  const time = document.getElementById('auth-clock-time');
+  const date = document.getElementById('auth-clock-date');
+  if (!time || !date) return;
+
+  const tick = () => {
+    const now = new Date();
+    time.textContent = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    date.textContent = now.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' });
+  };
+  // Wake on the minute boundary rather than polling every second.
+  const schedule = () => {
+    clockTimer = setTimeout(() => {
+      tick();
+      schedule();
+    }, 60_000 - (Date.now() % 60_000) + 50);
+  };
+  tick();
+  schedule();
+}
+
+function stopClock() {
+  clearTimeout(clockTimer);
+  clockTimer = null;
+}
 
 const state = {
   user: null,
@@ -48,12 +104,19 @@ function showAuthScreen(view, { forced = false } = {}) {
   loginForm.classList.toggle('flex', isLogin);
   cpForm.classList.toggle('hidden', isLogin);
   cpForm.classList.toggle('flex', !isLogin);
+  // The change-password view shares this sheet, so it gets the same greeter —
+  // it just isn't a greeting at that point.
+  authSub.textContent = isLogin ? 'Sign in to your workspace' : 'One more step';
+  greeter?.release();
+  startClock();
   // Dedicated route for the forced flow — tokens never ride in the URL.
   location.hash = isLogin ? '#/login' : '#/change-password';
   (isLogin ? document.getElementById('auth-username') : document.getElementById('cp-new')).focus();
 }
 
 function showApp() {
+  stopClock();
+  clearTimeout(flinchTimer);
   authScreen.style.display = 'none';
   frame.style.display = '';
   if (location.hash === '#/login' || location.hash === '#/change-password') location.hash = '';
@@ -62,6 +125,12 @@ function showApp() {
 function setError(el, message) {
   el.textContent = message || '';
   el.classList.toggle('hidden', !message);
+}
+
+// Every rejection on the lock screen: show the message, flinch the greeter.
+function rejectAuth(el, message) {
+  setError(el, message);
+  flinch();
 }
 
 /* ── post-login: load profile + role, gate on password change ── */
@@ -112,6 +181,13 @@ async function finishLogin(user) {
     showAuthScreen('change-password', { forced: true });
     return;
   }
+  // Coming off the lock screen, let the greeter register the win before the
+  // workspace takes over. A restored session has no lock screen to hold.
+  if (lockVisible()) {
+    greeter?.setState('ok');
+    authSub.textContent = `Welcome back, ${state.username}`;
+    await new Promise((resolve) => setTimeout(resolve, SUCCESS_HOLD_MS));
+  }
   renderNavbar();
   showApp();
   announce(`Signed in as ${state.username}`);
@@ -136,11 +212,11 @@ function wireLoginForm() {
     const password = document.getElementById('auth-password').value;
 
     if (!validUsername(username)) {
-      return setError(loginError, 'User ID: 2–32 letters, digits, dot, dash or underscore');
+      return rejectAuth(loginError, 'User ID: 2–32 letters, digits, dot, dash or underscore');
     }
-    if (!password) return setError(loginError, 'Password is required');
+    if (!password) return rejectAuth(loginError, 'Password is required');
     if (signupMode && password.length < PASSWORD_MIN) {
-      return setError(loginError, `Password needs at least ${PASSWORD_MIN} characters`);
+      return rejectAuth(loginError, `Password needs at least ${PASSWORD_MIN} characters`);
     }
 
     submitBtn.disabled = true;
@@ -155,7 +231,7 @@ function wireLoginForm() {
         });
         if (error) throw error;
         if (!data.session) {
-          return setError(loginError, 'Account created but sign-in is pending — email confirmations must be disabled for this app (see docs/SUPABASE-MIGRATION.md)');
+          return rejectAuth(loginError, 'Account created but sign-in is pending — email confirmations must be disabled for this app (see docs/SUPABASE-MIGRATION.md)');
         }
         user = data.user;
       } else {
@@ -169,7 +245,7 @@ function wireLoginForm() {
       loginForm.reset();
       await finishLogin(user);
     } catch (err) {
-      setError(loginError, friendlyAuthError(err));
+      rejectAuth(loginError, friendlyAuthError(err));
     } finally {
       submitBtn.disabled = false;
     }
@@ -193,12 +269,12 @@ function wireChangePasswordForm() {
     const confirm = document.getElementById('cp-confirm').value;
 
     if (next.length < PASSWORD_MIN) {
-      return setError(cpError, `Password needs at least ${PASSWORD_MIN} characters`);
+      return rejectAuth(cpError, `Password needs at least ${PASSWORD_MIN} characters`);
     }
     if (next === DEFAULT_PASSWORD) {
-      return setError(cpError, 'The default password cannot be reused');
+      return rejectAuth(cpError, 'The default password cannot be reused');
     }
-    if (next !== confirm) return setError(cpError, 'Passwords do not match');
+    if (next !== confirm) return rejectAuth(cpError, 'Passwords do not match');
 
     const btn = document.getElementById('cp-submit');
     btn.disabled = true;
@@ -212,7 +288,7 @@ function wireChangePasswordForm() {
       const { data } = await sb.auth.getUser();
       await finishLogin(data.user);
     } catch (err) {
-      setError(cpError, friendlyAuthError(err));
+      rejectAuth(cpError, friendlyAuthError(err));
     } finally {
       btn.disabled = false;
     }
@@ -499,6 +575,18 @@ function wireAdminPanel() {
   });
 }
 
+/* ── pre-auth tour ──────────────────────────────────────────── */
+
+// Both the sheet's "New here?" link and the dock pills open this: logged out
+// there is no tool to restore, so the pills explain instead of navigating.
+function wireAboutTour() {
+  const dlg = document.getElementById('dlg-about');
+  if (!dlg) return;
+  document.querySelectorAll('[data-auth-about]').forEach((btn) => {
+    btn.addEventListener('click', () => dlg.showModal());
+  });
+}
+
 /* ── boot ───────────────────────────────────────────────────── */
 
 /**
@@ -507,10 +595,14 @@ function wireAdminPanel() {
  * any data modules.
  */
 export async function initAuth() {
+  // The greeter fronts the sheet the way a lock screen holds an avatar. It
+  // tracks the cursor until an auth outcome pins its expression.
+  greeter = initFaceCard('auth-face', { compact: true }) || null;
   wireLoginForm();
   wireChangePasswordForm();
   wireUserMenu();
   wireAdminPanel();
+  wireAboutTour();
 
   sb.auth.onAuthStateChange((event) => {
     if (event === 'SIGNED_OUT') location.reload();

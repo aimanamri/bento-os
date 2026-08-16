@@ -552,6 +552,69 @@
 .dark .face-card[data-state="warning"] .face-card-emoji { color: rgb(var(--c-warn)); }
 .dark .face-card[data-state="danger"] .face-card-emoji { color: rgb(var(--c-danger)); }
 
+/* `ok` is only ever pinned by auth.js, when a sign-in succeeds */
+.face-card[data-state="ok"] { border-color: rgb(var(--c-ok) / 0.5); }
+.face-card[data-state="ok"] .face-card-emoji { color: rgb(var(--c-ok)); }
+.dark .face-card[data-state="ok"] {
+  border-color: rgb(var(--c-ok) / 0.5);
+  box-shadow: 0 0 0 1px rgb(var(--c-ok) / 0.14), 0 12px 34px rgb(0 0 0 / 0.55), 0 0 30px rgb(var(--c-ok) / 0.16);
+}
+.dark .face-card[data-state="ok"] .face-card-emoji { color: rgb(var(--c-ok)); }
+
+/* ── Lock screen (auth portal) ──
+   The body wallpaper already paints the accent/ok wash and shows through,
+   so this layer only adds the bento grid over it. */
+#auth-grid {
+  position: absolute; inset: 0; pointer-events: none;
+  background-image:
+    linear-gradient(rgb(var(--c-ink) / 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(var(--c-ink) / 0.05) 1px, transparent 1px);
+  background-size: 68px 68px;
+  -webkit-mask-image: radial-gradient(72% 62% at 50% 44%, #000 28%, transparent 100%);
+  mask-image: radial-gradient(72% 62% at 50% 44%, #000 28%, transparent 100%);
+}
+
+/* Only the installed app gets a clock: a standalone window has no browser
+   chrome, whereas in a tab the OS is already showing one. */
+#auth-clock { display: none; }
+@media (display-mode: standalone) {
+  #auth-clock {
+    position: relative;
+    display: flex; flex-direction: column; align-items: center; gap: 0.1rem;
+    padding-top: max(2rem, env(safe-area-inset-top));
+  }
+}
+#auth-clock-time { @apply text-4xl font-extralight tracking-tight; }
+#auth-clock-date { @apply text-xs text-ink-muted; }
+
+/* The sheet sits over the dock's glass, so it needs to read as the nearer
+   object — slightly more opaque than chrome glass, plus an accent glow. */
+#auth-card {
+  background: rgb(var(--glass-tint) / 0.82);
+  box-shadow: 0 8px 30px rgb(0 0 0 / 0.25), 0 0 60px rgb(var(--c-accent) / 0.10);
+}
+#auth-card.shake { animation: auth-shake 420ms cubic-bezier(0.36, 0.07, 0.19, 0.97); }
+@keyframes auth-shake {
+  10%, 90% { transform: translateX(-1px); }
+  20%, 80% { transform: translateX(2px); }
+  30%, 50%, 70% { transform: translateX(-4px); }
+  40%, 60% { transform: translateX(4px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  #auth-card.shake { animation: none; }
+}
+
+.auth-link {
+  @apply cursor-pointer text-accent underline decoration-accent/50 underline-offset-4;
+}
+.auth-link:hover { @apply decoration-accent; }
+
+#auth-dock { padding-bottom: max(0.5rem, env(safe-area-inset-bottom)); }
+@media (max-width: 639px) {
+  /* Three labelled pills won't fit a phone; the glyphs still say enough */
+  .auth-dock-label { display: none; }
+}
+
 /* Collapsible Summary section above the body editor */
 #lb-summary-wrap > summary { list-style: none; }
 #lb-summary-wrap > summary::-webkit-details-marker { display: none; }
