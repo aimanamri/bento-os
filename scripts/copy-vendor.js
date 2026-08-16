@@ -75,7 +75,50 @@ for (const lang of PRISM_LANGUAGES) {
 }
 fs.writeFileSync(path.join(out, 'prism.js'), prism.join('\n'));
 
+// ── Third-party notices ──
+// These libraries are redistributed inside dist/, and MIT requires the notice
+// to travel with the copy. Most upstream .min.js builds carry no banner, so
+// stack their real LICENSE files into one document beside them rather than
+// hand-maintaining a list that silently rots when a dependency changes.
+const NOTICE_PACKAGES = [
+  'markdown-it',
+  'dompurify',
+  'katex',
+  'mermaid',
+  '@supabase/supabase-js',
+  'prismjs',
+];
+
+const notices = [
+  'Third-party licences — Bento OS bundles the libraries below into',
+  'dist/vendor/. Each is redistributed under its own terms, reproduced in',
+  'full. Bento OS itself is MIT licensed; see LICENSE at the repository root.',
+  '',
+];
+
+for (const pkg of NOTICE_PACKAGES) {
+  const dir = path.join(nm, pkg);
+  const name = fs
+    .readdirSync(dir)
+    .find((f) => /^(LICENSE|LICENCE|COPYING)/i.test(f));
+  if (!name) {
+    console.error(`[build] MISSING licence file for vendored package: ${pkg}`);
+    process.exit(1);
+  }
+  const { version, license } = require(path.join(dir, 'package.json'));
+  notices.push(
+    '='.repeat(72),
+    `${pkg} ${version} — ${license}`,
+    '='.repeat(72),
+    '',
+    fs.readFileSync(path.join(dir, name), 'utf8').trim(),
+    '',
+  );
+}
+fs.writeFileSync(path.join(out, 'LICENSES.txt'), notices.join('\n'));
+
 console.log(
   `[build] vendor libs copied to dist/vendor/ (prism.js: ${PRISM_LANGUAGES.length - 1} grammars, ` +
-    `${(prism.join('\n').length / 1024).toFixed(0)} kB)`,
+    `${(prism.join('\n').length / 1024).toFixed(0)} kB; ` +
+    `LICENSES.txt: ${NOTICE_PACKAGES.length} packages)`,
 );
