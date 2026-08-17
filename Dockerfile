@@ -15,7 +15,7 @@
 # runtime node_modules.
 
 # ---- deps: resolve production dependencies once ----
-FROM node:20-alpine AS deps
+FROM node:22-alpine AS deps
 WORKDIR /app
 COPY package*.json ./
 # --omit=optional drops better-sqlite3: it only backs the local-SQLite variant
@@ -23,11 +23,21 @@ COPY package*.json ./
 RUN npm ci --omit=dev --omit=optional && npm cache clean --force
 
 # ---- build: compile assets ----
-FROM node:20-alpine AS build
+FROM node:22-alpine AS build
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY . .
+
+# Which backend the bundle calls. Empty (the default) keeps whatever is
+# committed in src/js/supabase-config.js — i.e. the hosted Supabase project.
+# The self-hosted compose stack passes its own gateway URL + anon key here, and
+# scripts/build-js.js swaps the module in at bundle time WITHOUT editing the
+# source file, so the committed cloud config is never disturbed.
+ARG BENTO_SUPABASE_URL=""
+ARG BENTO_SUPABASE_ANON_KEY=""
+ENV BENTO_SUPABASE_URL=$BENTO_SUPABASE_URL \
+    BENTO_SUPABASE_ANON_KEY=$BENTO_SUPABASE_ANON_KEY
 # The PWA assets come from the build context (src/assets, src/manifest.…) and
 # from build:sw, so a .dockerignore change or a missing file degrades the app
 # silently: it still boots, it just stops being installable or offline-capable.
@@ -36,6 +46,7 @@ COPY . .
 # the image must ship exactly one bundle and none of the readable modules it
 # was built from, or a build regression quietly republishes the source.
 RUN npm run build \
+ && node scripts/pin-supabase-config.js \
  && test -s dist/sw.js \
  && test -s dist/manifest.webmanifest \
  && test -s dist/assets/icons/icon-512.png \
@@ -44,9 +55,17 @@ RUN npm run build \
  && test "$(ls dist/js | wc -l)" -eq 1
 
 # ---- runtime ----
-FROM node:20-alpine AS runtime
+FROM node:22-alpine AS runtime
 ENV NODE_ENV=production
 WORKDIR /app
+
+# Carried into the runtime so server/index.js pins the CSP connect-src to the
+# SAME backend the bundle was built against. Without this the image would ship
+# a bundle calling the self-hosted gateway while the CSP still allowed only the
+# committed cloud project, and every request would be blocked. Compose can
+# still override it at run time.
+ARG BENTO_SUPABASE_URL=""
+ENV BENTO_SUPABASE_URL=$BENTO_SUPABASE_URL
 
 # tini = PID 1: forwards SIGTERM to Node for a clean shutdown and reaps
 # zombies. Non-root user is created up front.
@@ -63,6 +82,13 @@ COPY --chown=nodejs:nodejs package*.json ./
 # when BENTO_SUPABASE_URL is unset. Without it the CSP would fall back to a
 # https://*.supabase.co wildcard.
 COPY --from=build --chown=nodejs:nodejs /app/src/js/supabase-config.js ./src/js/supabase-config.js
+
+# The admin bootstrap, so a self-hosted stack can create its first account
+# without Node on the host (docker-compose.yml → `setup-admin` service). It is
+# never run by the server; it only needs @supabase/supabase-js, which is
+# already a production dependency. The other scripts/ are build- or host-only
+# and stay out of the image.
+COPY --from=build --chown=nodejs:nodejs /app/scripts/setup-supabase-admin.js ./scripts/setup-supabase-admin.js
 
 # No VOLUME and no writable directory: every byte of state lives in Supabase,
 # so the whole root filesystem can be mounted read-only (docker-compose.yml).

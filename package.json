@@ -17,6 +17,7 @@
     "build:readable": "BENTO_OBFUSCATE=0 npm run build",
     "icons": "node scripts/make-icons.js",
     "setup:admin": "node scripts/setup-supabase-admin.js",
+    "gen:keys": "node scripts/gen-local-keys.js",
     "migrate:data": "node scripts/migrate-sqlite-to-supabase.js",
     "audit:deps": "npm audit"
   },

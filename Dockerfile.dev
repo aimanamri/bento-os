@@ -10,7 +10,7 @@
 # closed (it waits by design — src/sw.js). If a change doesn't show up after
 # a restart + reload, tick DevTools → Application → Service Workers →
 # "Update on reload", or use a private window.
-FROM node:20-alpine
+FROM node:22-alpine
 ENV NODE_ENV=development
 WORKDIR /app
 
@@ -19,9 +19,13 @@ RUN apk add --no-cache tini \
  && adduser -S nodejs -u 1001
 
 COPY package*.json ./
-# Full install (incl. devDependencies) — tailwind + client vendor libs are
-# needed to build assets.
-RUN npm ci
+# devDependencies are required — tailwind + the client vendor libs are what
+# `npm run build` compiles and copies into dist/.
+# --omit=optional drops better-sqlite3, exactly as the production image does:
+# it only backs the local-SQLite variant (dev-local-auth) and the one-off
+# migrate:data script. Nothing in `npm run dev` loads it, and skipping it
+# avoids a pointless from-source native build against musl.
+RUN npm ci --omit=optional
 
 COPY . .
 # The anonymous node_modules volume must be writable by the unprivileged

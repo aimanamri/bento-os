@@ -40,7 +40,11 @@ graphify-out/
 .graphify*
 scratchpad/
 
-# Docker files themselves
+# Docker files themselves. docker/ holds the self-hosted stack's gateway conf,
+# Edge Functions router and migration runner — all bind-mounted into their own
+# containers at run time, never built into the app image.
 Dockerfile*
 docker-compose*.yml
 .dockerignore
+docker/
+.env.example
