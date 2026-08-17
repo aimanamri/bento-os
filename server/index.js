@@ -34,7 +34,10 @@ function supabaseOriginFromConfig() {
 const SUPABASE_ORIGIN = process.env.BENTO_SUPABASE_URL
   ? new URL(process.env.BENTO_SUPABASE_URL).origin
   : (supabaseOriginFromConfig() || 'https://*.supabase.co');
-const SUPABASE_WSS = SUPABASE_ORIGIN.replace(/^https:/, 'wss:');
+// Realtime rides a websocket on the same origin. The self-hosted gateway is
+// plain http:// on loopback, so map both schemes rather than only https: —
+// otherwise the http case emits the origin twice instead of its ws: form.
+const SUPABASE_WSS = SUPABASE_ORIGIN.replace(/^http(s)?:/, (_, s) => (s ? 'wss:' : 'ws:'));
 
 // SECURITY.md §2/§4 — headers on every response, CSP is the XSS backstop.
 // script-src 'self' with no inline allowance: even a sanitizer bypass cannot

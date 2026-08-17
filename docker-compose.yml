@@ -1,28 +1,299 @@
 # Compose Spec — no top-level `version:` key is needed anymore.
 #
-# Bento OS is a STATIC host: all data lives in Supabase (PostgreSQL + Auth) and
-# is reached from the browser. The container holds no database and needs no
-# writable path — nothing here is stateful, so standing it up on another
-# machine is just: clone, `docker compose up -d`.
+# Bento OS, fully self-hosted: the PostgreSQL database and the whole Supabase
+# API surface run here as containers. Nothing leaves the machine and no cloud
+# account is involved.
+#
+#   db         PostgreSQL 15 + Supabase roles/extensions   ← ALL your data
+#   auth       GoTrue — sign-in, sessions, admin user CRUD
+#   rest       PostgREST — every sb.from(...) / sb.rpc(...) call
+#   functions  Deno edge runtime — supabase/functions/*
+#   gateway    nginx — unifies the three above on ONE origin (:8000)
+#   migrate    one-shot: applies supabase/migrations/*.sql, then exits
+#   bento      the app itself — static host + CSP headers (:8481)
+#
+# The browser talks to `gateway` for data and to `bento` for the app shell;
+# `bento` still has no data layer of its own.
+#
+# UNLIKE the hosted setup, this stack is STATEFUL: your entire database lives
+# in the `db-data` named volume. `docker compose down` keeps it;
+# `docker compose down -v` DESTROYS it. See DOCKER.md § Backup & restore.
 #
 # Per-machine overrides go in a `.env` file next to this one (Compose reads it
-# automatically) — see DOCKER.md § Configuration.
+# automatically) — start from `.env.example`, and see DOCKER.md § Configuration.
+
+name: bento-os
+
+# Defaults are duplicated here rather than being required in .env so that a
+# fresh `git clone && docker compose up -d` works with no setup at all. Every
+# one of them is a development credential — read DOCKER.md § Security before
+# putting this anywhere but loopback.
+x-postgres-password: &postgres-password ${POSTGRES_PASSWORD:-bentoos-local-dev-password}
+x-jwt-secret: &jwt-secret ${JWT_SECRET:-bento-os-local-dev-jwt-secret-change-me-32b}
+x-anon-key: &anon-key ${ANON_KEY:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzY3MjI1NjAwLCJleHAiOjIwODI3NTg0MDB9.esm2v7G-HRRUBJh_zPGSSMoBmJwQEWELsN9A0J5x4gM}
+x-service-key: &service-key ${SERVICE_ROLE_KEY:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3NjcyMjU2MDAsImV4cCI6MjA4Mjc1ODQwMH0.IwKkrsdxz1hoNFVWpZp5iQlrWlWPwgO6pVUwbDiG1Tw}
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
 
 services:
-  # ---- Production ----
+  # ═══════════════════════════════════════════════════════════════════
+  # PostgreSQL — the actual backend
+  # ═══════════════════════════════════════════════════════════════════
+  # supabase/postgres, not stock postgres: the image ships the roles the rest
+  # of the stack signs in as (anon, authenticated, service_role, authenticator,
+  # supabase_auth_admin) and the auth.uid() / auth.role() helpers that every
+  # RLS policy in supabase/migrations/ is written against. Stock postgres:16
+  # would start fine and then fail every policy.
+  db:
+    image: supabase/postgres:15.8.1.060
+    container_name: bento-os-db
+    environment:
+      # supabase_admin, not postgres, is this image's bootstrap superuser —
+      # it is the image default, set explicitly here because the healthcheck
+      # and the migrate service both have to use the same name.
+      POSTGRES_USER: supabase_admin
+      POSTGRES_PASSWORD: *postgres-password
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+      JWT_SECRET: *jwt-secret
+      JWT_EXP: ${JWT_EXPIRY:-3600}
+    # Published on loopback for psql/TablePlus. 54322 rather than 5432 so it
+    # never collides with a Postgres already running on the host.
+    ports:
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-54322}:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      # NOTE: nothing is mounted into /docker-entrypoint-initdb.d. That
+      # directory already holds the image's own migrate.sh and migrations/,
+      # which create the roles, the auth schema and auth.uid(); mounting over it
+      # silently removes all of them. Role passwords are set by the `db-init`
+      # service instead — see the comment at the top of docker/set-role-passwords.sh.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U supabase_admin -d ${POSTGRES_DB:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    restart: unless-stopped
+    logging: *default-logging
+
+  # ═══════════════════════════════════════════════════════════════════
+  # Role passwords — one-shot, then exits 0
+  # ═══════════════════════════════════════════════════════════════════
+  # supabase/postgres creates supabase_auth_admin and authenticator but leaves
+  # them without a password, so GoTrue and PostgREST cannot log in until this
+  # runs. Must therefore complete BEFORE either of them starts.
+  db-init:
+    image: postgres:15-alpine
+    container_name: bento-os-db-init
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGHOST: db
+      PGUSER: supabase_admin
+      PGDATABASE: ${POSTGRES_DB:-postgres}
+      PGPASSWORD: *postgres-password
+      SERVICE_ROLE_PASSWORD: *postgres-password
+    volumes:
+      - ./docker/set-role-passwords.sh:/set-role-passwords.sh:ro
+    # Invoked through an explicit `sh` so the script's exec bit is irrelevant —
+    # bind mounts are noexec under Docker Desktop.
+    entrypoint: ["sh", "/set-role-passwords.sh"]
+    restart: "no"
+    logging: *default-logging
+
+  # ═══════════════════════════════════════════════════════════════════
+  # GoTrue — authentication
+  # ═══════════════════════════════════════════════════════════════════
+  # Creates the `auth` schema (including auth.users) via its own migrations on
+  # first boot. That is why `migrate` waits for this service, not just for db.
+  auth:
+    image: supabase/gotrue:v2.177.0
+    container_name: bento-os-auth
+    depends_on:
+      db:
+        condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: 9999
+      API_EXTERNAL_URL: http://localhost:${GATEWAY_HOST_PORT:-8000}
+
+      GOTRUE_DB_DRIVER: postgres
+      DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD:-bentoos-local-dev-password}@db:5432/${POSTGRES_DB:-postgres}
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD:-bentoos-local-dev-password}@db:5432/${POSTGRES_DB:-postgres}
+
+      GOTRUE_SITE_URL: http://localhost:${BENTO_HOST_PORT:-8481}
+      GOTRUE_URI_ALLOW_LIST: "*"
+      GOTRUE_DISABLE_SIGNUP: "false"
+
+      GOTRUE_JWT_SECRET: *jwt-secret
+      GOTRUE_JWT_EXP: ${JWT_EXPIRY:-3600}
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+
+      # Bento OS maps usernames onto synthesized <username>@bentoos.local
+      # addresses that cannot receive mail, so confirmation MUST be off or no
+      # account is ever usable. This mirrors supabase/config.toml and the
+      # Dashboard setting the hosted variant requires.
+      GOTRUE_MAILER_AUTOCONFIRM: "true"
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
+      GOTRUE_EXTERNAL_PHONE_ENABLED: "false"
+      GOTRUE_SMS_AUTOCONFIRM: "true"
+
+      GOTRUE_LOG_LEVEL: info
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9999/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
+    restart: unless-stopped
+    logging: *default-logging
+
+  # ═══════════════════════════════════════════════════════════════════
+  # PostgREST — the REST API behind every sb.from() / sb.rpc()
+  # ═══════════════════════════════════════════════════════════════════
+  # Connects as `authenticator`, a role with no rights of its own. It reads the
+  # `role` claim out of the request JWT and SET LOCAL ROLE's into anon /
+  # authenticated / service_role for that transaction — which is precisely what
+  # makes the RLS policies apply. This is the whole authorisation model.
+  rest:
+    image: postgrest/postgrest:v12.2.12
+    container_name: bento-os-rest
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      PGRST_DB_URI: postgres://authenticator:${POSTGRES_PASSWORD:-bentoos-local-dev-password}@db:5432/${POSTGRES_DB:-postgres}
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: *jwt-secret
+      PGRST_DB_USE_LEGACY_GUCS: "false"
+      PGRST_APP_SETTINGS_JWT_SECRET: *jwt-secret
+      PGRST_APP_SETTINGS_JWT_EXP: ${JWT_EXPIRY:-3600}
+      # Pick up schema changes (a new migration) without a restart.
+      PGRST_DB_CHANNEL_ENABLED: "true"
+    restart: unless-stopped
+    logging: *default-logging
+
+  # ═══════════════════════════════════════════════════════════════════
+  # Edge Functions — supabase/functions/* on the Deno runtime
+  # ═══════════════════════════════════════════════════════════════════
+  # These four are the only privileged operations in the product: creating
+  # users, resetting passwords, and hard-deleting accounts. They hold the
+  # service_role key so the BROWSER never has to.
+  functions:
+    image: supabase/edge-runtime:v1.69.12
+    container_name: bento-os-functions
+    depends_on:
+      db:
+        condition: service_healthy
+      auth:
+        condition: service_healthy
+    environment:
+      # Points at the gateway by its in-network name so a function calling
+      # back into PostgREST/GoTrue never depends on the host port mapping.
+      SUPABASE_URL: http://gateway:8000
+      SUPABASE_ANON_KEY: *anon-key
+      SUPABASE_SERVICE_ROLE_KEY: *service-key
+      SUPABASE_DB_URL: postgres://postgres:${POSTGRES_PASSWORD:-bentoos-local-dev-password}@db:5432/${POSTGRES_DB:-postgres}
+    volumes:
+      # Read-only: the runtime executes these, it must never rewrite them.
+      - ./supabase/functions:/home/deno/functions:ro
+      - ./docker/functions-main:/home/deno/main:ro
+    command: ["start", "--main-service", "/home/deno/main"]
+    restart: unless-stopped
+    logging: *default-logging
+
+  # ═══════════════════════════════════════════════════════════════════
+  # Gateway — one origin for all three APIs (the hosted product's Kong)
+  # ═══════════════════════════════════════════════════════════════════
+  gateway:
+    image: nginx:1.27-alpine
+    container_name: bento-os-gateway
+    depends_on:
+      auth:
+        condition: service_healthy
+      rest:
+        condition: service_started
+      functions:
+        condition: service_started
+    ports:
+      - "${BENTO_BIND:-127.0.0.1}:${GATEWAY_HOST_PORT:-8000}:8000"
+    volumes:
+      - ./docker/gateway.conf:/etc/nginx/conf.d/default.conf:ro
+    healthcheck:
+      # 127.0.0.1, not localhost: busybox wget resolves localhost to ::1 first
+      # and nginx listens on IPv4 only, so the probe would always be refused.
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8000/gateway-health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+    logging: *default-logging
+
+  # ═══════════════════════════════════════════════════════════════════
+  # Schema migrations — one-shot, then exits 0
+  # ═══════════════════════════════════════════════════════════════════
+  # Ordering is load-bearing: every migration references auth.users, which
+  # GoTrue creates on ITS first boot. Hence the wait on `auth`.
+  # Idempotent via public.schema_migrations — safe on every `up`.
+  migrate:
+    image: postgres:15-alpine
+    container_name: bento-os-migrate
+    depends_on:
+      db:
+        condition: service_healthy
+      auth:
+        condition: service_healthy
+    environment:
+      PGHOST: db
+      PGUSER: supabase_admin      # this image's superuser (see the db service)
+      PGDATABASE: ${POSTGRES_DB:-postgres}
+      PGPASSWORD: *postgres-password
+    volumes:
+      - ./supabase/migrations:/migrations:ro
+      - ./docker/apply-migrations.sh:/apply-migrations.sh:ro
+    entrypoint: ["sh", "/apply-migrations.sh"]
+    restart: "no"
+    logging: *default-logging
+
+  # ═══════════════════════════════════════════════════════════════════
+  # Bento OS — the app (production)
+  # ═══════════════════════════════════════════════════════════════════
   bento:
     build:
       context: .
       dockerfile: Dockerfile
-    image: bento-os:latest
+      # Point the BUNDLE at this stack's gateway instead of the hosted project
+      # committed in src/js/supabase-config.js. The swap happens inside
+      # scripts/build-js.js at bundle time — the source file is never edited,
+      # so `npm run build` on your machine still targets Supabase Cloud.
+      args:
+        BENTO_SUPABASE_URL: http://localhost:${GATEWAY_HOST_PORT:-8000}
+        BENTO_SUPABASE_ANON_KEY: *anon-key
+    image: bento-os:selfhosted
     container_name: bento-os-prod
+    depends_on:
+      gateway:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     # Published on loopback by default; front it with `tailscale serve` for
     # remote access. Override per machine in .env — e.g. BENTO_BIND=0.0.0.0 to
     # reach it from the LAN (read DOCKER.md § Exposing it first).
     # Note for the PWA: `http://localhost:<port>` is a secure context and
     # installs/works offline; `http://<lan-ip>:<port>` is not, and the service
-    # worker silently never registers there. Reach it over the HTTPS Tailscale
-    # serve to keep the installable, offline-capable build.
+    # worker silently never registers there.
     ports:
       - "${BENTO_BIND:-127.0.0.1}:${BENTO_HOST_PORT:-8481}:3000"
     environment:
@@ -30,10 +301,9 @@ services:
       - BENTO_HOST=0.0.0.0            # 0.0.0.0 *inside* the container so Docker can forward
       - NODE_ENV=production
       - NODE_OPTIONS=--max-old-space-size=384   # cap V8 heap under the 512m limit
-      # Pins the CSP connect-src to one Supabase origin. Leave unset to use the
-      # project baked into src/js/supabase-config.js at build time; set
-      # BENTO_SUPABASE_URL in .env to aim a deployment at a different project.
-      - BENTO_SUPABASE_URL=${BENTO_SUPABASE_URL:-}
+      # Pins the CSP connect-src to the gateway — must match the build arg
+      # above, or the browser blocks every request the bundle makes.
+      - BENTO_SUPABASE_URL=http://localhost:${GATEWAY_HOST_PORT:-8000}
     restart: unless-stopped
 
     # --- Security hardening ---
@@ -51,12 +321,7 @@ services:
     cpus: 1.0
     pids_limit: 256
 
-    # --- Keep logs from filling the disk ---
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
+    logging: *default-logging
 
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:3000/',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
@@ -65,9 +330,39 @@ services:
       retries: 3
       start_period: 10s
 
-  # ---- Development (opt-in) ----
+  # ═══════════════════════════════════════════════════════════════════
+  # First-admin bootstrap — one-shot, opt-in
+  # ═══════════════════════════════════════════════════════════════════
+  # Creates the single global admin (username `admin`, password `bentoos`,
+  # password change forced at first sign-in). Idempotent, and the database's
+  # partial unique index refuses a second global admin regardless.
+  #
+  #   docker compose --profile setup run --rm setup-admin
+  #
+  # Behind a profile so it never runs as part of a normal `up`. It holds the
+  # service_role key, which is why this is a separate container the browser
+  # never talks to.
+  setup-admin:
+    profiles: ["setup"]
+    image: bento-os:selfhosted
+    container_name: bento-os-setup-admin
+    depends_on:
+      gateway:
+        condition: service_healthy
+    environment:
+      # In-network name, so this works regardless of the host port mapping.
+      SUPABASE_URL: http://gateway:8000
+      SUPABASE_SERVICE_ROLE_KEY: *service-key
+    entrypoint: ["node", "scripts/setup-supabase-admin.js"]
+    restart: "no"
+    logging: *default-logging
+
+  # ═══════════════════════════════════════════════════════════════════
+  # Bento OS — development (opt-in)
+  # ═══════════════════════════════════════════════════════════════════
   # Start with:  docker compose --profile dev up bento-dev
   # Bind-mounts the source; no hardening/limits so you can iterate freely.
+  # Uses the same db/auth/rest/functions stack as production.
   bento-dev:
     profiles: ["dev"]
     build:
@@ -75,20 +370,39 @@ services:
       dockerfile: Dockerfile.dev
     image: bento-os:dev
     container_name: bento-os-dev
+    depends_on:
+      gateway:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     # `npm run dev` writes dist/ back into the bind-mounted source tree, so the
     # container's user must own those files on the host. Docker Desktop
     # (macOS/Windows) remaps ownership for you; on Linux set DOCKER_UID and
     # DOCKER_GID in .env to your own `id -u` / `id -g` or the build fails with
     # EACCES. See DOCKER.md § Development.
     user: "${DOCKER_UID:-1001}:${DOCKER_GID:-1001}"
+    # 3001, not 3000: `npm run dev` on the host already uses 3000 for the
+    # Supabase Cloud build, and the two are meant to be runnable side by side.
     ports:
-      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:${BENTO_DEV_HOST_PORT:-3001}:3000"
     environment:
       - BENTO_PORT=3000
       - BENTO_HOST=0.0.0.0
       - NODE_ENV=development
       - npm_config_cache=/tmp/.npm    # writable cache for the non-root user
+      # The dev container bind-mounts your working tree, so it must NOT rewrite
+      # src/js/supabase-config.js. These are read by scripts/build-js.js, which
+      # swaps the module in memory during the bundle — your checkout keeps
+      # pointing at Supabase Cloud, and `git status` stays clean.
+      - BENTO_SUPABASE_URL=http://localhost:${GATEWAY_HOST_PORT:-8000}
+      - BENTO_SUPABASE_ANON_KEY=${ANON_KEY:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzY3MjI1NjAwLCJleHAiOjIwODI3NTg0MDB9.esm2v7G-HRRUBJh_zPGSSMoBmJwQEWELsN9A0J5x4gM}
     volumes:
       - .:/app                       # live source
       - /app/node_modules            # keep the image's linux-built node_modules
     restart: unless-stopped
+    logging: *default-logging
+
+volumes:
+  # THE database. Everything you write in Bento OS is in here.
+  # `docker compose down` preserves it; `down -v` deletes it permanently.
+  db-data:
