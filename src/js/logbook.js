@@ -4,8 +4,9 @@
 import { api, ApiError } from './api.js';
 import { emit, on } from './bus.js';
 import { toast, confirmModal, showBanner, clearBanner, announce, relativeTime, formatStamp } from './ui.js';
+import { t } from './i18n.js';
 import { renderInto, renderMarkdown } from './render.js';
-import { initRibbon, GUIDE_MD } from './ribbon.js';
+import { initRibbon, guideMd } from './ribbon.js';
 import { copyText } from './clipboard.js';
 
 const DRAFT_KEY = 'bento.draft.v1';
@@ -176,8 +177,8 @@ function setMode(mode) {
   const reading = mode === 'read';
   el.modeToggle.querySelector('.mode-icon-read').classList.toggle('hidden', !reading);
   el.modeToggle.querySelector('.mode-icon-edit').classList.toggle('hidden', reading);
-  el.modeToggle.title = reading ? 'Reading mode — click to edit' : 'Editor mode — click to read';
-  el.modeToggle.setAttribute('aria-label', reading ? 'Reading mode (switch to editor)' : 'Editor mode (switch to reading)');
+  el.modeToggle.title = t(reading ? 'lb.readMode.title' : 'lb.editMode.title');
+  el.modeToggle.setAttribute('aria-label', t(reading ? 'lb.readMode.aria' : 'lb.editMode.aria'));
   el.modeToggle.setAttribute('aria-pressed', String(reading));
   if (reading) schedulePreview(0); // make sure the preview reflects current content
 }
@@ -186,9 +187,9 @@ function setMode(mode) {
 function renderCreated() {
   if (state.current) {
     el.created.textContent = formatStamp(state.current.created_at);
-    el.created.title = `UNIX ms: ${state.current.created_at}`;
+    el.created.title = t('meta.createdUnix', { ms: state.current.created_at });
   } else {
-    el.created.textContent = '— (set on first save)';
+    el.created.textContent = t('meta.createdEmpty');
     el.created.title = '';
   }
   el.deleteBtn.classList.toggle('hidden', !state.current);
@@ -202,6 +203,13 @@ function syncTimestampsFromCurrent() {
   state.modifiedEdited = false;
 }
 
+// The server stamps an unlabelled entry 'Uncategorized' (api.js). That string
+// is data — it stays exactly as it is in the database, in search and in the
+// sort below — but it is a word the app chose, not one the user typed, so it
+// is *shown* in whatever language they are reading.
+const DEFAULT_LABEL = 'Uncategorized';
+const labelText = (label) => (label === DEFAULT_LABEL ? t('meta.labelPlaceholder') : label);
+
 // Tag chips, URL validity markers, sublabel gating (EDGE-CASES §6.1/6.3/6.4)
 function syncMetaWidgets() {
   el.tagChips.textContent = '';
@@ -214,7 +222,7 @@ function syncMetaWidgets() {
 
   const hasLabel = el.label.value.trim().length > 0;
   el.sublabel.disabled = !hasLabel;
-  el.sublabel.placeholder = hasLabel ? 'optional' : 'needs a label first';
+  el.sublabel.placeholder = t(hasLabel ? 'meta.sublabel.optional' : 'meta.sublabel.needsLabel');
   if (!hasLabel) el.sublabel.value = '';
 
   renderUrlItems();
@@ -249,7 +257,7 @@ function renderUrlItems() {
 
   el.urlCount.textContent = String(items.length);
   el.urlCount.classList.toggle('hidden', items.length === 0);
-  el.urlCount.title = `${items.length} link${items.length === 1 ? '' : 's'}`;
+  el.urlCount.title = t('meta.urlCount', { n: items.length });
 
   el.urlItems.textContent = '';
   for (const item of items) {
@@ -262,7 +270,7 @@ function renderUrlItems() {
       row.rel = 'noopener noreferrer';
       row.title = item;
     } else {
-      row.title = `${item}\nNot a valid http(s) URL — kept as a note`;
+      row.title = t('meta.urlInvalid', { url: item });
     }
     row.appendChild(chipIcon(valid ? ICON_LINK : ICON_WARN));
     const text = document.createElement('span');
@@ -287,7 +295,7 @@ function renderFieldRows() {
   if (state.fields.size === 0) {
     const empty = document.createElement('p');
     empty.className = 'text-[11px] text-ink-muted/70';
-    empty.textContent = 'No fields yet — add one below (e.g. os_platform, is_valid).';
+    empty.textContent = t('meta.noFields');
     el.fields.appendChild(empty);
   }
   for (const [name, value] of state.fields) {
@@ -303,7 +311,7 @@ function renderFieldRows() {
     valueEl.className = 'input !py-1 min-w-0 flex-1 text-xs';
     valueEl.value = value;
     valueEl.maxLength = 2000;
-    valueEl.setAttribute('aria-label', `Value for field ${name}`);
+    valueEl.setAttribute('aria-label', t('meta.fieldValueFor', { name }));
     valueEl.addEventListener('input', () => {
       state.fields.set(name, valueEl.value);
       setDirty(true);
@@ -311,8 +319,8 @@ function renderFieldRows() {
 
     const del = document.createElement('button');
     del.className = 'icon-btn btn-ghost !p-1 text-ink-muted hover:text-danger';
-    del.setAttribute('aria-label', `Remove field ${name}`);
-    del.title = `Remove ${name}`;
+    del.setAttribute('aria-label', t('meta.removeField', { name }));
+    del.title = t('meta.remove', { name });
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('class', 'icon !h-3.5 !w-3.5');
     svg.setAttribute('viewBox', '0 0 24 24');
@@ -391,7 +399,7 @@ function schedulePreview(delay = null) {
     try {
       await renderInto(el.preview, el.editor.value);
     } catch (e) {
-      el.preview.textContent = 'Preview failed to render.';
+      el.preview.textContent = t('lb.previewFailed');
     }
     lastRenderMs = performance.now() - t0;
   }, wait);
@@ -424,7 +432,7 @@ function renderEntryRow(row) {
   meta.className = 'mt-0.5 flex items-center gap-1.5 text-[11px] text-ink-muted';
   const crumb = document.createElement('span');
   crumb.className = 'truncate';
-  crumb.textContent = row.sublabel ? `${row.label} › ${row.sublabel}` : row.label;
+  crumb.textContent = row.sublabel ? `${labelText(row.label)} › ${row.sublabel}` : labelText(row.label);
   const when = document.createElement('span');
   when.className = 'ml-auto whitespace-nowrap';
   when.textContent = relativeTime(row.updated_at);
@@ -462,11 +470,11 @@ function groupEntries(list, mode) {
     byLabel.get(row.label).push(row);
   }
   const labels = [...byLabel.keys()].sort((a, b) => {
-    if (a === 'Uncategorized') return 1;
-    if (b === 'Uncategorized') return -1;
+    if (a === DEFAULT_LABEL) return 1;
+    if (b === DEFAULT_LABEL) return -1;
     return a.localeCompare(b);
   });
-  return labels.map((label) => ({ key: label, heading: label, entries: byLabel.get(label) }));
+  return labels.map((label) => ({ key: label, heading: labelText(label), entries: byLabel.get(label) }));
 }
 
 /** One collapsible group section (Label or Year mode). */
@@ -561,10 +569,10 @@ function renderList() {
   if (state.list.length === 0) {
     renderEmptyState(
       el.search.value.trim()
-        ? `No entries match “${el.search.value.trim()}”.`
-        : 'No entries yet — create your first one.',
+        ? t('lb.noMatch', { q: el.search.value.trim() })
+        : t('lb.noEntries'),
       el.search.value.trim()
-        ? { label: 'Clear search', onClick: () => { el.search.value = ''; loadList(); } }
+        ? { label: t('lb.clearSearch'), onClick: () => { el.search.value = ''; loadList(); } }
         : null
     );
     renderTagPills();
@@ -578,8 +586,8 @@ function renderList() {
       : state.list.filter((row) => row.tags.some((t) => state.activeTags.has(t.toLowerCase())));
 
   if (filtered.length === 0) {
-    renderEmptyState(`No entries match the selected tag${state.activeTags.size > 1 ? 's' : ''}.`, {
-      label: 'Clear tag filter',
+    renderEmptyState(t('lb.noTagMatch', { n: state.activeTags.size }), {
+      label: t('lb.clearTagFilter'),
       onClick: () => {
         state.activeTags.clear();
         saveSidebarPrefs();
@@ -638,7 +646,7 @@ function renderTagPills() {
 
   const all = document.createElement('button');
   all.className = 'pill';
-  all.textContent = 'All';
+  all.textContent = t('common.all');
   all.setAttribute('aria-pressed', String(state.activeTags.size === 0));
   all.addEventListener('click', () => {
     state.activeTags.clear();
@@ -699,7 +707,7 @@ function applySidebarHidden(hidden) {
   el.sidebar.dataset.hidden = String(hidden);
   el.sidebarToggle.querySelector('.sidebar-icon-shown').classList.toggle('hidden', hidden);
   el.sidebarToggle.querySelector('.sidebar-icon-hidden').classList.toggle('hidden', !hidden);
-  const label = hidden ? 'Show sidebar' : 'Hide sidebar';
+  const label = t(hidden ? 'lb.showSidebar' : 'lb.hideSidebar');
   el.sidebarToggle.title = label;
   el.sidebarToggle.setAttribute('aria-label', label);
   el.sidebarToggle.setAttribute('aria-pressed', String(hidden));
@@ -718,7 +726,7 @@ async function openEntry(id) {
     renderList();
   } catch (e) {
     if (e.code === 'NOT_FOUND') {
-      toast('That entry no longer exists', 'err');
+      toast(t('lb.toast.gone'), 'err');
       await loadList();
     } else {
       toast(e.message, 'err');
@@ -753,12 +761,12 @@ function closeEntry() {
 async function guardThen(fn) {
   if (!state.dirty) return fn();
   const choice = await confirmModal({
-    title: 'Unsaved changes',
-    body: 'This entry has edits that haven’t been saved.',
+    title: t('lb.unsaved.title'),
+    body: t('lb.unsaved.body'),
     actions: [
-      { label: 'Save', value: 'save', style: 'primary' },
-      { label: 'Discard changes', value: 'discard', style: 'danger' },
-      { label: 'Cancel', value: 'cancel' },
+      { label: t('common.save'), value: 'save', style: 'primary' },
+      { label: t('lb.unsaved.discard'), value: 'discard', style: 'danger' },
+      { label: t('common.cancel'), value: 'cancel' },
     ],
   });
   if (choice === 'save') {
@@ -781,11 +789,9 @@ async function save() {
   if (!data.title.trim() || !data.body_md.trim()) {
     const missingTitle = !data.title.trim();
     await confirmModal({
-      title: 'Entry needs a title and details',
-      body: missingTitle
-        ? 'Give the entry a title before saving.'
-        : 'Write some details before saving.',
-      actions: [{ label: 'Got it', value: 'ok', style: 'primary' }],
+      title: t('lb.needsBoth.title'),
+      body: t(missingTitle ? 'lb.needsTitle.body' : 'lb.needsBody.body'),
+      actions: [{ label: t('common.gotIt'), value: 'ok', style: 'primary' }],
     });
     (missingTitle ? el.title : el.editor).focus();
     return false;
@@ -802,7 +808,7 @@ async function save() {
 
   state.saving = true;
   const spinnerTimer = setTimeout(() => {
-    el.saveBtn.querySelector('.save-label').textContent = 'Saving…';
+    el.saveBtn.querySelector('.save-label').textContent = t('lb.saving');
   }, 150);
 
   try {
@@ -827,7 +833,7 @@ async function save() {
     if (e.status === 409) return handleConflict(e, data);
     if (e.code === 'NOT_FOUND') return handleDeletedElsewhere(data);
     if (e.code === 'NETWORK') {
-      toast("Couldn't reach Bento host — your draft is safe locally", 'err', 6000);
+      toast(t('lb.toast.offlineDraft'), 'err', 6000);
       writeDraft(); // §3.5: dirty state + draft retained
       return false;
     }
@@ -841,21 +847,23 @@ async function save() {
 
 function flashSaved() {
   const label = el.saveBtn.querySelector('.save-label');
-  label.textContent = '✓ Saved';
-  announce('Entry saved');
-  setTimeout(() => (label.textContent = 'Save Entry'), 1200);
+  label.textContent = t('lb.savedFlash');
+  announce(t('lb.toast.saved'));
+  setTimeout(() => (label.textContent = t('lb.save')), 1200);
 }
 
 /** 409: saved on another device (§3.3). Overwrite is never the default. */
 async function handleConflict(err, data) {
   const server = err.payload?.entry;
   const choice = await confirmModal({
-    title: 'Saved on another device',
-    body: `This entry changed on the server at ${server ? formatStamp(server.updated_at) : 'an unknown time'}. Your version and theirs now differ.`,
+    title: t('common.savedElsewhere'),
+    body: t('lb.conflict.body', {
+      when: server ? formatStamp(server.updated_at) : t('lb.conflict.unknownTime'),
+    }),
     actions: [
-      { label: 'Cancel', value: 'cancel', style: 'primary' },
-      { label: 'Copy mine & load theirs', value: 'copyload' },
-      { label: 'Overwrite theirs', value: 'overwrite', style: 'danger' },
+      { label: t('common.cancel'), value: 'cancel', style: 'primary' },
+      { label: t('lb.conflict.copyload'), value: 'copyload' },
+      { label: t('common.overwriteTheirs'), value: 'overwrite', style: 'danger' },
     ],
   });
   if (choice === 'overwrite' && server) {
@@ -864,7 +872,7 @@ async function handleConflict(err, data) {
   }
   if (choice === 'copyload' && server) {
     await copyText(data.body_md);
-    toast('Your version copied to clipboard');
+    toast(t('lb.conflict.copied'));
     state.current = server;
     fillForm(server);
     setDirty(false);
@@ -877,11 +885,11 @@ async function handleConflict(err, data) {
 /** Entry deleted on another device while open here (§6.9). */
 async function handleDeletedElsewhere(data) {
   const choice = await confirmModal({
-    title: 'Entry was deleted elsewhere',
-    body: 'This entry no longer exists on the server.',
+    title: t('lb.gone.title'),
+    body: t('lb.gone.body'),
     actions: [
-      { label: 'Save as new entry', value: 'saveNew', style: 'primary' },
-      { label: 'Discard', value: 'discard', style: 'danger' },
+      { label: t('lb.gone.saveNew'), value: 'saveNew', style: 'primary' },
+      { label: t('lb.gone.discard'), value: 'discard', style: 'danger' },
     ],
   });
   if (choice === 'saveNew') {
@@ -899,17 +907,17 @@ async function handleDeletedElsewhere(data) {
 async function deleteEntry() {
   if (!state.current) return;
   const choice = await confirmModal({
-    title: 'Delete this entry?',
-    body: `“${state.current.title}” will be permanently deleted.`,
+    title: t('lb.delete.title'),
+    body: t('common.willBeDeleted', { title: state.current.title }),
     actions: [
-      { label: 'Cancel', value: 'cancel', style: 'primary' },
-      { label: 'Delete', value: 'delete', style: 'danger' },
+      { label: t('common.cancel'), value: 'cancel', style: 'primary' },
+      { label: t('common.delete'), value: 'delete', style: 'danger' },
     ],
   });
   if (choice !== 'delete') return;
   try {
     await api(`/api/entries/${state.current.id}`, { method: 'DELETE' });
-    toast('Entry deleted', 'ok');
+    toast(t('lb.toast.deleted'), 'ok');
     clearDraft();
     setDirty(false);
     newEntry();
@@ -944,7 +952,7 @@ function writeDraft() {
   } catch (e) {
     if (!state.quotaWarned) {
       state.quotaWarned = true;
-      toast('Auto-backup paused — note too large for browser storage', 'err', 6000);
+      toast(t('lb.toast.backupPaused'), 'err', 6000);
     }
   }
 }
@@ -980,18 +988,21 @@ async function offerDraftRestore() {
 
   const serverNewer = server && server.updated_at > draft.savedAt;
   const choice = await confirmModal({
-    title: 'Restore unsaved draft?',
+    title: t('lb.draft.title'),
     body: serverNewer
-      ? `A draft from ${formatStamp(draft.savedAt)} was found, but this entry was saved more recently (${formatStamp(server.updated_at)}) — possibly on another device.`
-      : `An unsaved draft from ${formatStamp(draft.savedAt)} was found${draft.entryId ? '' : ' for a new entry'}.`,
+      ? t('lb.draft.bodyNewer', {
+          draft: formatStamp(draft.savedAt),
+          server: formatStamp(server.updated_at),
+        })
+      : t('lb.draft.body', { when: formatStamp(draft.savedAt), isNew: !draft.entryId }),
     actions: serverNewer
       ? [
-          { label: 'Keep newer version', value: 'server', style: 'primary' },
-          { label: 'Restore draft anyway', value: 'restore' },
+          { label: t('lb.draft.keepServer'), value: 'server', style: 'primary' },
+          { label: t('lb.draft.restoreAnyway'), value: 'restore' },
         ]
       : [
-          { label: 'Restore draft', value: 'restore', style: 'primary' },
-          { label: 'Discard draft', value: 'discard', style: 'danger' },
+          { label: t('lb.draft.restore'), value: 'restore', style: 'primary' },
+          { label: t('lb.draft.discard'), value: 'discard', style: 'danger' },
         ],
   });
 
@@ -1027,7 +1038,7 @@ async function onWindowFocus() {
         if (entry && entry.updated_at !== state.current.updated_at) {
           state.current = entry;
           fillForm(entry);
-          toast('Entry refreshed from another device');
+          toast(t('lb.toast.refreshed'));
         }
       }
     } else {
@@ -1039,17 +1050,17 @@ async function onWindowFocus() {
       if (row && row.updated_at > state.current.updated_at) {
         showBanner({
           id: 'newer-version',
-          message: 'This entry was updated on another device.',
+          message: t('lb.banner.newer'),
           actions: [
             {
-              label: 'Review',
+              label: t('lb.banner.review'),
               onClick: async (dismiss) => {
                 dismiss();
                 const fresh = (await api(`/api/entries/${state.current.id}`)).entry;
                 await handleConflict({ payload: { entry: fresh } }, collectForm());
               },
             },
-            { label: 'Keep mine', onClick: (dismiss) => dismiss() },
+            { label: t('lb.banner.keepMine'), onClick: (dismiss) => dismiss() },
           ],
         });
       }
@@ -1063,9 +1074,9 @@ async function importFile(file) {
   if (!file) return;
   if (file.size > 2 * 1024 * 1024) {
     await confirmModal({
-      title: 'File too large',
-      body: 'Markdown imports are limited to 2 MB.',
-      actions: [{ label: 'Got it', value: 'ok', style: 'primary' }],
+      title: t('lb.import.tooLarge.title'),
+      body: t('lb.import.tooLarge.body'),
+      actions: [{ label: t('common.gotIt'), value: 'ok', style: 'primary' }],
     });
     return;
   }
@@ -1075,7 +1086,7 @@ async function importFile(file) {
       method: 'POST',
       body: { filename: file.name, content },
     });
-    toast(`Imported “${entry.title}”`, 'ok');
+    toast(t('lb.toast.imported', { title: entry.title }), 'ok');
     state.current = entry;
     fillForm(entry);
     setDirty(false);
@@ -1083,9 +1094,9 @@ async function importFile(file) {
     await loadList();
   } catch (e) {
     await confirmModal({
-      title: 'Import failed',
+      title: t('lb.import.failed.title'),
       body: e.message,
-      actions: [{ label: 'Got it', value: 'ok', style: 'primary' }],
+      actions: [{ label: t('common.gotIt'), value: 'ok', style: 'primary' }],
     });
   }
 }
@@ -1184,11 +1195,13 @@ function initMetaPanel() {
 
     el.metaToggle.querySelector('.meta-icon-shown').classList.toggle('hidden', !open);
     el.metaToggle.querySelector('.meta-icon-hidden').classList.toggle('hidden', open);
-    const label = open ? 'Hide metadata' : 'Show metadata';
+    const label = t(open ? 'lb.hideMeta' : 'lb.showMeta');
     el.metaToggle.title = label;
     el.metaToggle.setAttribute('aria-label', label);
     el.metaToggle.setAttribute('aria-pressed', String(open));
   }
+
+  on('locale:changed', () => apply(isOpen()));
 
   const isOpen = () => el.metaPanel.dataset.hidden !== 'true';
 
@@ -1327,7 +1340,7 @@ export async function initLogbook() {
   initDrawer();
 
   state.lsAvailable = probeLocalStorage();
-  if (!state.lsAvailable) toast('Browser storage unavailable — autosave is off this session', 'err', 6000);
+  if (!state.lsAvailable) toast(t('lb.toast.noStorage'), 'err', 6000);
 
   loadSidebarPrefs();
   syncGroupToggleUI();
@@ -1390,7 +1403,7 @@ export async function initLogbook() {
 
   el.guideBtn.addEventListener('click', async () => {
     const dlg = document.getElementById('dlg-guide');
-    await renderInto(document.getElementById('guide-body'), GUIDE_MD);
+    await renderInto(document.getElementById('guide-body'), guideMd());
     dlg.showModal();
   });
 
@@ -1445,6 +1458,17 @@ export async function initLogbook() {
 
   on('theme:changed', () => schedulePreview(0)); // mermaid re-themes
 
+  // The catalogue's DOM walker reaches the markup; these are the surfaces this
+  // module draws itself, so it has to redraw them.
+  on('locale:changed', () => {
+    renderList();          // relative times, empty states, the All pill
+    renderFieldRows();     // per-row aria-labels and the no-fields line
+    syncMetaWidgets();     // sublabel placeholder, URL tooltips
+    renderCreated();       // the "set on first save" placeholder
+    setMode(el.workspace.dataset.mode);            // toggle tooltip
+    applySidebarHidden(el.sidebar.dataset.hidden === 'true');
+  });
+
   // Boot: list, then draft restore, else open the most recent entry
   try {
     await loadList();
@@ -1454,6 +1478,6 @@ export async function initLogbook() {
       else newEntry();
     }
   } catch (e) {
-    toast("Couldn't reach the Bento host — check that the server is running", 'err', 8000);
+    toast(t('lb.toast.hostDown'), 'err', 8000);
   }
 }

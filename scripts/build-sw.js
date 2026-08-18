@@ -17,7 +17,7 @@ const dist = path.join(root, 'dist');
 // note actually contains math, and the runtime cache picks them up then.
 const INCLUDE = [
   /^index\.html$/,
-  /^manifest\.webmanifest$/,
+  /^manifest(\.[a-z]{2})?\.webmanifest$/,
   /^assets\/app\.css$/,
   /^assets\/icons\/.+\.png$/,
   /^js\/.+\.js$/,

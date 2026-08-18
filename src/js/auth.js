@@ -15,6 +15,8 @@ import { sb, usernameToEmail, validUsername } from './supabase.js';
 import { toast, confirmModal, announce } from './ui.js';
 import { initFaceCard } from './face-card.js';
 import { initTour } from './tour.js';
+import { t, localeTag } from './i18n.js';
+import { on } from './bus.js';
 
 const DEFAULT_PASSWORD = 'bentoos';
 const PASSWORD_MIN = 8;
@@ -60,8 +62,8 @@ function startClock() {
 
   const tick = () => {
     const now = new Date();
-    time.textContent = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-    date.textContent = now.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' });
+    time.textContent = now.toLocaleTimeString(localeTag(), { hour: 'numeric', minute: '2-digit' });
+    date.textContent = now.toLocaleDateString(localeTag(), { weekday: 'long', day: 'numeric', month: 'long' });
   };
   // Wake on the minute boundary rather than polling every second.
   const schedule = () => {
@@ -105,7 +107,7 @@ function showAuthScreen(view, { forced = false } = {}) {
   cpForm.classList.toggle('flex', !isLogin);
   // The change-password view shares this sheet, so it gets the same greeter —
   // it just isn't a greeting at that point.
-  authSub.textContent = isLogin ? 'Sign in to your workspace' : 'One more step';
+  authSub.textContent = t(isLogin ? 'auth.signInSub' : 'auth.oneMoreStep');
   greeter?.release();
   startClock();
   // Dedicated route for the forced flow — tokens never ride in the URL.
@@ -149,8 +151,8 @@ function renderNavbar() {
   const chip = document.getElementById('nav-user');
   document.getElementById('nav-username').textContent = state.username;
   const badge = document.getElementById('nav-role-badge');
-  if (state.role === 'global_admin') badge.textContent = 'global admin';
-  else if (state.role === 'admin') badge.textContent = 'admin';
+  if (state.role === 'global_admin') badge.textContent = t('admin.role.global_admin');
+  else if (state.role === 'admin') badge.textContent = t('admin.role.admin');
   else badge.textContent = '';
   badge.classList.toggle('hidden', state.role === 'user');
   document.getElementById('menu-admin').classList.toggle('hidden', state.role === 'user');
@@ -166,11 +168,11 @@ let resolveReady; // resolves initAuth()'s promise once fully authenticated
 
 function friendlyAuthError(error) {
   const msg = error?.message || '';
-  if (/invalid login credentials/i.test(msg)) return 'Wrong User ID or password';
-  if (/already registered/i.test(msg)) return 'That User ID is taken';
-  if (/database error saving/i.test(msg)) return 'That User ID is taken';
-  if (/rate limit/i.test(msg)) return 'Too many attempts — wait a moment and try again';
-  return msg || 'Sign-in failed';
+  if (/invalid login credentials/i.test(msg)) return t('auth.err.wrongCreds');
+  if (/already registered/i.test(msg)) return t('auth.err.taken');
+  if (/database error saving/i.test(msg)) return t('auth.err.taken');
+  if (/rate limit/i.test(msg)) return t('auth.err.rateLimit');
+  return msg || t('auth.err.failed');
 }
 
 async function finishLogin(user) {
@@ -184,12 +186,12 @@ async function finishLogin(user) {
   // workspace takes over. A restored session has no lock screen to hold.
   if (lockVisible()) {
     greeter?.setState('ok');
-    authSub.textContent = `Welcome back, ${state.username}`;
+    authSub.textContent = t('auth.welcomeBack', { name: state.username });
     await new Promise((resolve) => setTimeout(resolve, SUCCESS_HOLD_MS));
   }
   renderNavbar();
   showApp();
-  announce(`Signed in as ${state.username}`);
+  announce(t('auth.signedInAs', { name: state.username }));
   resolveReady?.();
 }
 
@@ -199,8 +201,8 @@ function wireLoginForm() {
 
   modeToggle.addEventListener('click', () => {
     signupMode = !signupMode;
-    submitBtn.textContent = signupMode ? 'Create account' : 'Sign in';
-    modeToggle.textContent = signupMode ? 'I already have an account' : 'Create an account';
+    submitBtn.textContent = t(signupMode ? 'auth.createAccountSubmit' : 'auth.signIn');
+    modeToggle.textContent = t(signupMode ? 'auth.haveAccount' : 'auth.createAccountLink');
     setError(loginError, '');
   });
 
@@ -211,7 +213,7 @@ function wireLoginForm() {
     const password = document.getElementById('auth-password').value;
 
     if (!validUsername(username)) {
-      return rejectAuth(loginError, 'User ID: 2–32 letters, digits, dot, dash or underscore');
+      return rejectAuth(loginError, t('auth.err.badUsername'));
     }
     if (!password) return rejectAuth(loginError, 'Password is required');
     if (signupMode && password.length < PASSWORD_MIN) {
@@ -268,12 +270,12 @@ function wireChangePasswordForm() {
     const confirm = document.getElementById('cp-confirm').value;
 
     if (next.length < PASSWORD_MIN) {
-      return rejectAuth(cpError, `Password needs at least ${PASSWORD_MIN} characters`);
+      return rejectAuth(cpError, t('auth.err.shortPassword', { n: PASSWORD_MIN }));
     }
     if (next === DEFAULT_PASSWORD) {
-      return rejectAuth(cpError, 'The default password cannot be reused');
+      return rejectAuth(cpError, t('auth.err.defaultReuse'));
     }
-    if (next !== confirm) return rejectAuth(cpError, 'Passwords do not match');
+    if (next !== confirm) return rejectAuth(cpError, t('auth.err.mismatch'));
 
     const btn = document.getElementById('cp-submit');
     btn.disabled = true;
@@ -283,7 +285,7 @@ function wireChangePasswordForm() {
       const { error: rpcErr } = await sb.rpc('mark_password_changed');
       if (rpcErr) throw rpcErr;
       cpForm.reset();
-      toast('Password updated', 'info');
+      toast(t('auth.toast.pwUpdated'), 'info');
       const { data } = await sb.auth.getUser();
       await finishLogin(data.user);
     } catch (err) {
@@ -331,17 +333,17 @@ function wireUserMenu() {
   document.getElementById('menu-delete').addEventListener('click', async () => {
     closeMenu();
     const choice = await confirmModal({
-      title: 'Delete your account?',
-      body: 'This permanently erases your account, every LogBook entry and every prompt. There is no undo and nothing is retained (GDPR/PDPA hard delete).',
+      title: t('auth.delete.title'),
+      body: t('auth.delete.body'),
       actions: [
-        { label: 'Cancel', value: 'cancel' },
-        { label: 'Delete everything', value: 'delete', style: 'danger' },
+        { label: t('common.cancel'), value: 'cancel' },
+        { label: t('auth.delete.confirm'), value: 'delete', style: 'danger' },
       ],
     });
     if (choice !== 'delete') return;
     const { error } = await sb.functions.invoke('delete-account', { body: {} });
-    if (error) return toast('Account deletion failed — try again later', 'err');
-    toast('Account deleted');
+    if (error) return toast(t('auth.delete.failed'), 'err');
+    toast(t('auth.delete.done'));
     await sb.auth.signOut();
     location.reload();
   });
@@ -356,9 +358,11 @@ function wireUserMenu() {
 // enough that scanning it is work; below this a flat list reads faster.
 const GROUP_AT = 8;
 
-const ROLE_LABEL = { global_admin: 'global admin', admin: 'admin', user: 'user' };
+// Role keys are the database's, not the reader's — the display strings hang
+// off them so a language switch redraws the list without touching the model.
+const ROLE_LABEL = (role) => t(`admin.role.${role}`);
 const ROLE_ORDER = ['global_admin', 'admin', 'user'];
-const ROLE_SECTION = { global_admin: 'Global admin', admin: 'Admins', user: 'Users' };
+const ROLE_SECTION = (role) => t(`admin.section.${role}`);
 
 const adminState = { users: [], filter: '', openId: null };
 
@@ -374,7 +378,7 @@ async function openAdminPanel() {
 
 async function loadAdminUsers() {
   const list = document.getElementById('admin-user-list');
-  list.textContent = 'Loading…';
+  list.textContent = t('admin.loading');
 
   const [{ data: profiles, error: pErr }, { data: roles }] = await Promise.all([
     // created_at has been on the row since the first migration; admins already
@@ -383,7 +387,7 @@ async function loadAdminUsers() {
     sb.from('user_roles').select('user_id, role, requires_password_change'),
   ]);
   if (pErr) {
-    list.textContent = 'Could not load users.';
+    list.textContent = t('admin.loadFailed');
     return;
   }
   const roleById = new Map((roles || []).map((r) => [r.user_id, r]));
@@ -407,7 +411,7 @@ function joinedLabel(value) {
   if (!value) return '';
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
+  return d.toLocaleDateString(localeTag(), { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 /**
@@ -424,34 +428,34 @@ function actionsFor(u) {
   // Any admin, but only on normal users, and never on themselves.
   if (u.role === 'user' && !isSelf) {
     actions.push({
-      label: 'Reset password',
-      button: 'Reset',
-      description: `Sets their password back to the default and forces a change at their next sign-in.`,
+      label: t('admin.action.reset.label'),
+      button: t('admin.action.reset.button'),
+      description: t('admin.action.reset.desc'),
       run: (btn) => resetPassword(u, btn),
     });
   }
   if (isGlobalAdmin && u.role === 'user') {
     actions.push({
-      label: 'Make admin',
-      button: 'Promote',
-      description: 'Lets them create users and reset passwords. They still cannot read anyone else\'s notes.',
+      label: t('admin.action.promote.label'),
+      button: t('admin.action.promote.button'),
+      description: t('admin.action.promote.desc'),
       run: (btn) => changeRole(u, 'promote', btn),
     });
   }
   if (isGlobalAdmin && u.role === 'admin') {
     actions.push({
-      label: 'Remove admin',
-      button: 'Demote',
-      description: 'Returns them to a normal user. Their own entries and prompts are untouched.',
+      label: t('admin.action.demote.label'),
+      button: t('admin.action.demote.button'),
+      description: t('admin.action.demote.desc'),
       run: (btn) => changeRole(u, 'demote', btn),
     });
   }
   if (isGlobalAdmin && u.role !== 'global_admin' && !isSelf) {
     actions.push({
       danger: true,
-      label: 'Delete account',
-      button: 'Delete…',
-      description: 'Erases the account and every entry, prompt and snippet they own. This cannot be undone.',
+      label: t('admin.action.delete.label'),
+      button: t('admin.action.delete.button'),
+      description: t('admin.action.delete.desc'),
       run: () => deleteUser(u),
     });
   }
@@ -465,12 +469,12 @@ function renderAdminList() {
 
   const visible = visibleAdminUsers();
   const total = adminState.users.length;
-  count.textContent = total ? `${total} ${total === 1 ? 'person' : 'people'}` : '';
+  count.textContent = total ? t('admin.count', { n: total }) : '';
 
   if (visible.length === 0) {
     const empty = document.createElement('p');
     empty.className = 'py-6 text-center text-sm text-ink-muted';
-    empty.textContent = total === 0 ? 'No users yet.' : `Nothing matches “${adminState.filter.trim()}”.`;
+    empty.textContent = total === 0 ? t('admin.noUsers') : t('common.noMatchQuery', { q: adminState.filter.trim() });
     list.appendChild(empty);
     return;
   }
@@ -487,7 +491,7 @@ function renderAdminList() {
 
     const heading = document.createElement('div');
     heading.className = 'flex items-center gap-2 pt-1 text-[11px] uppercase tracking-wider text-ink-muted';
-    heading.append(ROLE_SECTION[role]);
+    heading.append(ROLE_SECTION(role));
     const badge = document.createElement('span');
     badge.className = 'rounded-full border border-edge px-1.5';
     badge.textContent = String(members.length);
@@ -508,7 +512,7 @@ function rolePill(role) {
     : role === 'admin' ? 'border-accent/55 text-accent'
     : 'border-edge text-ink-muted';
   pill.className = `rounded-full border px-2 py-0.5 text-[11px] ${tone}`;
-  pill.textContent = ROLE_LABEL[role] || role;
+  pill.textContent = ROLE_LABEL(role) || role;
   return pill;
 }
 
@@ -550,18 +554,18 @@ function renderAdminRow(u) {
   if (u.id === state.user.id) {
     const you = document.createElement('span');
     you.className = 'rounded-full border border-ok-hue/50 px-2 py-0.5 text-[11px] text-ok-hue';
-    you.textContent = 'you';
+    you.textContent = t('admin.you');
     // Half the actions are withheld on your own row; say so rather than
     // leaving an admin to wonder why it does nothing.
-    you.title = 'You cannot change your own role or delete your own account here';
+    you.title = t('admin.youTitle');
     head.appendChild(you);
   }
 
   if (u.requires_password_change) {
     const flag = document.createElement('span');
     flag.className = 'rounded-full border border-warn-hue/55 px-2 py-0.5 text-[11px] text-warn-hue';
-    flag.title = 'Must change password at next sign-in';
-    flag.textContent = 'reset pending';
+    flag.title = t('admin.resetPendingTitle');
+    flag.textContent = t('admin.resetPending');
     head.appendChild(flag);
   }
 
@@ -569,7 +573,7 @@ function renderAdminRow(u) {
   if (joined) {
     const when = document.createElement('span');
     when.className = 'whitespace-nowrap text-[11px] tabular-nums text-ink-muted';
-    when.title = 'Account created';
+    when.title = t('admin.accountCreated');
     when.textContent = joined;
     head.appendChild(when);
   }
@@ -630,21 +634,21 @@ async function changeRole(u, direction, btn) {
   });
   if (error) {
     btn.disabled = false;
-    return toast(promote ? 'Promotion failed' : 'Demotion failed', 'err');
+    return toast(t(promote ? 'admin.promoteFailed' : 'admin.demoteFailed'), 'err');
   }
   u.role = promote ? 'admin' : 'user';
   // The permitted actions change with the role, so re-render rather than patch.
   renderAdminList();
-  toast(promote ? `${u.username} is now an admin` : `${u.username} is a normal user again`);
+  toast(t(promote ? 'admin.nowAdmin' : 'admin.nowUser', { name: u.username }));
 }
 
 async function resetPassword(profile, btn) {
   const choice = await confirmModal({
-    title: `Reset ${profile.username}'s password?`,
-    body: `Their password returns to the default ("${DEFAULT_PASSWORD}") and they must choose a new one at next login.`,
+    title: t('admin.reset.title', { name: profile.username }),
+    body: t('admin.reset.body', { pw: DEFAULT_PASSWORD }),
     actions: [
-      { label: 'Cancel', value: 'cancel' },
-      { label: 'Reset password', value: 'reset', style: 'primary' },
+      { label: t('common.cancel'), value: 'cancel' },
+      { label: t('admin.reset.confirm'), value: 'reset', style: 'primary' },
     ],
   });
   if (choice !== 'reset') return;
@@ -654,30 +658,30 @@ async function resetPassword(profile, btn) {
     body: { target_user_id: profile.id },
   });
   btn.disabled = false;
-  if (error) return toast('Reset failed — you may be rate limited', 'err');
+  if (error) return toast(t('admin.reset.failed'), 'err');
   profile.requires_password_change = true;
   renderAdminList();
-  toast(`${profile.username}'s password was reset to the default`);
+  toast(t('admin.reset.done', { name: profile.username }));
 }
 
 async function deleteUser(profile) {
   const choice = await confirmModal({
-    title: `Delete ${profile.username}?`,
-    body: 'This permanently erases their account and every LogBook entry, prompt and snippet they own. There is no undo.',
+    title: t('admin.delete.title', { name: profile.username }),
+    body: t('admin.delete.body'),
     actions: [
-      { label: 'Cancel', value: 'cancel' },
-      { label: 'Delete everything', value: 'delete', style: 'danger' },
+      { label: t('common.cancel'), value: 'cancel' },
+      { label: t('admin.delete.confirm'), value: 'delete', style: 'danger' },
     ],
   });
   if (choice !== 'delete') return;
   const { error } = await sb.functions.invoke('admin-delete-user', {
     body: { target_user_id: profile.id },
   });
-  if (error) return toast('Deletion failed — you may be rate limited', 'err');
+  if (error) return toast(t('admin.delete.failed'), 'err');
   adminState.users = adminState.users.filter((u) => u.id !== profile.id);
   if (adminState.openId === profile.id) adminState.openId = null;
   renderAdminList();
-  toast(`${profile.username} was deleted`);
+  toast(t('admin.delete.done', { name: profile.username }));
 }
 
 async function createUser(username) {
@@ -685,10 +689,10 @@ async function createUser(username) {
     body: { username },
   });
   if (error) {
-    let message = 'Account creation failed';
+    let message = t('admin.create.failed');
     try {
       const payload = await error.context?.json?.();
-      if (payload?.error?.code === 'USERNAME_TAKEN') message = 'That User ID is taken';
+      if (payload?.error?.code === 'USERNAME_TAKEN') message = t('auth.err.taken');
       else if (payload?.error?.message) message = payload.error.message;
     } catch (e) {
       /* fall back to the generic message */
@@ -708,7 +712,7 @@ async function createUser(username) {
   adminState.users.push(created);
   adminState.users.sort((a, b) => a.username.localeCompare(b.username));
   renderAdminList();
-  toast(`${created.username} created — default password is "${DEFAULT_PASSWORD}"`);
+  toast(t('admin.create.done', { name: created.username, pw: DEFAULT_PASSWORD }));
 }
 
 function showCreateForm(show) {
@@ -745,7 +749,7 @@ function wireAdminPanel() {
     const input = document.getElementById('admin-create-username');
     const username = input.value.trim().toLowerCase();
     if (!validUsername(username)) {
-      return toast('User ID: 2–32 letters, digits, dot, dash or underscore', 'err');
+      return toast(t('auth.err.badUsername'), 'err');
     }
     const btn = e.target.querySelector('button[type="submit"]');
     btn.disabled = true;
@@ -776,6 +780,12 @@ export async function initAuth() {
   wireUserMenu();
   wireAdminPanel();
   initTour();
+
+  // Drawn from JS, so out of the DOM walker's reach.
+  on('locale:changed', () => {
+    if (state.user) renderNavbar();
+    if (document.getElementById('dlg-admin').open) renderAdminList();
+  });
 
   sb.auth.onAuthStateChange((event) => {
     if (event === 'SIGNED_OUT') location.reload();

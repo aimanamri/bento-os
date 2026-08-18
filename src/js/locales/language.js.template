@@ -1,0 +1,1001 @@
+// LANGUAGE TEMPLATE — copy this file to src/js/locales/<code>.js and
+// translate every value.
+//
+// How to use this file:
+//   1. Copy it:  cp src/js/locales/language.js.template src/js/locales/<code>.js
+//      <code> is the language's two-letter ISO 639-1 code (fr, de, ko, …).
+//   2. Every value below is the English source string, wrapped in TR(...).
+//      Replace the argument with your translation and leave TR itself alone —
+//      it's a no-op at runtime, present only so this file works if it's
+//      accidentally imported before you've translated it, and so a `grep -n
+//      "TR("` shows every line you still have left.
+//   3. Leave every key ('nav.tab.logbook', 'lb.save', …) exactly as it is.
+//      Keys are how the app looks phrases up — renaming or removing one
+//      breaks the app for that language.
+//   4. Entries written as `({ n }) => TR(...)` or `({ name }) => TR(...)` are
+//      functions, not plain strings, because the English phrase bends around
+//      a number or a name ("3 people" / "Restore Docs LogBook"). Keep the
+//      `({ ... }) =>` part unchanged and translate only inside TR(). Rework
+//      the sentence around the variable however your language needs to —
+//      English pluralizes with -s; your language may not need to mark plural
+//      at all, or may need a different word depending on the count. There is
+//      no plural-rule system to fight here: write the sentence the way it
+//      would actually read.
+//   5. `[TABLE]`, `[NOTE]`, `[TIP]`, `[IMPORTANT]`, `[WARNING]`, `[CAUTION]`
+//      inside 'guide.md' are Markdown/app syntax, not English words — leave
+//      the markers themselves alone and translate only the surrounding
+//      prose. See src/js/locales/ja.js for a worked example of the whole
+//      file, including this one.
+//   6. When every TR(...) is gone, register the language in src/js/i18n.js:
+//        - import your file and add it to CATALOGS
+//        - add a row to LOCALES: { code, label (the language's own name,
+//          e.g. 'Français'), short, tag (BCP-47, e.g. 'fr'), manifest }
+//        - copy src/manifest.ja.webmanifest to manifest.<code>.webmanifest,
+//          translate name/description/shortcuts, and register it in
+//          scripts/copy-static.js
+//   7. A key you never get to is not a crash — i18n.js falls back to the
+//      English string for anything missing, so a partial translation ships
+//      safely. Run `grep -c "TR(" src/js/locales/<code>.js` to see how many
+//      are left.
+//
+// A no-op: TR('x') === 'x'. It exists purely as a grep target — see step 2.
+const TR = (s) => s;
+
+export default {
+
+  /* ── app shell ─────────────────────────────────────────────── */
+  'app.title': TR('Bento OS'),
+
+
+  'nav.tools': TR('Tools'),
+
+  'nav.tab.logbook': TR('Docs LogBook'),
+
+  'nav.tab.logbook.short': TR('LogBook'),
+
+  'nav.tab.prompts': TR('Prompt Library'),
+
+  'nav.tab.prompts.short': TR('Prompts'),
+
+  'nav.tab.snippets': TR('Code Snippets'),
+
+  'nav.tab.snippets.short': TR('Snippets'),
+
+  'nav.minimize': TR('Minimize current tool to dock'),
+
+  'nav.focus': TR('Toggle focus mode'),
+
+  'nav.fullscreen': TR('Toggle fullscreen'),
+
+  'nav.unsaved': TR('Unsaved changes'),
+
+  'nav.offline': TR('offline'),
+
+  'nav.hostUnreachable': TR('Host unreachable'),
+
+  'nav.accountMenu': TR('Account menu'),
+
+  'nav.account': TR('Account'),
+
+  'nav.dock': TR('Minimized tools'),
+
+
+  'menu.admin': TR('User management'),
+
+  'menu.changepw': TR('Change password'),
+
+  'menu.install': TR('Install Bento OS…'),
+
+  'menu.delete': TR('Delete my account…'),
+
+  'menu.signout': TR('Sign out'),
+
+
+  'theme.toggle': TR('Toggle light or dark theme'),
+
+  'lang.toggle': TR('Change display language'),
+
+  'lang.label': TR('Language'),
+
+
+  'main.focusOn': TR('Focus mode on'),
+
+  'main.focusOff': TR('Focus mode off'),
+
+  'main.noFullscreen': TR('Fullscreen is not supported here'),
+
+  'main.updated': TR('Bento OS was updated — reloading'),
+
+  'main.restore': TR(({ name }) => `Restore ${name}`),
+
+  'main.minimized': TR(({ name }) => `${name} minimized to dock`),
+
+  'main.restored': TR(({ name }) => `${name} restored`),
+
+
+  'pwa.installed': TR('Bento OS installed — it now opens in its own window'),
+
+  'pwa.updateReady': TR('Update ready — it applies next time you open Bento OS'),
+
+
+  'ui.dismissNotice': TR('Dismiss notice'),
+
+
+  'clip.title': TR('Copy manually'),
+
+  'clip.body': TR('Clipboard access is unavailable here (it needs HTTPS — e.g. the tailscale serve URL). Select and copy the text below:'),
+
+
+  /* ── shared vocabulary ─────────────────────────────────────── */
+  'common.cancel': TR('Cancel'),
+
+  'common.delete': TR('Delete'),
+
+  'common.save': TR('Save'),
+
+  'common.gotIt': TR('Got it'),
+
+  'common.copy': TR('Copy'),
+
+  'common.copied': TR('✓ Copied'),
+
+  'common.close': TR('Close'),
+
+  'common.back': TR('Back'),
+
+  'common.done': TR('Done'),
+
+  'common.all': TR('All'),
+
+  'common.clearFilters': TR('Clear filters'),
+
+  'common.commaSeparated': TR('(comma-separated)'),
+
+  'common.markdownSupported': TR('· Markdown supported'),
+
+  'common.reloadTheirs': TR('Reload theirs'),
+
+  'common.overwriteTheirs': TR('Overwrite theirs'),
+
+  'common.filterByTag': TR('Filter by tag'),
+
+  'common.willBeDeleted': TR(({ title }) => `“${title}” will be permanently deleted.`),
+
+  'common.noMatchQuery': TR(({ q }) => `Nothing matches “${q}”.`),
+
+  'common.noMatchTags': TR('Nothing matches the selected tags.'),
+
+  'common.placeholderHint': TR('Click a highlighted placeholder to fill it in.'),
+
+  'common.varsHintPre': TR('Double-brace variables like '),
+
+  'common.varsHintPost': TR(' become directly editable placeholders on the card.'),
+
+  'common.savedElsewhere': TR('Saved on another device'),
+
+
+  'time.now': TR('now'),
+
+  'time.minutes': TR(({ n }) => `${n}m ago`),
+
+  'time.hours': TR(({ n }) => `${n}h ago`),
+
+  'time.days': TR(({ n }) => `${n}d ago`),
+
+
+  /* ── Docs LogBook ──────────────────────────────────────────── */
+  'lb.new': TR('New Entry'),
+
+  'lb.import': TR('Import'),
+
+  'lb.importTitle': TR('Import as Markdown file'),
+
+  'lb.searchLabel': TR('Search entries'),
+
+  'lb.searchPlaceholder': TR('Search titles, tags, notes…'),
+
+  'lb.groupBy': TR('Group entries by'),
+
+  'lb.group.flat': TR('Flat'),
+
+  'lb.group.label': TR('Label'),
+
+  'lb.group.year': TR('Year'),
+
+  'lb.savedEntries': TR('Saved entries'),
+
+  'lb.guide': TR('Markdown Guide'),
+
+  'lb.guideClose': TR('Close guide'),
+
+  'lb.openList': TR('Open entries list'),
+
+  'lb.hideSidebar': TR('Hide sidebar'),
+
+  'lb.showSidebar': TR('Show sidebar'),
+
+  'lb.titleLabel': TR('Entry title'),
+
+  'lb.titlePlaceholder': TR('Untitled entry'),
+
+  'lb.edited': TR('Edited'),
+
+  'lb.hideMeta': TR('Hide metadata'),
+
+  'lb.showMeta': TR('Show metadata'),
+
+  'lb.readMode.title': TR('Reading mode — click to edit'),
+
+  'lb.readMode.aria': TR('Reading mode (switch to editor)'),
+
+  'lb.editMode.title': TR('Editor mode — click to read'),
+
+  'lb.editMode.aria': TR('Editor mode (switch to reading)'),
+
+  'lb.save': TR('Save Entry'),
+
+  'lb.saving': TR('Saving…'),
+
+  'lb.savedFlash': TR('✓ Saved'),
+
+  'lb.close': TR('Close entry'),
+
+  'lb.summary': TR('Summary / Problem Statement'),
+
+  'lb.summaryLabel': TR('Summary or problem statement'),
+
+  'lb.summaryPlaceholder': TR('What problem does this entry solve?'),
+
+  'lb.body': TR('Body'),
+
+  'lb.bodyHint': TR('(Content: knowledges, solutions, troubleshooting, workarounds)'),
+
+  'lb.formatting': TR('Formatting'),
+
+  'lb.bulb': TR('Syntax reference: LaTeX and Mermaid boilerplate'),
+
+  'lb.bulbMenu': TR('Insert syntax boilerplate'),
+
+  'lb.viewToggle': TR('Editor or preview'),
+
+  'lb.write': TR('Write'),
+
+  'lb.preview': TR('Preview'),
+
+  'lb.editorLabel': TR('Markdown details and solution'),
+
+  'lb.editorPlaceholder': TR('Write your notes in Markdown…\n\n$inline math$, $$block math$$, and ```mermaid diagrams are supported.'),
+
+  'lb.resize': TR('Resize editor and preview'),
+
+  'lb.previewLabel': TR('Rendered preview'),
+
+  'lb.empty': TR('No entry open — pick one from the list, or start a new one.'),
+
+  'lb.previewFailed': TR('Preview failed to render.'),
+
+  'lb.delete': TR('Delete entry'),
+
+  'lb.drawer': TR('Entries'),
+
+
+  'lb.noMatch': TR(({ q }) => `No entries match “${q}”.`),
+
+  'lb.noEntries': TR('No entries yet — create your first one.'),
+
+  'lb.clearSearch': TR('Clear search'),
+
+  'lb.noTagMatch': TR(({ n }) => `No entries match the selected tag${n > 1 ? 's' : ''}.`),
+
+  'lb.clearTagFilter': TR('Clear tag filter'),
+
+
+  'lb.unsaved.title': TR('Unsaved changes'),
+
+  'lb.unsaved.body': TR('This entry has edits that haven’t been saved.'),
+
+  'lb.unsaved.discard': TR('Discard changes'),
+
+  'lb.needsBoth.title': TR('Entry needs a title and details'),
+
+  'lb.needsTitle.body': TR('Give the entry a title before saving.'),
+
+  'lb.needsBody.body': TR('Write some details before saving.'),
+
+  'lb.conflict.body': TR(({ when }) =>
+    `This entry changed on the server at ${when}. Your version and theirs now differ.`),
+
+  'lb.conflict.unknownTime': TR('an unknown time'),
+
+  'lb.conflict.copyload': TR('Copy mine & load theirs'),
+
+  'lb.conflict.copied': TR('Your version copied to clipboard'),
+
+  'lb.gone.title': TR('Entry was deleted elsewhere'),
+
+  'lb.gone.body': TR('This entry no longer exists on the server.'),
+
+  'lb.gone.saveNew': TR('Save as new entry'),
+
+  'lb.gone.discard': TR('Discard'),
+
+  'lb.delete.title': TR('Delete this entry?'),
+
+  'lb.draft.title': TR('Restore unsaved draft?'),
+
+  'lb.draft.bodyNewer': TR(({ draft, server }) =>
+    `A draft from ${draft} was found, but this entry was saved more recently (${server}) — possibly on another device.`),
+
+  'lb.draft.body': TR(({ when, isNew }) =>
+    `An unsaved draft from ${when} was found${isNew ? ' for a new entry' : ''}.`),
+
+  'lb.draft.keepServer': TR('Keep newer version'),
+
+  'lb.draft.restoreAnyway': TR('Restore draft anyway'),
+
+  'lb.draft.restore': TR('Restore draft'),
+
+  'lb.draft.discard': TR('Discard draft'),
+
+  'lb.banner.newer': TR('This entry was updated on another device.'),
+
+  'lb.banner.review': TR('Review'),
+
+  'lb.banner.keepMine': TR('Keep mine'),
+
+  'lb.import.tooLarge.title': TR('File too large'),
+
+  'lb.import.tooLarge.body': TR('Markdown imports are limited to 2 MB.'),
+
+  'lb.import.failed.title': TR('Import failed'),
+
+  'lb.toast.imported': TR(({ title }) => `Imported “${title}”`),
+
+  'lb.toast.gone': TR('That entry no longer exists'),
+
+  'lb.toast.offlineDraft': TR("Couldn't reach Bento host — your draft is safe locally"),
+
+  'lb.toast.saved': TR('Entry saved'),
+
+  'lb.toast.deleted': TR('Entry deleted'),
+
+  'lb.toast.refreshed': TR('Entry refreshed from another device'),
+
+  'lb.toast.backupPaused': TR('Auto-backup paused — note too large for browser storage'),
+
+  'lb.toast.noStorage': TR('Browser storage unavailable — autosave is off this session'),
+
+  'lb.toast.hostDown': TR("Couldn't reach the Bento host — check that the server is running"),
+
+
+  /* ── metadata panel ────────────────────────────────────────── */
+  'meta.title': TR('Metadata'),
+
+  'meta.close': TR('Close metadata'),
+
+  'meta.label': TR('Label'),
+
+  'meta.labelPlaceholder': TR('Uncategorized'),
+
+  'meta.sublabel': TR('Sub-label'),
+
+  'meta.sublabel.optional': TR('optional'),
+
+  'meta.sublabel.needsLabel': TR('needs a label first'),
+
+  'meta.tags': TR('Tags'),
+
+  'meta.tagsPlaceholder': TR('linux, docker, fix'),
+
+  'meta.fields': TR('Fields'),
+
+  'meta.fieldNameLabel': TR('New field name'),
+
+  'meta.fieldValueLabel': TR('New field value'),
+
+  'meta.fieldNamePlaceholder': TR('field name'),
+
+  'meta.fieldValuePlaceholder': TR('field value'),
+
+  'meta.addField': TR('Add field'),
+
+  'meta.add': TR('add'),
+
+  'meta.noFields': TR('No fields yet — add one below (e.g. os_platform, is_valid).'),
+
+  'meta.fieldValueFor': TR(({ name }) => `Value for field ${name}`),
+
+  'meta.removeField': TR(({ name }) => `Remove field ${name}`),
+
+  'meta.remove': TR(({ name }) => `Remove ${name}`),
+
+  'meta.created': TR('Created'),
+
+  'meta.readonly': TR('(read-only)'),
+
+  'meta.createdEmpty': TR('— (set on first save)'),
+
+  'meta.createdUnix': TR(({ ms }) => `UNIX ms: ${ms}`),
+
+  'meta.modified': TR('Modified'),
+
+  'meta.urls': TR('URL list'),
+
+  'meta.urlsPlaceholder': TR('https://…, https://…'),
+
+  'meta.urlCount': TR(({ n }) => `${n} link${n === 1 ? '' : 's'}`),
+
+  'meta.urlInvalid': TR(({ url }) => `${url}\nNot a valid http(s) URL — kept as a note`),
+
+
+  /* ── Prompt Library ────────────────────────────────────────── */
+  'pr.searchLabel': TR('Search prompts'),
+
+  'pr.searchPlaceholder': TR('Search prompts…'),
+
+  'pr.new': TR('New Prompt'),
+
+  'pr.empty': TR('No prompts yet. Save your first reusable template.'),
+
+  'pr.edit': TR('Edit prompt'),
+
+  'pr.delete': TR('Delete prompt'),
+
+  'pr.why': TR('Why this works'),
+
+  'pr.dlg.new': TR('New Prompt'),
+
+  'pr.dlg.edit': TR('Edit Prompt'),
+
+  'pr.dlg.close': TR('Close prompt editor'),
+
+  'pr.f.title': TR('Title'),
+
+  'pr.f.category': TR('Category'),
+
+  'pr.f.categoryPlaceholder': TR('GENERAL'),
+
+  'pr.f.tags': TR('Tags (comma-separated)'),
+
+  'pr.f.tagsPlaceholder': TR('writing, code'),
+
+  'pr.f.body': TR('Prompt'),
+
+  'pr.f.bodyPlaceholder': TR('Use {{Variable Name}} for fill-in placeholders.'),
+
+  'pr.f.varSample': TR('{{Topic}}'),
+
+  'pr.f.whyPlaceholder': TR("The reasoning behind this prompt's structure…"),
+
+  'pr.f.save': TR('Save Prompt'),
+
+  'pr.err.required': TR('A prompt needs both a title and prompt text.'),
+
+  'pr.conflict.body': TR('This prompt changed on the server since you opened it.'),
+
+  'pr.delete.title': TR('Delete this prompt?'),
+
+  'pr.toast.saved': TR('Prompt saved'),
+
+  'pr.toast.updated': TR('Prompt updated'),
+
+  'pr.toast.deleted': TR('Prompt deleted'),
+
+  'pr.toast.loadFailed': TR("Couldn't load prompts"),
+
+
+  /* ── Code Snippets ─────────────────────────────────────────── */
+  'sn.searchLabel': TR('Search snippets'),
+
+  'sn.searchPlaceholder': TR('Search commands, languages, tags…'),
+
+  'sn.new': TR('New Snippet'),
+
+  'sn.empty': TR('No snippets yet. Save your first reusable command.'),
+
+  'sn.edit': TR('Edit snippet'),
+
+  'sn.delete': TR('Delete snippet'),
+
+  'sn.notes': TR('Notes'),
+
+  'sn.dlg.new': TR('New Snippet'),
+
+  'sn.dlg.edit': TR('Edit Snippet'),
+
+  'sn.dlg.close': TR('Close snippet editor'),
+
+  'sn.f.title': TR('Title'),
+
+  'sn.f.category': TR('Language / Tool'),
+
+  'sn.f.categoryPlaceholder': TR('BASH'),
+
+  'sn.f.tags': TR('Tags (comma-separated)'),
+
+  'sn.f.tagsPlaceholder': TR('ssh, remote'),
+
+  'sn.f.body': TR('Command'),
+
+  'sn.f.bodyPlaceholder': TR('curl -v {{URL Link}}'),
+
+  'sn.f.varSample': TR('{{File Name}}'),
+
+  'sn.f.notes': TR('Notes'),
+
+  'sn.f.notesPlaceholder': TR('Flags, platform differences, gotchas…'),
+
+  'sn.f.save': TR('Save Snippet'),
+
+  'sn.err.required': TR('A snippet needs both a title and command text.'),
+
+  'sn.conflict.body': TR('This snippet changed on the server since you opened it.'),
+
+  'sn.delete.title': TR('Delete this snippet?'),
+
+  'sn.toast.saved': TR('Snippet saved'),
+
+  'sn.toast.updated': TR('Snippet updated'),
+
+  'sn.toast.deleted': TR('Snippet deleted'),
+
+  'sn.toast.loadFailed': TR("Couldn't load snippets"),
+
+
+  /* ── lock screen ───────────────────────────────────────────── */
+  'auth.signInSub': TR('Sign in to your workspace'),
+
+  'auth.oneMoreStep': TR('One more step'),
+
+  'auth.welcomeBack': TR(({ name }) => `Welcome back, ${name}`),
+
+  'auth.signedInAs': TR(({ name }) => `Signed in as ${name}`),
+
+  'auth.userId': TR('User ID'),
+
+  'auth.password': TR('Password'),
+
+  'auth.signIn': TR('Sign in'),
+
+  'auth.createAccountLink': TR('Create an account'),
+
+  'auth.createAccountSubmit': TR('Create account'),
+
+  'auth.haveAccount': TR('I already have an account'),
+
+  'auth.cpIntro': TR('Choose a new password before continuing. Default or reset passwords must be replaced before the dashboard opens.'),
+
+  'auth.newPassword': TR('New password'),
+
+  'auth.confirmPassword': TR('Confirm new password'),
+
+  'auth.setPassword': TR('Set new password'),
+
+  'auth.backToApp': TR('Back to the app'),
+
+  'auth.newHere': TR('New here?'),
+
+  'auth.seeWhat': TR('See what Bento OS does'),
+
+  'auth.dock.logbook': TR('About the Docs LogBook'),
+
+  'auth.dock.prompts': TR('About the Prompt Library'),
+
+  'auth.dock.snippets': TR('About Code Snippets'),
+
+  'auth.err.badUsername': TR('User ID: 2–32 letters, digits, dot, dash or underscore'),
+
+  'auth.err.shortPassword': TR(({ n }) => `Password needs at least ${n} characters`),
+
+  'auth.err.defaultReuse': TR('The default password cannot be reused'),
+
+  'auth.err.mismatch': TR('Passwords do not match'),
+
+  'auth.err.wrongCreds': TR('Wrong User ID or password'),
+
+  'auth.err.taken': TR('That User ID is taken'),
+
+  'auth.err.rateLimit': TR('Too many attempts — wait a moment and try again'),
+
+  'auth.err.failed': TR('Sign-in failed'),
+
+  'auth.toast.pwUpdated': TR('Password updated'),
+
+  'auth.delete.title': TR('Delete your account?'),
+
+  'auth.delete.body': TR('This permanently erases your account, every LogBook entry and every prompt. There is no undo and nothing is retained (GDPR/PDPA hard delete).'),
+
+  'auth.delete.confirm': TR('Delete everything'),
+
+  'auth.delete.failed': TR('Account deletion failed — try again later'),
+
+  'auth.delete.done': TR('Account deleted'),
+
+
+  /* ── user management ───────────────────────────────────────── */
+  'admin.title': TR('User management'),
+
+  'admin.close': TR('Close user management'),
+
+  'admin.filterLabel': TR('Filter users'),
+
+  'admin.filterPlaceholder': TR('Filter by User ID…'),
+
+  'admin.newUser': TR('+ New user'),
+
+  'admin.newUserLabel': TR('New User ID'),
+
+  'admin.newUserPlaceholder': TR('New User ID'),
+
+  'admin.create': TR('Create'),
+
+  'admin.footer': TR('New accounts start with the default password and must change it at first sign-in.'),
+
+  'admin.loading': TR('Loading…'),
+
+  'admin.loadFailed': TR('Could not load users.'),
+
+  'admin.count': TR(({ n }) => `${n} ${n === 1 ? 'person' : 'people'}`),
+
+  'admin.noUsers': TR('No users yet.'),
+
+  'admin.role.global_admin': TR('global admin'),
+
+  'admin.role.admin': TR('admin'),
+
+  'admin.role.user': TR('user'),
+
+  'admin.section.global_admin': TR('Global admin'),
+
+  'admin.section.admin': TR('Admins'),
+
+  'admin.section.user': TR('Users'),
+
+  'admin.you': TR('you'),
+
+  'admin.youTitle': TR('You cannot change your own role or delete your own account here'),
+
+  'admin.resetPending': TR('reset pending'),
+
+  'admin.resetPendingTitle': TR('Must change password at next sign-in'),
+
+  'admin.accountCreated': TR('Account created'),
+
+  'admin.action.reset.label': TR('Reset password'),
+
+  'admin.action.reset.button': TR('Reset'),
+
+  'admin.action.reset.desc': TR('Sets their password back to the default and forces a change at their next sign-in.'),
+
+  'admin.action.promote.label': TR('Make admin'),
+
+  'admin.action.promote.button': TR('Promote'),
+
+  'admin.action.promote.desc': TR("Lets them create users and reset passwords. They still cannot read anyone else's notes."),
+
+  'admin.action.demote.label': TR('Remove admin'),
+
+  'admin.action.demote.button': TR('Demote'),
+
+  'admin.action.demote.desc': TR('Returns them to a normal user. Their own entries and prompts are untouched.'),
+
+  'admin.action.delete.label': TR('Delete account'),
+
+  'admin.action.delete.button': TR('Delete…'),
+
+  'admin.action.delete.desc': TR('Erases the account and every entry, prompt and snippet they own. This cannot be undone.'),
+
+  'admin.promoteFailed': TR('Promotion failed'),
+
+  'admin.demoteFailed': TR('Demotion failed'),
+
+  'admin.nowAdmin': TR(({ name }) => `${name} is now an admin`),
+
+  'admin.nowUser': TR(({ name }) => `${name} is a normal user again`),
+
+  'admin.reset.title': TR(({ name }) => `Reset ${name}'s password?`),
+
+  'admin.reset.body': TR(({ pw }) =>
+    `Their password returns to the default ("${pw}") and they must choose a new one at next login.`),
+
+  'admin.reset.confirm': TR('Reset password'),
+
+  'admin.reset.failed': TR('Reset failed — you may be rate limited'),
+
+  'admin.reset.done': TR(({ name }) => `${name}'s password was reset to the default`),
+
+  'admin.delete.title': TR(({ name }) => `Delete ${name}?`),
+
+  'admin.delete.body': TR('This permanently erases their account and every LogBook entry, prompt and snippet they own. There is no undo.'),
+
+  'admin.delete.confirm': TR('Delete everything'),
+
+  'admin.delete.failed': TR('Deletion failed — you may be rate limited'),
+
+  'admin.delete.done': TR(({ name }) => `${name} was deleted`),
+
+  'admin.create.failed': TR('Account creation failed'),
+
+  'admin.create.done': TR(({ name, pw }) => `${name} created — default password is "${pw}"`),
+
+
+  /* ── pre-auth tour ─────────────────────────────────────────── */
+  'tour.title': TR('What Bento OS does'),
+
+  'tour.footer': TR('Everything you save belongs to your account alone — administrators included.'),
+
+  'tour.mini.search': TR('search'),
+
+  'tour.demoCap.blanks': TR('Try it — type into the highlighted blanks'),
+
+
+  'tour.lb.intro': TR("Long-form notes in plain markdown — guides, write-ups, and anything you'll want to find again months from now."),
+
+  'tour.lb.h1': TR('Read like a page, edit when you need to'),
+
+  'tour.lb.p1': TR('Notes open as clean rendered prose at a comfortable reading width. One toggle switches to the side-by-side editor.'),
+
+  'tour.lb.demoCap': TR('Try it — edit the left side'),
+
+  'tour.lb.youWrite': TR('You write'),
+
+  'tour.lb.mdLabel': TR('Markdown to preview'),
+
+  'tour.lb.bentoShows': TR('Bento shows'),
+
+  'tour.lb.pill1': TR('guide'),
+
+  'tour.lb.pill2': TR('setup'),
+
+  'tour.lb.h2': TR('Find it again in one search'),
+
+  'tour.lb.p2': TR('Search covers the title, tags, your own metadata fields, the summary and the body at once. Group by label or year, or narrow down with tag pills.'),
+
+  'tour.lb.foot': TR('Drafts autosave every 10 seconds while you type, so a crash or a stray refresh offers to put your work back.'),
+
+
+  'tour.pr.intro': TR('The prompts you keep rewriting, saved once and grouped by category.'),
+
+  'tour.pr.pill1': TR('writing'),
+
+  'tour.pr.pill2': TR('code'),
+
+  'tour.pr.h1': TR('A library, not a scratch file'),
+
+  'tour.pr.p1': TR('Every prompt sits in a category with its own tags, so you can search the whole library or filter it down to one kind of work.'),
+
+  'tour.pr.blanksNote': TR('Blanks you leave empty stay as placeholders.'),
+
+  'tour.pr.h2': TR('Copy the finished text, not the template'),
+
+  'tour.pr.p2': TR('One click puts the composed prompt on your clipboard with the blanks filled in — nothing left to tidy up by hand.'),
+
+
+  'tour.sn.intro': TR("Commands and code you'd rather not look up twice."),
+
+  'tour.sn.h1': TR('Grouped by language, coloured automatically'),
+
+  'tour.sn.p1': TR('Whatever language or tool you type becomes its own group with a distinct accent — no palette to pick and nothing to configure.'),
+
+  'tour.sn.blanksNote': TR('The same blanks as the Prompt Library.'),
+
+  'tour.sn.flip': TR('flip ↻'),
+
+  'tour.sn.h2': TR('Keep the why on the back'),
+
+  'tour.sn.p2': TR("Flip a card over to store notes with the snippet — what it's for, and the part that bites you at 2am."),
+
+
+  // Demo content. Deliberately generic: the point is the mechanism, not the
+  // subject — and it is written per language rather than translated word for
+  // word, so the live preview reads like something a local would have typed.
+  'tour.sample.markdown': TR(`## Anything worth finding later
+
+Write in **plain markdown** and it renders as you type.
+
+- the steps that actually worked
+- a link you'll want again
+
+\\\`one line of code\\\`
+`),
+
+  'tour.sample.prompt': TR('Explain {{topic}} to a {{audience}} in {{count}} sentences.'),
+
+  'tour.sample.snippet': TR('git checkout -b {{branch-name}}'),
+
+
+  /* ── editor ribbon ─────────────────────────────────────────── */
+  'ribbon.h1': TR('Heading 1'),
+
+  'ribbon.h2': TR('Heading 2'),
+
+  'ribbon.h3': TR('Heading 3'),
+
+  'ribbon.bold': TR('Bold'),
+
+  'ribbon.italic': TR('Italic'),
+
+  'ribbon.strike': TR('Strikethrough'),
+
+  'ribbon.sup': TR('Superscript'),
+
+  'ribbon.sub': TR('Subscript'),
+
+  'ribbon.code': TR('Inline code'),
+
+  'ribbon.link': TR('Link'),
+
+  'ribbon.ul': TR('Bulleted list'),
+
+  'ribbon.ol': TR('Numbered list'),
+
+  'ribbon.checkbox': TR('Checkbox item'),
+
+  'ribbon.table': TR('Insert 3×4 table'),
+
+  'ribbon.alert.note': TR('Note alert block'),
+
+  'ribbon.alert.tip': TR('Tip alert block'),
+
+  'ribbon.alert.important': TR('Important alert block'),
+
+  'ribbon.alert.warning': TR('Warning alert block'),
+
+  'ribbon.alert.caution': TR('Caution alert block'),
+
+
+  // Text the ribbon types into the note itself, not chrome around it — so it
+  // follows the display language the way the user's own writing would.
+  'ribbon.ph.text': TR('text'),
+
+  'ribbon.ph.bold': TR('bold'),
+
+  'ribbon.ph.italic': TR('italic'),
+
+  'ribbon.ph.code': TR('code'),
+
+  'ribbon.ph.linkText': TR('link text'),
+
+  'ribbon.ph.task': TR('task'),
+
+  'ribbon.table.col': TR(({ n }) => `Column ${n}`),
+
+  'ribbon.alertBody.note': TR('Useful information'),
+
+  'ribbon.alertBody.tip': TR('Helpful advice'),
+
+  'ribbon.alertBody.important': TR('Key information'),
+
+  'ribbon.alertBody.warning': TR('Urgent information'),
+
+  'ribbon.alertBody.caution': TR('Risks or negative outcomes'),
+
+  'ribbon.bulb.inlineLatex': TR('Inline LaTeX'),
+
+  'ribbon.bulb.blockLatex': TR('Block LaTeX'),
+
+  'ribbon.bulb.mermaid': TR('Mermaid flowchart'),
+
+  'ribbon.mermaid.start': TR('Start'),
+
+  'ribbon.mermaid.decision': TR('Decision'),
+
+  'ribbon.mermaid.done': TR('Done'),
+
+
+  /* ── render pipeline ───────────────────────────────────────── */
+  'alert.NOTE': TR('Note'),
+
+  'alert.TIP': TR('Tip'),
+
+  'alert.IMPORTANT': TR('Important'),
+
+  'alert.WARNING': TR('Warning'),
+
+  'alert.CAUTION': TR('Caution'),
+
+  'render.copyCode': TR('Copy code'),
+
+  'render.copyLangCode': TR(({ lang }) => `Copy ${lang} code`),
+
+  'render.codeCopied': TR('Code copied'),
+
+  'render.mermaidError': TR('Mermaid error'),
+
+
+  'vars.valueFor': TR(({ name }) => `Value for ${name}`),
+
+
+  /* ── Markdown guide ──────────────────────────────── */
+  'guide.md': TR(`
+## Formatting
+
+| Type | Syntax |
+| --- | --- |
+| Bold | \`**bold**\` |
+| Italic | \`*italic*\` |
+| Strikethrough | \`~~text~~\` |
+| Superscript | \`x<sup>2</sup>\` → x<sup>2</sup> |
+| Subscript | \`H<sub>2</sub>O\` → H<sub>2</sub>O |
+| Inline code | \`\` \`code\` \`\` |
+| Link | \`[label](https://url)\` |
+| Jump to a heading | \`[label](#heading-title)\` |
+| Heading | \`# H1\` … \`### H3\` |
+| Bulleted list | \`- item\` |
+| Numbered list | \`1. item\` |
+| Checkbox | \`- [ ] task\` / \`- [x] done\` |
+
+## Math (KaTeX)
+
+Inline: \`$E = mc^2$\` → $E = mc^2$
+
+Block:
+
+\`\`\`
+$$
+\\int_a^b f(x)\\,dx
+$$
+\`\`\`
+
+Math inside code spans or fences is left as-is. A stray \`$\` can pair with another \`$\` later in the paragraph — escape prices as \`\\$5\`.
+
+## Diagrams (Mermaid)
+
+\`\`\`mermaid
+flowchart LR
+  A[Start] --> B{Decision}
+  B -->|Yes| C[Done]
+\`\`\`
+
+A syntax error shows a local warning chip; the rest of the note still renders.
+
+## Alert blocks
+
+Start a quote with a \`[!TYPE]\` marker on its own line:
+
+> [!NOTE]
+> Useful information that users should know, even when skimming content.
+
+> [!TIP]
+> Helpful advice for doing things better or more easily.
+
+> [!IMPORTANT]
+> Key information users need to know to achieve their goal.
+
+> [!WARNING]
+> Urgent info that needs immediate user attention to avoid problems.
+
+> [!CAUTION]
+> Advises about risks or negative outcomes of certain actions.
+
+## Frontmatter
+
+A \`---\` fence at the very top of a note — closed by \`---\` or \`...\` — renders as a key/value table instead of a rule:
+
+\`\`\`
+---
+title: Release notes
+tags: [ops, deploy]
+owner:
+  team: platform
+  oncall: rotating
+---
+\`\`\`
+
+Values show exactly as typed — markdown and math inside them stay literal. Nested keys and lists become tables of their own. A \`---\` anywhere else in the note is still a horizontal rule.
+
+## Good to know
+
+- **Links** to \`https://…\` open in a new tab. A link to \`#a-heading-in-this-note\` scrolls you to that heading instead — same tab, same note. Write the heading in lowercase with hyphens for spaces (*Setup Steps* → \`#setup-steps\`).
+- **Tags** are comma-separated — a tag can't contain a comma.
+- **Labels** left blank file under *Uncategorized*; sub-labels need a label first.
+- **Fields** are your own name/value metadata (e.g. \`os_platform: macOS\`, \`is_valid: true\`). Values are plain text and searchable from the sidebar.
+- **Created** is set once and can't be changed. **Modified** updates automatically on every save, but you can set it by hand — an edited value is kept instead of bumping to now.
+- **Import** takes \`.md\` files up to 2 MB. The first \`# H1\` becomes the title; YAML frontmatter is kept, and renders as a table.
+- **Autosave** snapshots your draft every 10 seconds; you'll be offered a restore after a crash or refresh.
+- **Install Bento OS** from the account menu to run it in its own window. Installed, it still opens when you're offline — but your entries live on the server, so you'll see the workspace with an *offline* chip and empty lists until you're back online.
+- In prompts, \`{{Variable}}\` fill-ins match literally — \`{{A}}{{B}}\` is two variables, \`{{}}\` is plain text.
+`),
+
+
+};

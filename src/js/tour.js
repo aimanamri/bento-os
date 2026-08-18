@@ -11,22 +11,17 @@
 import { renderInto } from './render.js';
 import { composeBody, buildEditableBody } from './vars.js';
 import { copyText } from './clipboard.js';
+import { t } from './i18n.js';
+import { on as onBus } from './bus.js';
 
 const RENDER_DEBOUNCE_MS = 140; // KaTeX/Mermaid make each pass non-trivial
 
 // Deliberately generic samples: the point is the mechanism, not the subject.
-const MARKDOWN_SAMPLE = `## Anything worth finding later
-
-Write in **plain markdown** and it renders as you type.
-
-- the steps that actually worked
-- a link you'll want again
-
-\`one line of code\`
-`;
-
-const PROMPT_SAMPLE = 'Explain {{topic}} to a {{audience}} in {{count}} sentences.';
-const SNIPPET_SAMPLE = 'git checkout -b {{branch-name}}';
+// They live in the catalogues so each language shows something a reader of
+// that language would plausibly have typed, rather than a translation.
+const markdownSample = () => t('tour.sample.markdown');
+const promptSample = () => t('tour.sample.prompt');
+const snippetSample = () => t('tour.sample.snippet');
 
 let dlg = null;
 
@@ -57,7 +52,7 @@ function wireMarkdownDemo() {
   const output = document.getElementById('tour-md-out');
   if (!input || !output) return;
 
-  input.value = MARKDOWN_SAMPLE;
+  input.value = markdownSample();
 
   let timer = null;
   let pending = false; // a render finished late while another edit landed
@@ -75,6 +70,16 @@ function wireMarkdownDemo() {
 
   input.addEventListener('input', schedule);
   paint();
+
+  // Only reseed a sample the visitor has not touched — switching language must
+  // never overwrite something they typed.
+  let pristine = markdownSample();
+  input.addEventListener('input', () => (pristine = null));
+  onBus('locale:changed', () => {
+    if (input.value !== pristine) return;
+    input.value = pristine = markdownSample();
+    schedule();
+  });
 }
 
 /* ── Prompts + Snippets: the shared fill-in engine ──────────── */
@@ -84,15 +89,22 @@ function wireVariableDemo({ bodyId, copyId, template, language }) {
   const copyBtn = document.getElementById(copyId);
   if (!body || !copyBtn) return;
 
-  const values = new Map(); // buildEditableBody writes into this as you type
-  buildEditableBody(body, template, values, language);
+  let values = new Map(); // buildEditableBody writes into this as you type
+  buildEditableBody(body, template(), values, language);
+
+  // The blanks are named in the sample, so a language switch rebuilds the
+  // card from scratch — the old values keyed off the old names.
+  onBus('locale:changed', () => {
+    values = new Map();
+    buildEditableBody(body, template(), values, language);
+  });
 
   // Same feedback the real cards use: the label confirms, and copyText's own
   // fallbacks handle a clipboard the browser won't give us.
   copyBtn.addEventListener('click', async () => {
-    if (!(await copyText(composeBody(template, values)))) return;
-    copyBtn.textContent = '✓ Copied';
-    setTimeout(() => (copyBtn.textContent = 'Copy'), 1500);
+    if (!(await copyText(composeBody(template(), values)))) return;
+    copyBtn.textContent = t('common.copied');
+    setTimeout(() => (copyBtn.textContent = t('common.copy')), 1500);
   });
 }
 
@@ -113,13 +125,13 @@ export function initTour() {
   wireVariableDemo({
     bodyId: 'tour-prompt-body',
     copyId: 'tour-prompt-copy',
-    template: PROMPT_SAMPLE,
+    template: promptSample,
     language: null,
   });
   wireVariableDemo({
     bodyId: 'tour-snippet-body',
     copyId: 'tour-snippet-copy',
-    template: SNIPPET_SAMPLE,
+    template: snippetSample,
     language: 'bash',
   });
 }

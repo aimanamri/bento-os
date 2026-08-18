@@ -2,6 +2,8 @@
 // Everything is built with createElement + textContent: no user string ever
 // reaches innerHTML from this module.
 
+import { t, localeTag } from './i18n.js';
+
 const toastsEl = document.getElementById('toasts');
 const liveEl = document.getElementById('sr-live');
 const bannerSlot = document.getElementById('banner-slot');
@@ -95,7 +97,7 @@ export function showBanner({ id, message, actions = [] }) {
 
   const dismiss = document.createElement('button');
   dismiss.className = 'icon-btn btn-ghost !py-1';
-  dismiss.setAttribute('aria-label', 'Dismiss notice');
+  dismiss.setAttribute('aria-label', t('ui.dismissNotice'));
   dismiss.textContent = '✕';
   dismiss.addEventListener('click', clearBanner);
   el.appendChild(dismiss);
@@ -114,21 +116,27 @@ document.addEventListener('click', (e) => {
   if (btn) btn.closest('dialog')?.close();
 });
 
-/** Relative time for sidebar rows ("3d ago"); absolute in tooltip. */
+/**
+ * Relative time for sidebar rows ("3d ago" / 「3日前」); absolute in tooltip.
+ *
+ * The unit phrases come from the catalogue rather than Intl.RelativeTimeFormat
+ * because English wants the compact "3d ago" this app has always shown, and
+ * Intl would insist on "3 days ago". Each language writes its own short form.
+ */
 export function relativeTime(ts) {
   const diff = Date.now() - ts;
   const m = Math.floor(diff / 60000);
-  if (m < 1) return 'now';
-  if (m < 60) return `${m}m ago`;
+  if (m < 1) return t('time.now');
+  if (m < 60) return t('time.minutes', { n: m });
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
+  if (h < 24) return t('time.hours', { n: h });
   const d = Math.floor(h / 24);
-  if (d < 30) return `${d}d ago`;
-  return new Date(ts).toLocaleDateString();
+  if (d < 30) return t('time.days', { n: d });
+  return new Date(ts).toLocaleDateString(localeTag());
 }
 
 export function formatStamp(ts) {
-  return new Date(ts).toLocaleString(undefined, {
+  return new Date(ts).toLocaleString(localeTag(), {
     dateStyle: 'medium',
     timeStyle: 'short',
   });

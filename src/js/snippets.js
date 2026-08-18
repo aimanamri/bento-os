@@ -3,6 +3,8 @@
 
 import { api } from './api.js';
 import { toast, confirmModal } from './ui.js';
+import { t } from './i18n.js';
+import { on } from './bus.js';
 import { copyText } from './clipboard.js';
 import { parseVars, composeBody, buildEditableBody } from './vars.js';
 import { highlightInto, languageOf } from './highlight.js';
@@ -77,7 +79,7 @@ function renderPills() {
 
   const all = document.createElement('button');
   all.className = 'pill';
-  all.textContent = 'All';
+  all.textContent = t('common.all');
   all.setAttribute('aria-pressed', String(state.activeTags.size === 0));
   all.addEventListener('click', () => {
     state.activeTags.clear();
@@ -107,19 +109,19 @@ function renderGroups() {
     empty.className = 'flex flex-col items-center gap-3 py-16 text-center text-sm text-ink-muted';
     const msg = document.createElement('p');
     if (state.snippets.length === 0 && !el.search.value.trim()) {
-      msg.textContent = 'No snippets yet. Save your first reusable command.';
+      msg.textContent = t('sn.empty');
       const cta = document.createElement('button');
       cta.className = 'btn btn-primary';
-      cta.textContent = 'New Snippet';
+      cta.textContent = t('sn.new');
       cta.addEventListener('click', () => openDialog(null));
       empty.append(msg, cta);
     } else {
       msg.textContent = el.search.value.trim()
-        ? `Nothing matches “${el.search.value.trim()}”.`
-        : 'Nothing matches the selected tags.';
+        ? t('common.noMatchQuery', { q: el.search.value.trim() })
+        : t('common.noMatchTags');
       const clear = document.createElement('button');
       clear.className = 'btn';
-      clear.textContent = 'Clear filters';
+      clear.textContent = t('common.clearFilters');
       clear.addEventListener('click', () => {
         el.search.value = '';
         state.activeTags.clear();
@@ -235,8 +237,8 @@ function renderCard(s, hue) {
   const editRow = document.createElement('div');
   editRow.className = 'flex flex-none gap-0.5';
   editRow.append(
-    iconActionBtn('Edit snippet', EDIT_ICON, () => openDialog(s), 'text-ink-muted'),
-    iconActionBtn('Delete snippet', DELETE_ICON, () => deleteSnippet(s), 'text-ink-muted hover:text-danger')
+    iconActionBtn(t('sn.edit'), EDIT_ICON, () => openDialog(s), 'text-ink-muted'),
+    iconActionBtn(t('sn.delete'), DELETE_ICON, () => deleteSnippet(s), 'text-ink-muted hover:text-danger')
   );
   head.appendChild(editRow);
   front.appendChild(head);
@@ -258,26 +260,26 @@ function renderCard(s, hue) {
   if (vars.length) {
     const hint = document.createElement('p');
     hint.className = 'text-[11px] text-ink-muted';
-    hint.textContent = 'Click a highlighted placeholder to fill it in.';
+    hint.textContent = t('common.placeholderHint');
     front.appendChild(hint);
   }
 
   const actions = document.createElement('div');
   actions.className = 'flex flex-wrap items-center gap-1.5';
 
-  const copyBtn = actionBtn('Copy', async () => {
+  const copyBtn = actionBtn(t('common.copy'), async () => {
     const text = vars.length ? composeBody(s.body, fillValues) : s.body;
     const ok = await copyText(text);
     if (ok) {
-      copyBtn.textContent = '✓ Copied';
-      setTimeout(() => (copyBtn.textContent = 'Copy'), 1500);
+      copyBtn.textContent = t('common.copied');
+      setTimeout(() => (copyBtn.textContent = t('common.copy')), 1500);
     }
   }, 'btn-primary');
   actions.appendChild(copyBtn);
 
   if (s.notes && s.notes.trim()) {
     actions.appendChild(
-      actionBtn('Notes', () => {
+      actionBtn(t('sn.notes'), () => {
         scene.dataset.flipped = 'true';
         renderProseOnce(prose, s.notes);
         back.querySelector('button')?.focus();
@@ -294,8 +296,8 @@ function renderCard(s, hue) {
   backHead.className = 'flex items-center justify-between gap-2';
   const backTitle = document.createElement('h3');
   backTitle.className = 'text-sm font-semibold text-accent';
-  backTitle.textContent = 'Notes';
-  backHead.append(backTitle, actionBtn('Back', () => (scene.dataset.flipped = 'false'), 'btn-ghost'));
+  backTitle.textContent = t('sn.notes');
+  backHead.append(backTitle, actionBtn(t('common.back'), () => (scene.dataset.flipped = 'false'), 'btn-ghost'));
   // Markdown, through the same sanitize-then-render pipeline the LogBook
   // uses (SECURITY.md §2). A <div>, not a <p>: the pipeline emits block
   // elements, and a <p> would be closed early by the parser.
@@ -311,7 +313,7 @@ function renderCard(s, hue) {
 
 function openDialog(snippet) {
   state.editing = snippet;
-  el.dlgTitle.textContent = snippet ? 'Edit Snippet' : 'New Snippet';
+  el.dlgTitle.textContent = t(snippet ? 'sn.dlg.edit' : 'sn.dlg.new');
   el.fTitle.value = snippet?.title || '';
   el.fCategory.value = snippet?.category || '';
   el.fTags.value = (snippet?.tags || []).join(', ');
@@ -332,7 +334,7 @@ async function submitDialog(e) {
     notes: el.fNotes.value,
   };
   if (!body.title.trim() || !body.body.trim()) {
-    el.fError.textContent = 'A snippet needs both a title and command text.';
+    el.fError.textContent = t('sn.err.required');
     el.fError.classList.remove('hidden');
     (!body.title.trim() ? el.fTitle : el.fBody).focus();
     return;
@@ -347,17 +349,17 @@ async function submitDialog(e) {
       await api('/api/snippets', { method: 'POST', body });
     }
     el.dlg.close();
-    toast(state.editing ? 'Snippet updated' : 'Snippet saved', 'ok');
+    toast(t(state.editing ? 'sn.toast.updated' : 'sn.toast.saved'), 'ok');
     await load();
   } catch (err) {
     if (err.status === 409) {
       el.dlg.close();
       const choice = await confirmModal({
-        title: 'Saved on another device',
-        body: 'This snippet changed on the server since you opened it.',
+        title: t('common.savedElsewhere'),
+        body: t('sn.conflict.body'),
         actions: [
-          { label: 'Reload theirs', value: 'reload', style: 'primary' },
-          { label: 'Overwrite theirs', value: 'overwrite', style: 'danger' },
+          { label: t('common.reloadTheirs'), value: 'reload', style: 'primary' },
+          { label: t('common.overwriteTheirs'), value: 'overwrite', style: 'danger' },
         ],
       });
       if (choice === 'overwrite') {
@@ -376,18 +378,18 @@ async function submitDialog(e) {
 
 async function deleteSnippet(s) {
   const choice = await confirmModal({
-    title: 'Delete this snippet?',
-    body: `“${s.title}” will be permanently deleted.`,
+    title: t('sn.delete.title'),
+    body: t('common.willBeDeleted', { title: s.title }),
     actions: [
-      { label: 'Cancel', value: 'cancel', style: 'primary' },
-      { label: 'Delete', value: 'delete', style: 'danger' },
+      { label: t('common.cancel'), value: 'cancel', style: 'primary' },
+      { label: t('common.delete'), value: 'delete', style: 'danger' },
     ],
   });
   if (choice !== 'delete') return;
   try {
     await api(`/api/snippets/${s.id}`, { method: 'DELETE' });
     state.fill.delete(s.id);
-    toast('Snippet deleted', 'ok');
+    toast(t('sn.toast.deleted'), 'ok');
     await load();
   } catch (e) {
     toast(e.message, 'err');
@@ -405,9 +407,16 @@ export async function initSnippets() {
   el.newBtn.addEventListener('click', () => openDialog(null));
   el.form.addEventListener('submit', submitDialog);
 
+  // Cards are drawn here, not in the markup, so the DOM walker cannot reach
+  // them — redraw the whole list instead.
+  on('locale:changed', () => {
+    renderPills();
+    renderGroups();
+  });
+
   try {
     await load();
   } catch (e) {
-    toast("Couldn't load snippets", 'err');
+    toast(t('sn.toast.loadFailed'), 'err');
   }
 }

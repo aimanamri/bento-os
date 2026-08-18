@@ -2,6 +2,7 @@
 // async Clipboard API → execCommand fallback → manual-copy modal.
 
 import { confirmModal } from './ui.js';
+import { t } from './i18n.js';
 
 export async function copyText(text) {
   if (navigator.clipboard && window.isSecureContext) {
@@ -33,9 +34,9 @@ export async function copyText(text) {
 
 function manualCopyModal(text) {
   const dlg = document.getElementById('dlg-confirm');
-  dlg.querySelector('#dlg-confirm-title').textContent = 'Copy manually';
+  dlg.querySelector('#dlg-confirm-title').textContent = t('clip.title');
   const body = dlg.querySelector('#dlg-confirm-body');
-  body.textContent = 'Clipboard access is unavailable here (it needs HTTPS — e.g. the tailscale serve URL). Select and copy the text below:';
+  body.textContent = t('clip.body');
   const ta = document.createElement('textarea');
   ta.className = 'input mt-2 min-h-[120px] w-full font-mono text-xs';
   ta.value = text;
@@ -45,7 +46,7 @@ function manualCopyModal(text) {
   actions.textContent = '';
   const done = document.createElement('button');
   done.className = 'btn btn-primary';
-  done.textContent = 'Done';
+  done.textContent = t('common.done');
   done.value = 'ok';
   actions.appendChild(done);
   return new Promise((resolve) => {

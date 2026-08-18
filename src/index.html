@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="dark light">
-  <title>Bento OS</title>
+  <title data-i18n="app.title">Bento OS</title>
   <link rel="stylesheet" href="/assets/app.css">
   <link rel="stylesheet" href="/vendor/katex.min.css">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8D%B1%3C/text%3E%3C/svg%3E">
@@ -34,13 +34,13 @@
            mean nothing on a handset, so the phone header spends that room on
            the wordmark and the account menu instead. -->
       <div class="flex items-center gap-1.5 max-sm:hidden">
-        <button id="tl-red" class="tl" style="--tl-color:#ff5f57" aria-label="Minimize current tool to dock">
+        <button id="tl-red" class="tl" style="--tl-color:#ff5f57" data-i18n-attr="aria-label:nav.minimize">
           <svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2 5h6"/></svg>
         </button>
-        <button id="tl-yellow" class="tl" style="--tl-color:#febc2e" aria-label="Toggle focus mode" aria-pressed="false">
+        <button id="tl-yellow" class="tl" style="--tl-color:#febc2e" data-i18n-attr="aria-label:nav.focus" aria-pressed="false">
           <svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2 8L8 2M5 2h3v3"/></svg>
         </button>
-        <button id="tl-green" class="tl" style="--tl-color:#28c840" aria-label="Toggle fullscreen" aria-pressed="false">
+        <button id="tl-green" class="tl" style="--tl-color:#28c840" data-i18n-attr="aria-label:nav.fullscreen" aria-pressed="false">
           <svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2 4V2h2M8 6v2H6"/></svg>
         </button>
       </div>
@@ -55,44 +55,54 @@
       <!-- On phones the tablist drops to its own full-width row and the three
            tabs split it evenly: all destinations stay reachable and each one
            clears the 44px touch floor. -->
-      <nav role="tablist" aria-label="Tools" class="flex items-center gap-1 max-sm:order-last max-sm:w-full sm:ml-2">
-        <button id="tab-logbook" role="tab" aria-selected="true" aria-controls="view-logbook" aria-label="Docs LogBook"
+      <nav role="tablist" data-i18n-attr="aria-label:nav.tools" class="flex items-center gap-1 max-sm:order-last max-sm:w-full sm:ml-2">
+        <button id="tab-logbook" role="tab" aria-selected="true" aria-controls="view-logbook" data-i18n-attr="aria-label:nav.tab.logbook"
           class="btn btn-ghost text-sm data-[active=true]:bg-panel-2 data-[active=true]:border-edge max-sm:flex-1 max-sm:justify-center" data-active="true">
           <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-          <span class="max-lg:hidden">Docs LogBook</span><span class="lg:hidden">LogBook</span>
-          <span id="dirty-dot" class="hidden h-1.5 w-1.5 rounded-full bg-warn-hue" title="Unsaved changes"></span>
+          <span class="max-lg:hidden" data-i18n="nav.tab.logbook">Docs LogBook</span><span class="lg:hidden" data-i18n="nav.tab.logbook.short">LogBook</span>
+          <span id="dirty-dot" class="hidden h-1.5 w-1.5 rounded-full bg-warn-hue" data-i18n-attr="title:nav.unsaved"></span>
         </button>
-        <button id="tab-prompts" role="tab" aria-selected="false" aria-controls="view-prompts" aria-label="Prompt Library" class="btn btn-ghost text-sm data-[active=true]:bg-panel-2 data-[active=true]:border-edge max-sm:flex-1 max-sm:justify-center" data-active="false">
+        <button id="tab-prompts" role="tab" aria-selected="false" aria-controls="view-prompts" data-i18n-attr="aria-label:nav.tab.prompts" class="btn btn-ghost text-sm data-[active=true]:bg-panel-2 data-[active=true]:border-edge max-sm:flex-1 max-sm:justify-center" data-active="false">
           <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m7 8-4 4 4 4"/><path d="m17 8 4 4-4 4"/><path d="m14 4-4 16"/></svg>
-          <span class="max-lg:hidden">Prompt Library</span><span class="lg:hidden">Prompts</span>
+          <span class="max-lg:hidden" data-i18n="nav.tab.prompts">Prompt Library</span><span class="lg:hidden" data-i18n="nav.tab.prompts.short">Prompts</span>
         </button>
-        <button id="tab-snippets" role="tab" aria-selected="false" aria-controls="view-snippets" aria-label="Code Snippets" class="btn btn-ghost text-sm data-[active=true]:bg-panel-2 data-[active=true]:border-edge max-sm:flex-1 max-sm:justify-center" data-active="false">
+        <button id="tab-snippets" role="tab" aria-selected="false" aria-controls="view-snippets" data-i18n-attr="aria-label:nav.tab.snippets" class="btn btn-ghost text-sm data-[active=true]:bg-panel-2 data-[active=true]:border-edge max-sm:flex-1 max-sm:justify-center" data-active="false">
           <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m6 9 3 3-3 3"/><path d="M12 15h5"/></svg>
-          <span class="max-lg:hidden">Code Snippets</span><span class="lg:hidden">Snippets</span>
+          <span class="max-lg:hidden" data-i18n="nav.tab.snippets">Code Snippets</span><span class="lg:hidden" data-i18n="nav.tab.snippets.short">Snippets</span>
         </button>
       </nav>
 
       <div class="ml-auto flex items-center gap-1">
-        <span id="conn-status" class="mr-1 hidden items-center gap-1.5 text-xs text-ink-muted" title="Host unreachable">
-          <span class="h-1.5 w-1.5 rounded-full bg-danger"></span> offline
+        <span id="conn-status" class="mr-1 hidden items-center gap-1.5 text-xs text-ink-muted" data-i18n-attr="title:nav.hostUnreachable">
+          <span class="h-1.5 w-1.5 rounded-full bg-danger"></span> <span data-i18n="nav.offline">offline</span>
         </span>
         <!-- Logged-in user chip: username always visible (goal spec §5) -->
         <div id="nav-user" class="relative hidden">
-          <button id="nav-user-btn" class="btn btn-ghost text-xs" aria-haspopup="menu" aria-expanded="false" aria-label="Account menu">
+          <button id="nav-user-btn" class="btn btn-ghost text-xs" aria-haspopup="menu" aria-expanded="false" data-i18n-attr="aria-label:nav.accountMenu">
             <svg class="icon !h-4 !w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
             <span id="nav-username" class="max-w-[6rem] truncate font-medium sm:max-w-[10rem]">—</span>
             <span id="nav-role-badge" class="hidden rounded-full border border-edge px-1.5 py-0.5 text-[10px] text-ink-muted"></span>
           </button>
-          <div id="user-menu" role="menu" aria-label="Account" class="glass absolute right-0 top-full z-50 mt-1 hidden w-52 rounded-card border p-1 shadow-lift">
-            <button id="menu-admin" role="menuitem" class="btn btn-ghost hidden w-full justify-start text-xs">User management</button>
-            <button id="menu-changepw" role="menuitem" class="btn btn-ghost w-full justify-start text-xs">Change password</button>
+          <div id="user-menu" role="menu" data-i18n-attr="aria-label:nav.account" class="glass absolute right-0 top-full z-50 mt-1 hidden w-52 rounded-card border p-1 shadow-lift">
+            <button id="menu-admin" role="menuitem" class="btn btn-ghost hidden w-full justify-start text-xs" data-i18n="menu.admin">User management</button>
+            <button id="menu-changepw" role="menuitem" class="btn btn-ghost w-full justify-start text-xs" data-i18n="menu.changepw">Change password</button>
             <!-- Shown only once the browser signals the app is installable -->
-            <button id="menu-install" role="menuitem" class="btn btn-ghost hidden w-full justify-start text-xs">Install Bento OS…</button>
-            <button id="menu-delete" role="menuitem" class="btn btn-ghost hidden w-full justify-start text-xs text-danger">Delete my account…</button>
-            <button id="menu-signout" role="menuitem" class="btn btn-ghost w-full justify-start text-xs">Sign out</button>
+            <button id="menu-install" role="menuitem" class="btn btn-ghost hidden w-full justify-start text-xs" data-i18n="menu.install">Install Bento OS…</button>
+            <button id="menu-delete" role="menuitem" class="btn btn-ghost hidden w-full justify-start text-xs text-danger" data-i18n="menu.delete">Delete my account…</button>
+            <button id="menu-signout" role="menuitem" class="btn btn-ghost w-full justify-start text-xs" data-i18n="menu.signout">Sign out</button>
           </div>
         </div>
-        <button id="theme-toggle" data-theme-toggle class="icon-btn btn-ghost" aria-label="Toggle light or dark theme">
+        <!-- Display language. The menu is filled from i18n.js LOCALES, so adding a
+             language needs a catalogue and nothing here. -->
+        <div class="relative" data-lang-switch>
+          <button type="button" class="icon-btn btn-ghost" data-lang-toggle aria-haspopup="menu"
+            aria-expanded="false" data-i18n-attr="aria-label:lang.toggle">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/><path d="M2 12h20"/></svg>
+          </button>
+          <div data-lang-menu role="menu" data-i18n-attr="aria-label:lang.label"
+            class="glass absolute right-0 top-full z-50 mt-1 hidden w-40 rounded-card border p-1 shadow-lift"></div>
+        </div>
+        <button id="theme-toggle" data-theme-toggle class="icon-btn btn-ghost" data-i18n-attr="aria-label:theme.toggle">
           <svg class="icon dark:hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4m11.4-11.4 1.4-1.4"/></svg>
           <svg class="icon hidden dark:block" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z"/></svg>
         </button>
@@ -113,29 +123,29 @@
             <div class="flex gap-2">
               <button id="lb-new" class="btn btn-primary flex-1 justify-center text-xs">
                 <svg class="icon !h-3.5 !w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-                New Entry
+                <span data-i18n="lb.new">New Entry</span>
               </button>
-              <button id="lb-import" class="btn flex-1 justify-center text-xs" title="Import as Markdown file">
+              <button id="lb-import" class="btn flex-1 justify-center text-xs" data-i18n-attr="title:lb.importTitle">
                 <svg class="icon !h-3.5 !w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg>
-                Import
+                <span data-i18n="lb.import">Import</span>
               </button>
               <input id="lb-file" type="file" accept=".md,.markdown" class="hidden" aria-hidden="true">
             </div>
-            <label for="lb-search" class="sr-only">Search entries</label>
-            <input id="lb-search" type="search" class="input" placeholder="Search titles, tags, notes…" autocomplete="off">
-            <div id="lb-grouptoggle" class="flex items-center rounded-md border border-edge bg-panel p-0.5" role="group" aria-label="Group entries by">
-              <button data-group="flat" class="btn btn-ghost flex-1 justify-center px-2 py-1 text-xs data-[active=true]:bg-accent data-[active=true]:text-surface" data-active="true">Flat</button>
-              <button data-group="label" class="btn btn-ghost flex-1 justify-center px-2 py-1 text-xs data-[active=true]:bg-accent data-[active=true]:text-surface" data-active="false">Label</button>
-              <button data-group="year" class="btn btn-ghost flex-1 justify-center px-2 py-1 text-xs data-[active=true]:bg-accent data-[active=true]:text-surface" data-active="false">Year</button>
+            <label for="lb-search" class="sr-only" data-i18n="lb.searchLabel">Search entries</label>
+            <input id="lb-search" type="search" class="input" data-i18n-attr="placeholder:lb.searchPlaceholder" autocomplete="off">
+            <div id="lb-grouptoggle" class="flex items-center rounded-md border border-edge bg-panel p-0.5" role="group" data-i18n-attr="aria-label:lb.groupBy">
+              <button data-group="flat" class="btn btn-ghost flex-1 justify-center px-2 py-1 text-xs data-[active=true]:bg-accent data-[active=true]:text-surface" data-active="true" data-i18n="lb.group.flat">Flat</button>
+              <button data-group="label" class="btn btn-ghost flex-1 justify-center px-2 py-1 text-xs data-[active=true]:bg-accent data-[active=true]:text-surface" data-active="false" data-i18n="lb.group.label">Label</button>
+              <button data-group="year" class="btn btn-ghost flex-1 justify-center px-2 py-1 text-xs data-[active=true]:bg-accent data-[active=true]:text-surface" data-active="false" data-i18n="lb.group.year">Year</button>
             </div>
             <!-- Top 6 most-used tags as filter pills; hidden entirely when no entries have tags -->
-            <div id="lb-tagpills" class="hidden max-h-16 flex-wrap gap-1 overflow-y-auto pr-0.5" role="group" aria-label="Filter by tag"></div>
+            <div id="lb-tagpills" class="hidden max-h-16 flex-wrap gap-1 overflow-y-auto pr-0.5" role="group" data-i18n-attr="aria-label:common.filterByTag"></div>
           </div>
-          <div id="lb-list" class="min-h-0 flex-1 overflow-y-auto px-2 pb-2" role="list" aria-label="Saved entries"></div>
+          <div id="lb-list" class="min-h-0 flex-1 overflow-y-auto px-2 pb-2" role="list" data-i18n-attr="aria-label:lb.savedEntries"></div>
           <footer class="border-t border-edge p-2">
             <button id="lb-guide" class="btn btn-ghost w-full justify-start text-xs text-ink-muted">
               <svg class="icon !h-4 !w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6M10 22h4M15.09 14c.26-1.3.9-2.2 1.91-3.2a6 6 0 1 0-10 0c1 1 1.65 1.9 1.91 3.2"/></svg>
-              Markdown Guide
+              <span data-i18n="lb.guide">Markdown Guide</span>
             </button>
           </footer>
         </aside>
@@ -147,33 +157,33 @@
           <!-- Six controls plus a title don't fit a phone row: the title drops
                to its own full-width line rather than being squeezed to ~60px. -->
           <div class="flex flex-wrap items-center gap-2 border-b border-edge px-3 py-2">
-            <button id="lb-drawer-open" class="icon-btn btn-ghost lg:hidden" aria-label="Open entries list">
+            <button id="lb-drawer-open" class="icon-btn btn-ghost lg:hidden" data-i18n-attr="aria-label:lb.openList">
               <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
             </button>
             <!-- Sidebar Hide/Show — independent of Focus Mode; chevron direction flips with state -->
-            <button id="lb-sidebar-toggle" class="icon-btn btn-ghost hidden lg:flex" title="Hide sidebar" aria-label="Hide sidebar" aria-pressed="false">
+            <button id="lb-sidebar-toggle" class="icon-btn btn-ghost hidden lg:flex" data-i18n-attr="title:lb.hideSidebar; aria-label:lb.hideSidebar" aria-pressed="false">
               <svg class="icon sidebar-icon-shown" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/><path d="m14 10-2 2 2 2"/></svg>
               <svg class="icon sidebar-icon-hidden hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/><path d="m12 10 2 2-2 2"/></svg>
             </button>
-            <label for="lb-title" class="sr-only">Entry title</label>
-            <input id="lb-title" class="input min-w-0 flex-1 border-transparent bg-transparent text-base font-semibold focus:border-accent max-sm:order-last max-sm:w-full max-sm:flex-none" placeholder="Untitled entry" maxlength="300">
-            <span id="lb-edited-hint" class="hidden whitespace-nowrap text-xs text-ink-muted">Edited</span>
+            <label for="lb-title" class="sr-only" data-i18n="lb.titleLabel">Entry title</label>
+            <input id="lb-title" class="input min-w-0 flex-1 border-transparent bg-transparent text-base font-semibold focus:border-accent max-sm:order-last max-sm:w-full max-sm:flex-none" data-i18n-attr="placeholder:lb.titlePlaceholder" maxlength="300">
+            <span id="lb-edited-hint" class="hidden whitespace-nowrap text-xs text-ink-muted" data-i18n="lb.edited">Edited</span>
             <!-- Metadata Hide/Show — mirror of the sidebar toggle on the left
                  edge; chevron direction flips with state. -->
-            <button id="lb-meta-toggle" class="icon-btn btn-ghost" title="Hide metadata" aria-label="Hide metadata" aria-pressed="true">
+            <button id="lb-meta-toggle" class="icon-btn btn-ghost" data-i18n-attr="title:lb.hideMeta; aria-label:lb.hideMeta" aria-pressed="true">
               <svg class="icon meta-icon-shown" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/><path d="m10 10 2 2-2 2"/></svg>
               <svg class="icon meta-icon-hidden hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/><path d="m12 10-2 2 2 2"/></svg>
             </button>
             <!-- Reading / Editor mode toggle (icon swaps with mode; label shows on hover) -->
-            <button id="lb-mode-toggle" class="icon-btn btn-ghost" title="Reading mode — click to edit" aria-label="Reading mode (switch to editor)" aria-pressed="true">
+            <button id="lb-mode-toggle" class="icon-btn btn-ghost" data-i18n-attr="title:lb.readMode.title; aria-label:lb.readMode.aria" aria-pressed="true">
               <svg class="icon mode-icon-read" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>
               <svg class="icon mode-icon-edit hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
             </button>
             <button id="lb-save" class="btn btn-primary text-xs">
-              <span class="save-label">Save Entry</span>
+              <span class="save-label" data-i18n="lb.save">Save Entry</span>
               <span class="save-spinner hidden" aria-hidden="true">…</span>
             </button>
-            <button id="lb-close" class="icon-btn btn-ghost" aria-label="Close entry">
+            <button id="lb-close" class="icon-btn btn-ghost" data-i18n-attr="aria-label:lb.close">
               <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
             </button>
           </div>
@@ -182,46 +192,46 @@
           <details id="lb-summary-wrap" open class="border-b border-edge">
             <summary class="flex cursor-pointer select-none items-center gap-1.5 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-ink-muted hover:text-ink">
               <svg class="summary-chevron icon !h-3.5 !w-3.5 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
-              Summary / Problem Statement
+              <span data-i18n="lb.summary">Summary / Problem Statement</span>
             </summary>
             <div class="px-4 pb-3">
-              <label for="meta-summary" class="sr-only">Summary or problem statement</label>
-              <textarea id="meta-summary" class="input min-h-[4.2rem] resize-y" rows="3" placeholder="What problem does this entry solve?"></textarea>
+              <label for="meta-summary" class="sr-only" data-i18n="lb.summaryLabel">Summary or problem statement</label>
+              <textarea id="meta-summary" class="input min-h-[4.2rem] resize-y" rows="3" data-i18n-attr="placeholder:lb.summaryPlaceholder"></textarea>
             </div>
           </details>
 
           <!-- Body section header -->
           <div id="lb-body-header" class="flex items-baseline gap-1.5 px-4 pt-2 pb-1">
-            <span class="text-xs font-semibold uppercase tracking-wider text-ink-muted">Body</span>
-            <span class="truncate text-[11px] text-ink-muted/80">(Content: knowledges, solutions, troubleshooting, workarounds)</span>
+            <span class="text-xs font-semibold uppercase tracking-wider text-ink-muted" data-i18n="lb.body">Body</span>
+            <span class="truncate text-[11px] text-ink-muted/80" data-i18n="lb.bodyHint">(Content: knowledges, solutions, troubleshooting, workarounds)</span>
           </div>
 
           <!-- Sticky tool ribbon -->
-          <div id="lb-ribbon" class="glass flex items-center gap-1 border-b border-t px-2 py-1.5" role="toolbar" aria-label="Formatting">
+          <div id="lb-ribbon" class="glass flex items-center gap-1 border-b border-t px-2 py-1.5" role="toolbar" data-i18n-attr="aria-label:lb.formatting">
             <div class="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto">
               <div class="flex items-center gap-0.5" id="ribbon-buttons"></div>
-              <button id="bulb-btn" class="icon-btn btn-ghost ml-1" aria-label="Syntax reference: LaTeX and Mermaid boilerplate" aria-expanded="false" aria-haspopup="menu">
+              <button id="bulb-btn" class="icon-btn btn-ghost ml-1" data-i18n-attr="aria-label:lb.bulb" aria-expanded="false" aria-haspopup="menu">
                 <svg class="icon text-warn-hue" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6M10 22h4M15.09 14c.26-1.3.9-2.2 1.91-3.2a6 6 0 1 0-10 0c1 1 1.65 1.9 1.91 3.2"/></svg>
               </button>
             </div>
             <!-- Narrow-viewport write/preview toggle (EDGE-CASES §8.3) — pinned outside the scroll region -->
-            <div id="lb-viewtoggle" class="hidden flex-none items-center rounded-md border border-edge bg-panel p-0.5 max-lg:flex" role="group" aria-label="Editor or preview">
-              <button data-pane="editor" class="btn btn-ghost px-2.5 py-1 text-xs data-[active=true]:bg-accent data-[active=true]:text-surface" data-active="true">Write</button>
-              <button data-pane="preview" class="btn btn-ghost px-2.5 py-1 text-xs data-[active=true]:bg-accent data-[active=true]:text-surface" data-active="false">Preview</button>
+            <div id="lb-viewtoggle" class="hidden flex-none items-center rounded-md border border-edge bg-panel p-0.5 max-lg:flex" role="group" data-i18n-attr="aria-label:lb.viewToggle">
+              <button data-pane="editor" class="btn btn-ghost px-2.5 py-1 text-xs data-[active=true]:bg-accent data-[active=true]:text-surface" data-active="true" data-i18n="lb.write">Write</button>
+              <button data-pane="preview" class="btn btn-ghost px-2.5 py-1 text-xs data-[active=true]:bg-accent data-[active=true]:text-surface" data-active="false" data-i18n="lb.preview">Preview</button>
             </div>
           </div>
 
           <!-- Split editor / preview -->
           <div id="lb-split" class="flex min-h-0 flex-1">
             <div id="lb-editor-pane" class="flex min-w-0 flex-1 flex-col">
-              <label for="lb-editor" class="sr-only">Markdown details and solution</label>
+              <label for="lb-editor" class="sr-only" data-i18n="lb.editorLabel">Markdown details and solution</label>
               <textarea id="lb-editor" dir="auto" spellcheck="true"
                 class="min-h-0 w-full flex-1 resize-none bg-transparent p-4 font-mono text-[13px] leading-relaxed outline-none placeholder:text-ink-muted/60"
-                placeholder="Write your notes in Markdown…&#10;&#10;$inline math$, $$block math$$, and ```mermaid diagrams are supported."></textarea>
+                data-i18n-attr="placeholder:lb.editorPlaceholder"></textarea>
             </div>
-            <div id="lb-divider" class="w-px flex-none cursor-col-resize bg-edge transition-colors hover:bg-accent max-lg:hidden" role="separator" aria-label="Resize editor and preview" tabindex="0"></div>
+            <div id="lb-divider" class="w-px flex-none cursor-col-resize bg-edge transition-colors hover:bg-accent max-lg:hidden" role="separator" data-i18n-attr="aria-label:lb.resize" tabindex="0"></div>
             <div id="lb-preview-pane" class="min-w-0 flex-1 overflow-y-auto max-lg:hidden">
-              <div id="lb-preview" class="md-preview p-4" dir="auto" aria-label="Rendered preview" aria-live="off"></div>
+              <div id="lb-preview" class="md-preview p-4" dir="auto" data-i18n-attr="aria-label:lb.previewLabel" aria-live="off"></div>
             </div>
           </div>
 
@@ -230,10 +240,10 @@
           <div id="lb-empty" class="hidden min-h-0 flex-1 flex-col items-center justify-center gap-6 p-6">
             <div id="lb-face-card"></div>
             <div class="flex flex-col items-center gap-3 text-center">
-              <p class="text-sm text-ink-muted">No entry open — pick one from the list, or start a new one.</p>
+              <p class="text-sm text-ink-muted" data-i18n="lb.empty">No entry open — pick one from the list, or start a new one.</p>
               <button id="lb-empty-new" class="btn btn-primary text-xs">
                 <svg class="icon !h-3.5 !w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-                New Entry
+                <span data-i18n="lb.new">New Entry</span>
               </button>
             </div>
           </div>
@@ -243,49 +253,49 @@
         <aside id="lb-meta" class="collapse-x w-72 flex-none overflow-y-auto border-l border-edge bg-panel-2/50" data-hidden="true">
           <div class="flex flex-col gap-4 p-4 text-sm">
             <div class="flex items-center justify-between gap-2">
-              <h2 class="text-xs font-semibold uppercase tracking-wider text-ink-muted">Metadata</h2>
+              <h2 class="text-xs font-semibold uppercase tracking-wider text-ink-muted" data-i18n="meta.title">Metadata</h2>
               <!-- Only rendered as a sheet on narrow screens (see input.css) -->
-              <button id="lb-meta-close" class="icon-btn btn-ghost -my-1 hidden" aria-label="Close metadata">
+              <button id="lb-meta-close" class="icon-btn btn-ghost -my-1 hidden" data-i18n-attr="aria-label:meta.close">
                 <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
               </button>
             </div>
             <div class="grid grid-cols-2 gap-2">
               <div>
-                <label for="meta-label" class="mb-1 block text-xs font-medium text-ink-muted">Label</label>
-                <input id="meta-label" class="input" list="label-options" placeholder="Uncategorized">
+                <label for="meta-label" class="mb-1 block text-xs font-medium text-ink-muted" data-i18n="meta.label">Label</label>
+                <input id="meta-label" class="input" list="label-options" data-i18n-attr="placeholder:meta.labelPlaceholder">
                 <datalist id="label-options"></datalist>
               </div>
               <div>
-                <label for="meta-sublabel" class="mb-1 block text-xs font-medium text-ink-muted">Sub-label</label>
+                <label for="meta-sublabel" class="mb-1 block text-xs font-medium text-ink-muted" data-i18n="meta.sublabel">Sub-label</label>
                 <input id="meta-sublabel" class="input" placeholder="—" disabled>
               </div>
             </div>
             <div>
-              <label for="meta-tags" class="mb-1 block text-xs font-medium text-ink-muted">Tags <span class="font-normal">(comma-separated)</span></label>
-              <input id="meta-tags" class="input" placeholder="linux, docker, fix">
+              <label for="meta-tags" class="mb-1 block text-xs font-medium text-ink-muted"><span data-i18n="meta.tags">Tags</span> <span class="font-normal" data-i18n="common.commaSeparated">(comma-separated)</span></label>
+              <input id="meta-tags" class="input" data-i18n-attr="placeholder:meta.tagsPlaceholder">
               <div id="meta-tag-chips" class="mt-1.5 flex flex-wrap gap-1"></div>
             </div>
             <!-- User-defined metadata fields (TiddlyWiki-style name/value rows) -->
             <div>
-              <span class="mb-1.5 block text-xs font-medium text-ink-muted">Fields</span>
+              <span class="mb-1.5 block text-xs font-medium text-ink-muted" data-i18n="meta.fields">Fields</span>
               <div id="meta-fields" class="flex flex-col gap-1.5"></div>
               <div class="mt-2 flex items-center gap-1.5">
-                <label for="field-add-name" class="sr-only">New field name</label>
-                <input id="field-add-name" class="input !py-1 min-w-0 flex-1 text-xs" list="field-name-options" placeholder="field name" maxlength="64" autocomplete="off">
+                <label for="field-add-name" class="sr-only" data-i18n="meta.fieldNameLabel">New field name</label>
+                <input id="field-add-name" class="input !py-1 min-w-0 flex-1 text-xs" list="field-name-options" data-i18n-attr="placeholder:meta.fieldNamePlaceholder" maxlength="64" autocomplete="off">
                 <datalist id="field-name-options"></datalist>
-                <label for="field-add-value" class="sr-only">New field value</label>
-                <input id="field-add-value" class="input !py-1 min-w-0 flex-1 text-xs" placeholder="field value" maxlength="2000" autocomplete="off">
-                <button id="field-add-btn" class="btn !py-1 text-xs" aria-label="Add field">add</button>
+                <label for="field-add-value" class="sr-only" data-i18n="meta.fieldValueLabel">New field value</label>
+                <input id="field-add-value" class="input !py-1 min-w-0 flex-1 text-xs" data-i18n-attr="placeholder:meta.fieldValuePlaceholder" maxlength="2000" autocomplete="off">
+                <button id="field-add-btn" class="btn !py-1 text-xs" data-i18n-attr="aria-label:meta.addField" data-i18n="meta.add">add</button>
               </div>
               <p id="field-add-error" class="mt-1 hidden text-[11px] text-danger" role="alert"></p>
             </div>
             <div class="grid grid-cols-1 gap-3">
               <div>
-                <span class="mb-1 block text-xs font-medium text-ink-muted">Created <span class="font-normal text-ink-muted/70">(read-only)</span></span>
+                <span class="mb-1 block text-xs font-medium text-ink-muted"><span data-i18n="meta.created">Created</span> <span class="font-normal text-ink-muted/70" data-i18n="meta.readonly">(read-only)</span></span>
                 <span id="meta-created" class="font-mono text-xs text-ink-muted" title="">—</span>
               </div>
               <div>
-                <label for="meta-modified" class="mb-1 block text-xs font-medium text-ink-muted">Modified</label>
+                <label for="meta-modified" class="mb-1 block text-xs font-medium text-ink-muted" data-i18n="meta.modified">Modified</label>
                 <input id="meta-modified" type="datetime-local" step="1" class="input font-mono text-xs">
               </div>
             </div>
@@ -293,14 +303,14 @@
                  below it stay visible either way (they are the useful part). -->
             <div>
               <details id="meta-urls-wrap" open>
-                <summary class="cursor-pointer text-xs font-medium text-ink-muted">URL list <span class="font-normal">(comma-separated)</span><span id="meta-url-count" class="url-count hidden"></span></summary>
-                <textarea id="meta-urls" class="input mt-1.5 min-h-[60px] resize-y font-mono text-xs" placeholder="https://…, https://…"></textarea>
+                <summary class="cursor-pointer text-xs font-medium text-ink-muted"><span data-i18n="meta.urls">URL list</span> <span class="font-normal" data-i18n="common.commaSeparated">(comma-separated)</span><span id="meta-url-count" class="url-count hidden"></span></summary>
+                <textarea id="meta-urls" class="input mt-1.5 min-h-[60px] resize-y font-mono text-xs" data-i18n-attr="placeholder:meta.urlsPlaceholder"></textarea>
               </details>
               <div id="meta-url-items" class="url-list mt-1.5"></div>
             </div>
             <button id="lb-delete" class="btn btn-ghost justify-start text-xs text-danger hidden">
               <svg class="icon !h-4 !w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
-              Delete entry
+              <span data-i18n="lb.delete">Delete entry</span>
             </button>
           </div>
         </aside>
@@ -311,14 +321,14 @@
         <div class="mx-auto max-w-3xl px-4 py-6">
           <div id="pr-face-card" class="mb-8"></div>
           <div class="flex gap-2">
-            <label for="pr-search" class="sr-only">Search prompts</label>
-            <input id="pr-search" type="search" class="input flex-1 !py-2.5 text-base" placeholder="Search prompts…" autocomplete="off">
+            <label for="pr-search" class="sr-only" data-i18n="pr.searchLabel">Search prompts</label>
+            <input id="pr-search" type="search" class="input flex-1 !py-2.5 text-base" data-i18n-attr="placeholder:pr.searchPlaceholder" autocomplete="off">
             <button id="pr-new" class="btn btn-primary whitespace-nowrap">
               <svg class="icon !h-4 !w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-              New Prompt
+              <span data-i18n="pr.new">New Prompt</span>
             </button>
           </div>
-          <div id="pr-pills" class="mt-3 flex flex-wrap gap-1.5" role="group" aria-label="Filter by tag"></div>
+          <div id="pr-pills" class="mt-3 flex flex-wrap gap-1.5" role="group" data-i18n-attr="aria-label:common.filterByTag"></div>
           <div id="pr-groups" class="mt-2"></div>
         </div>
       </section>
@@ -328,14 +338,14 @@
         <div class="mx-auto max-w-3xl px-4 py-6">
           <div id="sn-face-card" class="mb-8"></div>
           <div class="flex gap-2">
-            <label for="sn-search" class="sr-only">Search snippets</label>
-            <input id="sn-search" type="search" class="input flex-1 !py-2.5 text-base" placeholder="Search commands, languages, tags…" autocomplete="off">
+            <label for="sn-search" class="sr-only" data-i18n="sn.searchLabel">Search snippets</label>
+            <input id="sn-search" type="search" class="input flex-1 !py-2.5 text-base" data-i18n-attr="placeholder:sn.searchPlaceholder" autocomplete="off">
             <button id="sn-new" class="btn btn-primary whitespace-nowrap">
               <svg class="icon !h-4 !w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-              New Snippet
+              <span data-i18n="sn.new">New Snippet</span>
             </button>
           </div>
-          <div id="sn-pills" class="mt-3 flex flex-wrap gap-1.5" role="group" aria-label="Filter by tag"></div>
+          <div id="sn-pills" class="mt-3 flex flex-wrap gap-1.5" role="group" data-i18n-attr="aria-label:common.filterByTag"></div>
           <div id="sn-groups" class="mt-2"></div>
         </div>
       </section>
@@ -343,7 +353,7 @@
     </main>
 
     <!-- ══ Status dock (red traffic light) ══ -->
-    <footer id="dock" class="glass flex items-center gap-2 border-t px-3 py-2" aria-label="Minimized tools"></footer>
+    <footer id="dock" class="glass flex items-center gap-2 border-t px-3 py-2" data-i18n-attr="aria-label:nav.dock"></footer>
   </div>
 
   <!-- ══ Auth portal: lock screen — login + forced change-password
@@ -355,11 +365,23 @@
 
     <!-- The title bar is hidden until sign-in, so the lock screen carries
          its own theme control. Both are wired by theme.js. -->
-    <button type="button" id="auth-theme-toggle" data-theme-toggle class="icon-btn btn-ghost"
-      aria-label="Toggle light or dark theme">
-      <svg class="icon dark:hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4m11.4-11.4 1.4-1.4"/></svg>
-      <svg class="icon hidden dark:block" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z"/></svg>
-    </button>
+    <div id="auth-controls">
+      <!-- Display language. The menu is filled from i18n.js LOCALES, so adding a
+           language needs a catalogue and nothing here. -->
+      <div class="relative" data-lang-switch>
+        <button type="button" class="icon-btn btn-ghost" data-lang-toggle aria-haspopup="menu"
+          aria-expanded="false" data-i18n-attr="aria-label:lang.toggle">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/><path d="M2 12h20"/></svg>
+        </button>
+        <div data-lang-menu role="menu" data-i18n-attr="aria-label:lang.label"
+          class="glass absolute right-0 top-full z-50 mt-1 hidden w-40 rounded-card border p-1 shadow-lift"></div>
+      </div>
+      <button type="button" id="auth-theme-toggle" data-theme-toggle class="icon-btn btn-ghost"
+        data-i18n-attr="aria-label:theme.toggle">
+        <svg class="icon dark:hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4m11.4-11.4 1.4-1.4"/></svg>
+        <svg class="icon hidden dark:block" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z"/></svg>
+      </button>
+    </div>
 
     <!-- Installed-app only: a standalone window has no browser chrome to
          tell you the time. In a tab the OS already shows one. -->
@@ -375,44 +397,44 @@
         <div id="auth-card" class="glass w-full rounded-frame border border-edge/80 px-6 pb-6 pt-14 shadow-lift">
           <div class="mb-5 text-center">
             <h1 class="text-lg font-semibold">Bento OS</h1>
-            <p id="auth-sub" class="text-xs text-ink-muted">Sign in to your workspace</p>
+            <p id="auth-sub" class="text-xs text-ink-muted" data-i18n="auth.signInSub">Sign in to your workspace</p>
           </div>
 
           <form id="auth-login-form" class="flex flex-col gap-3" novalidate>
             <div>
-              <label for="auth-username" class="mb-1 block text-xs font-medium text-ink-muted">User ID</label>
+              <label for="auth-username" class="mb-1 block text-xs font-medium text-ink-muted" data-i18n="auth.userId">User ID</label>
               <input id="auth-username" class="input" autocomplete="username" autocapitalize="none" spellcheck="false" required>
             </div>
             <div>
-              <label for="auth-password" class="mb-1 block text-xs font-medium text-ink-muted">Password</label>
+              <label for="auth-password" class="mb-1 block text-xs font-medium text-ink-muted" data-i18n="auth.password">Password</label>
               <input id="auth-password" type="password" class="input" autocomplete="current-password" required>
             </div>
             <p id="auth-error" class="hidden text-xs text-danger" role="alert"></p>
-            <button id="auth-submit" type="submit" class="btn btn-primary justify-center">Sign in</button>
-            <button id="auth-mode-toggle" type="button" class="btn btn-ghost justify-center text-xs text-ink-muted">Create an account</button>
+            <button id="auth-submit" type="submit" class="btn btn-primary justify-center" data-i18n="auth.signIn">Sign in</button>
+            <button id="auth-mode-toggle" type="button" class="btn btn-ghost justify-center text-xs text-ink-muted" data-i18n="auth.createAccountLink">Create an account</button>
           </form>
 
           <form id="auth-cp-form" class="hidden flex-col gap-3" novalidate>
-            <p class="text-xs text-ink-muted">
+            <p class="text-xs text-ink-muted" data-i18n="auth.cpIntro">
               Choose a new password before continuing. Default or reset passwords
               must be replaced before the dashboard opens.
             </p>
             <div>
-              <label for="cp-new" class="mb-1 block text-xs font-medium text-ink-muted">New password</label>
+              <label for="cp-new" class="mb-1 block text-xs font-medium text-ink-muted" data-i18n="auth.newPassword">New password</label>
               <input id="cp-new" type="password" class="input" autocomplete="new-password" minlength="8" required>
             </div>
             <div>
-              <label for="cp-confirm" class="mb-1 block text-xs font-medium text-ink-muted">Confirm new password</label>
+              <label for="cp-confirm" class="mb-1 block text-xs font-medium text-ink-muted" data-i18n="auth.confirmPassword">Confirm new password</label>
               <input id="cp-confirm" type="password" class="input" autocomplete="new-password" minlength="8" required>
             </div>
             <p id="cp-error" class="hidden text-xs text-danger" role="alert"></p>
-            <button id="cp-submit" type="submit" class="btn btn-primary justify-center">Set new password</button>
-            <button id="cp-cancel" type="button" class="btn btn-ghost hidden justify-center text-xs text-ink-muted">Back to the app</button>
+            <button id="cp-submit" type="submit" class="btn btn-primary justify-center" data-i18n="auth.setPassword">Set new password</button>
+            <button id="cp-cancel" type="button" class="btn btn-ghost hidden justify-center text-xs text-ink-muted" data-i18n="auth.backToApp">Back to the app</button>
           </form>
 
           <p id="auth-about-line" class="mt-4 text-center text-xs text-ink-muted">
-            New here?
-            <button type="button" class="auth-link" data-tour="logbook">See what Bento OS does</button>
+            <span data-i18n="auth.newHere">New here?</span>
+            <button type="button" class="auth-link" data-tour="logbook" data-i18n="auth.seeWhat">See what Bento OS does</button>
           </p>
         </div>
       </div>
@@ -421,14 +443,14 @@
     <!-- Logged out there is nothing to restore, so these open the tour
          rather than a tool. -->
     <footer id="auth-dock" class="glass relative flex items-center justify-center gap-2 border-t px-3 py-2">
-      <button type="button" class="dock-pill" data-tour="logbook" aria-label="About the Docs LogBook">
-        <span aria-hidden="true">📓</span><span class="auth-dock-label">Docs LogBook</span>
+      <button type="button" class="dock-pill" data-tour="logbook" data-i18n-attr="aria-label:auth.dock.logbook">
+        <span aria-hidden="true">📓</span><span class="auth-dock-label" data-i18n="nav.tab.logbook">Docs LogBook</span>
       </button>
-      <button type="button" class="dock-pill" data-tour="prompts" aria-label="About the Prompt Library">
-        <span aria-hidden="true">💬</span><span class="auth-dock-label">Prompt Library</span>
+      <button type="button" class="dock-pill" data-tour="prompts" data-i18n-attr="aria-label:auth.dock.prompts">
+        <span aria-hidden="true">💬</span><span class="auth-dock-label" data-i18n="nav.tab.prompts">Prompt Library</span>
       </button>
-      <button type="button" class="dock-pill" data-tour="snippets" aria-label="About Code Snippets">
-        <span aria-hidden="true">🧩</span><span class="auth-dock-label">Code Snippets</span>
+      <button type="button" class="dock-pill" data-tour="snippets" data-i18n-attr="aria-label:auth.dock.snippets">
+        <span aria-hidden="true">🧩</span><span class="auth-dock-label" data-i18n="nav.tab.snippets">Code Snippets</span>
       </button>
     </footer>
   </div>
@@ -440,31 +462,31 @@
   <dialog id="dlg-tour" class="modal-wide" aria-labelledby="dlg-tour-title">
     <div class="flex max-h-[85dvh] flex-col">
       <div class="flex items-center justify-between gap-3 border-b border-edge px-5 py-3">
-        <h2 id="dlg-tour-title" class="text-base font-semibold">What Bento OS does</h2>
-        <button class="icon-btn btn-ghost" data-close-dialog aria-label="Close">
+        <h2 id="dlg-tour-title" class="text-base font-semibold" data-i18n="tour.title">What Bento OS does</h2>
+        <button class="icon-btn btn-ghost" data-close-dialog data-i18n-attr="aria-label:common.close">
           <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
         </button>
       </div>
 
-      <div role="tablist" aria-label="Tools" class="flex gap-1 border-b border-edge px-3 py-2">
+      <div role="tablist" data-i18n-attr="aria-label:nav.tools" class="flex gap-1 border-b border-edge px-3 py-2">
         <button role="tab" data-tour-tab="logbook" aria-selected="true" aria-controls="tour-pane-logbook"
           class="btn btn-ghost flex-1 justify-center text-xs data-[active=true]:border-edge data-[active=true]:bg-panel-2" data-active="true">
-          <span aria-hidden="true">📓</span> Docs LogBook
+          <span aria-hidden="true">📓</span> <span data-i18n="nav.tab.logbook">Docs LogBook</span>
         </button>
         <button role="tab" data-tour-tab="prompts" aria-selected="false" aria-controls="tour-pane-prompts"
           class="btn btn-ghost flex-1 justify-center text-xs data-[active=true]:border-edge data-[active=true]:bg-panel-2" data-active="false">
-          <span aria-hidden="true">💬</span> Prompt Library
+          <span aria-hidden="true">💬</span> <span data-i18n="nav.tab.prompts">Prompt Library</span>
         </button>
         <button role="tab" data-tour-tab="snippets" aria-selected="false" aria-controls="tour-pane-snippets"
           class="btn btn-ghost flex-1 justify-center text-xs data-[active=true]:border-edge data-[active=true]:bg-panel-2" data-active="false">
-          <span aria-hidden="true">🧩</span> Code Snippets
+          <span aria-hidden="true">🧩</span> <span data-i18n="nav.tab.snippets">Code Snippets</span>
         </button>
       </div>
 
       <div class="overflow-y-auto p-5">
         <!-- ── Docs LogBook ── -->
         <div id="tour-pane-logbook" role="tabpanel" data-tour-pane="logbook" class="flex flex-col gap-4">
-          <p class="text-sm text-ink-muted">Long-form notes in plain markdown — guides, write-ups, and anything you'll want to find again months from now.</p>
+          <p class="text-sm text-ink-muted" data-i18n="tour.lb.intro">Long-form notes in plain markdown — guides, write-ups, and anything you'll want to find again months from now.</p>
 
           <div class="tour-row">
             <div class="tour-thumb">
@@ -474,21 +496,21 @@
               <div class="tour-bar w-11/12"></div>
             </div>
             <div>
-              <h3 class="text-sm font-semibold">Read like a page, edit when you need to</h3>
-              <p class="text-xs text-ink-muted">Notes open as clean rendered prose at a comfortable reading width. One toggle switches to the side-by-side editor.</p>
+              <h3 class="text-sm font-semibold" data-i18n="tour.lb.h1">Read like a page, edit when you need to</h3>
+              <p class="text-xs text-ink-muted" data-i18n="tour.lb.p1">Notes open as clean rendered prose at a comfortable reading width. One toggle switches to the side-by-side editor.</p>
             </div>
           </div>
 
           <div class="tour-demo">
-            <p class="tour-demo-cap">Try it — edit the left side</p>
+            <p class="tour-demo-cap" data-i18n="tour.lb.demoCap">Try it — edit the left side</p>
             <div class="grid gap-2 sm:grid-cols-2">
               <div class="tour-pane-box">
-                <div class="tour-pane-cap">You write</div>
-                <label class="sr-only" for="tour-md-in">Markdown to preview</label>
+                <div class="tour-pane-cap" data-i18n="tour.lb.youWrite">You write</div>
+                <label class="sr-only" for="tour-md-in" data-i18n="tour.lb.mdLabel">Markdown to preview</label>
                 <textarea id="tour-md-in" class="tour-in" spellcheck="false" rows="7"></textarea>
               </div>
               <div class="tour-pane-box">
-                <div class="tour-pane-cap">Bento shows</div>
+                <div class="tour-pane-cap" data-i18n="tour.lb.bentoShows">Bento shows</div>
                 <div id="tour-md-out" class="md-preview tour-out" aria-live="polite"></div>
               </div>
             </div>
@@ -496,44 +518,44 @@
 
           <div class="tour-row">
             <div class="tour-thumb justify-center gap-1.5">
-              <div class="tour-mini-search">search</div>
+              <div class="tour-mini-search" data-i18n="tour.mini.search">search</div>
               <div class="flex flex-wrap gap-1">
-                <span class="tour-mini-pill">guide</span><span class="tour-mini-pill">setup</span>
+                <span class="tour-mini-pill" data-i18n="tour.lb.pill1">guide</span><span class="tour-mini-pill" data-i18n="tour.lb.pill2">setup</span>
               </div>
             </div>
             <div>
-              <h3 class="text-sm font-semibold">Find it again in one search</h3>
-              <p class="text-xs text-ink-muted">Search covers the title, tags, your own metadata fields, the summary and the body at once. Group by label or year, or narrow down with tag pills.</p>
+              <h3 class="text-sm font-semibold" data-i18n="tour.lb.h2">Find it again in one search</h3>
+              <p class="text-xs text-ink-muted" data-i18n="tour.lb.p2">Search covers the title, tags, your own metadata fields, the summary and the body at once. Group by label or year, or narrow down with tag pills.</p>
             </div>
           </div>
 
-          <p class="text-xs text-ink-muted">Drafts autosave every 10 seconds while you type, so a crash or a stray refresh offers to put your work back.</p>
+          <p class="text-xs text-ink-muted" data-i18n="tour.lb.foot">Drafts autosave every 10 seconds while you type, so a crash or a stray refresh offers to put your work back.</p>
         </div>
 
         <!-- ── Prompt Library ── -->
         <div id="tour-pane-prompts" role="tabpanel" data-tour-pane="prompts" class="hidden flex-col gap-4">
-          <p class="text-sm text-ink-muted">The prompts you keep rewriting, saved once and grouped by category.</p>
+          <p class="text-sm text-ink-muted" data-i18n="tour.pr.intro">The prompts you keep rewriting, saved once and grouped by category.</p>
 
           <div class="tour-row">
             <div class="tour-thumb justify-center gap-1.5">
-              <div class="tour-mini-search">search</div>
+              <div class="tour-mini-search" data-i18n="tour.mini.search">search</div>
               <div class="flex flex-wrap gap-1">
-                <span class="tour-mini-pill">writing</span><span class="tour-mini-pill">code</span>
+                <span class="tour-mini-pill" data-i18n="tour.pr.pill1">writing</span><span class="tour-mini-pill" data-i18n="tour.pr.pill2">code</span>
               </div>
             </div>
             <div>
-              <h3 class="text-sm font-semibold">A library, not a scratch file</h3>
-              <p class="text-xs text-ink-muted">Every prompt sits in a category with its own tags, so you can search the whole library or filter it down to one kind of work.</p>
+              <h3 class="text-sm font-semibold" data-i18n="tour.pr.h1">A library, not a scratch file</h3>
+              <p class="text-xs text-ink-muted" data-i18n="tour.pr.p1">Every prompt sits in a category with its own tags, so you can search the whole library or filter it down to one kind of work.</p>
             </div>
           </div>
 
           <div class="tour-demo">
-            <p class="tour-demo-cap">Try it — type into the highlighted blanks</p>
+            <p class="tour-demo-cap" data-i18n="tour.demoCap.blanks">Try it — type into the highlighted blanks</p>
             <div class="tour-card">
               <div id="tour-prompt-body" class="tour-body"></div>
               <div class="mt-3 flex items-center justify-between gap-2">
-                <span class="text-[11px] text-ink-muted">Blanks you leave empty stay as placeholders.</span>
-                <button type="button" id="tour-prompt-copy" class="btn btn-primary text-xs">Copy</button>
+                <span class="text-[11px] text-ink-muted" data-i18n="tour.pr.blanksNote">Blanks you leave empty stay as placeholders.</span>
+                <button type="button" id="tour-prompt-copy" class="btn btn-primary text-xs" data-i18n="common.copy">Copy</button>
               </div>
             </div>
           </div>
@@ -542,18 +564,18 @@
             <div class="tour-thumb justify-center">
               <div class="tour-bar w-5/6"></div>
               <div class="tour-bar w-2/3"></div>
-              <div class="mt-1 self-start rounded-md bg-accent px-2 py-1 text-[10px] font-medium text-surface">Copy</div>
+              <div class="mt-1 self-start rounded-md bg-accent px-2 py-1 text-[10px] font-medium text-surface" data-i18n="common.copy">Copy</div>
             </div>
             <div>
-              <h3 class="text-sm font-semibold">Copy the finished text, not the template</h3>
-              <p class="text-xs text-ink-muted">One click puts the composed prompt on your clipboard with the blanks filled in — nothing left to tidy up by hand.</p>
+              <h3 class="text-sm font-semibold" data-i18n="tour.pr.h2">Copy the finished text, not the template</h3>
+              <p class="text-xs text-ink-muted" data-i18n="tour.pr.p2">One click puts the composed prompt on your clipboard with the blanks filled in — nothing left to tidy up by hand.</p>
             </div>
           </div>
         </div>
 
         <!-- ── Code Snippets ── -->
         <div id="tour-pane-snippets" role="tabpanel" data-tour-pane="snippets" class="hidden flex-col gap-4">
-          <p class="text-sm text-ink-muted">Commands and code you'd rather not look up twice.</p>
+          <p class="text-sm text-ink-muted" data-i18n="tour.sn.intro">Commands and code you'd rather not look up twice.</p>
 
           <div class="tour-row">
             <div class="tour-thumb justify-center gap-1">
@@ -564,18 +586,18 @@
               <div class="tour-bar w-1/2"></div>
             </div>
             <div>
-              <h3 class="text-sm font-semibold">Grouped by language, coloured automatically</h3>
-              <p class="text-xs text-ink-muted">Whatever language or tool you type becomes its own group with a distinct accent — no palette to pick and nothing to configure.</p>
+              <h3 class="text-sm font-semibold" data-i18n="tour.sn.h1">Grouped by language, coloured automatically</h3>
+              <p class="text-xs text-ink-muted" data-i18n="tour.sn.p1">Whatever language or tool you type becomes its own group with a distinct accent — no palette to pick and nothing to configure.</p>
             </div>
           </div>
 
           <div class="tour-demo">
-            <p class="tour-demo-cap">Try it — type into the highlighted blanks</p>
+            <p class="tour-demo-cap" data-i18n="tour.demoCap.blanks">Try it — type into the highlighted blanks</p>
             <div class="tour-card">
               <div id="tour-snippet-body" class="tour-body font-mono"></div>
               <div class="mt-3 flex items-center justify-between gap-2">
-                <span class="text-[11px] text-ink-muted">The same blanks as the Prompt Library.</span>
-                <button type="button" id="tour-snippet-copy" class="btn btn-primary text-xs">Copy</button>
+                <span class="text-[11px] text-ink-muted" data-i18n="tour.sn.blanksNote">The same blanks as the Prompt Library.</span>
+                <button type="button" id="tour-snippet-copy" class="btn btn-primary text-xs" data-i18n="common.copy">Copy</button>
               </div>
             </div>
           </div>
@@ -584,19 +606,19 @@
             <div class="tour-thumb justify-center">
               <div class="tour-bar w-2/3"></div>
               <div class="tour-bar w-full"></div>
-              <div class="mt-1 self-end text-[10px] text-ink-muted">flip ↻</div>
+              <div class="mt-1 self-end text-[10px] text-ink-muted" data-i18n="tour.sn.flip">flip ↻</div>
             </div>
             <div>
-              <h3 class="text-sm font-semibold">Keep the why on the back</h3>
-              <p class="text-xs text-ink-muted">Flip a card over to store notes with the snippet — what it's for, and the part that bites you at 2am.</p>
+              <h3 class="text-sm font-semibold" data-i18n="tour.sn.h2">Keep the why on the back</h3>
+              <p class="text-xs text-ink-muted" data-i18n="tour.sn.p2">Flip a card over to store notes with the snippet — what it's for, and the part that bites you at 2am.</p>
             </div>
           </div>
         </div>
       </div>
 
       <div class="flex items-center justify-between gap-3 border-t border-edge px-5 py-3">
-        <p class="text-xs text-ink-muted">Everything you save belongs to your account alone — administrators included.</p>
-        <button class="btn btn-primary text-xs" data-close-dialog>Got it</button>
+        <p class="text-xs text-ink-muted" data-i18n="tour.footer">Everything you save belongs to your account alone — administrators included.</p>
+        <button class="btn btn-primary text-xs" data-close-dialog data-i18n="common.gotIt">Got it</button>
       </div>
     </div>
   </dialog>
@@ -610,32 +632,32 @@
     <div class="flex max-h-[85dvh] flex-col">
       <div class="flex items-center justify-between gap-3 border-b border-edge px-5 py-3">
         <h2 id="dlg-admin-title" class="text-base font-semibold">
-          User management <span id="admin-count" class="ml-1 text-xs font-normal text-ink-muted"></span>
+          <span data-i18n="admin.title">User management</span> <span id="admin-count" class="ml-1 text-xs font-normal text-ink-muted"></span>
         </h2>
-        <button class="icon-btn btn-ghost" data-close-dialog aria-label="Close user management">
+        <button class="icon-btn btn-ghost" data-close-dialog data-i18n-attr="aria-label:admin.close">
           <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
         </button>
       </div>
 
       <div class="flex items-center gap-2 border-b border-edge px-5 py-3">
-        <label for="admin-search" class="sr-only">Filter users</label>
-        <input id="admin-search" type="search" class="input min-w-0 flex-1 !py-1.5 text-sm" placeholder="Filter by User ID…" autocomplete="off">
+        <label for="admin-search" class="sr-only" data-i18n="admin.filterLabel">Filter users</label>
+        <input id="admin-search" type="search" class="input min-w-0 flex-1 !py-1.5 text-sm" data-i18n-attr="placeholder:admin.filterPlaceholder" autocomplete="off">
         <button type="button" id="admin-new-toggle" class="btn btn-primary whitespace-nowrap text-xs" aria-expanded="false" aria-controls="admin-create-form">
-          + New user
+          <span data-i18n="admin.newUser">+ New user</span>
         </button>
       </div>
 
       <!-- Revealed by the button above, so creating and filtering stop sharing a line -->
       <form id="admin-create-form" class="hidden items-center gap-2 border-b border-edge bg-panel-2/50 px-5 py-3" novalidate>
-        <label for="admin-create-username" class="sr-only">New User ID</label>
-        <input id="admin-create-username" class="input min-w-0 flex-1 !py-1.5 text-sm" placeholder="New User ID" maxlength="32" autocomplete="off">
-        <button type="submit" class="btn btn-primary whitespace-nowrap text-xs">Create</button>
-        <button type="button" id="admin-create-cancel" class="btn btn-ghost text-xs text-ink-muted">Cancel</button>
+        <label for="admin-create-username" class="sr-only" data-i18n="admin.newUserLabel">New User ID</label>
+        <input id="admin-create-username" class="input min-w-0 flex-1 !py-1.5 text-sm" data-i18n-attr="placeholder:admin.newUserPlaceholder" maxlength="32" autocomplete="off">
+        <button type="submit" class="btn btn-primary whitespace-nowrap text-xs" data-i18n="admin.create">Create</button>
+        <button type="button" id="admin-create-cancel" class="btn btn-ghost text-xs text-ink-muted" data-i18n="common.cancel">Cancel</button>
       </form>
 
       <div id="admin-user-list" class="flex flex-col gap-1.5 overflow-y-auto p-5 text-sm"></div>
 
-      <p class="border-t border-edge px-5 py-2.5 text-xs text-ink-muted">
+      <p class="border-t border-edge px-5 py-2.5 text-xs text-ink-muted" data-i18n="admin.footer">
         New accounts start with the default password and must change it at first sign-in.
       </p>
     </div>
@@ -643,7 +665,7 @@
 
   <!-- Bulb menu lives at body level: a backdrop-filter ancestor (the glass
        ribbon) would become the containing block for position:fixed -->
-  <div id="bulb-menu" role="menu" aria-label="Insert syntax boilerplate" class="glass fixed z-40 hidden w-72 rounded-card border p-1 shadow-lift"></div>
+  <div id="bulb-menu" role="menu" data-i18n-attr="aria-label:lb.bulbMenu" class="glass fixed z-40 hidden w-72 rounded-card border p-1 shadow-lift"></div>
 
   <!-- ══ Dialogs ══ -->
   <dialog id="dlg-confirm" aria-labelledby="dlg-confirm-title">
@@ -657,8 +679,8 @@
   <dialog id="dlg-guide" class="modal-wide" aria-labelledby="dlg-guide-title">
     <div class="flex max-h-[80dvh] flex-col">
       <div class="flex items-center justify-between border-b border-edge px-5 py-3">
-        <h2 id="dlg-guide-title" class="text-base font-semibold">Markdown Guide</h2>
-        <button class="icon-btn btn-ghost" data-close-dialog aria-label="Close guide">
+        <h2 id="dlg-guide-title" class="text-base font-semibold" data-i18n="lb.guide">Markdown Guide</h2>
+        <button class="icon-btn btn-ghost" data-close-dialog data-i18n-attr="aria-label:lb.guideClose">
           <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
         </button>
       </div>
@@ -669,43 +691,43 @@
   <dialog id="dlg-prompt" class="modal-wide" aria-labelledby="dlg-prompt-title">
     <form id="prompt-form" class="flex max-h-[85dvh] flex-col" novalidate>
       <div class="flex items-center justify-between border-b border-edge px-5 py-3">
-        <h2 id="dlg-prompt-title" class="text-base font-semibold">New Prompt</h2>
-        <button type="button" class="icon-btn btn-ghost" data-close-dialog aria-label="Close prompt editor">
+        <h2 id="dlg-prompt-title" class="text-base font-semibold" data-i18n="pr.dlg.new">New Prompt</h2>
+        <button type="button" class="icon-btn btn-ghost" data-close-dialog data-i18n-attr="aria-label:pr.dlg.close">
           <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
         </button>
       </div>
       <div class="flex flex-col gap-3 overflow-y-auto p-5 text-sm">
         <div>
-          <label for="pf-title" class="mb-1 block text-xs font-medium text-ink-muted">Title <span class="text-danger">*</span></label>
+          <label for="pf-title" class="mb-1 block text-xs font-medium text-ink-muted"><span data-i18n="pr.f.title">Title</span> <span class="text-danger">*</span></label>
           <input id="pf-title" class="input" required maxlength="300">
         </div>
         <div class="grid grid-cols-2 gap-2">
           <div>
-            <label for="pf-category" class="mb-1 block text-xs font-medium text-ink-muted">Category</label>
-            <input id="pf-category" class="input uppercase" placeholder="GENERAL" maxlength="64">
+            <label for="pf-category" class="mb-1 block text-xs font-medium text-ink-muted" data-i18n="pr.f.category">Category</label>
+            <input id="pf-category" class="input uppercase" data-i18n-attr="placeholder:pr.f.categoryPlaceholder" maxlength="64">
           </div>
           <div>
-            <label for="pf-tags" class="mb-1 block text-xs font-medium text-ink-muted">Tags (comma-separated)</label>
-            <input id="pf-tags" class="input" placeholder="writing, code">
+            <label for="pf-tags" class="mb-1 block text-xs font-medium text-ink-muted" data-i18n="pr.f.tags">Tags (comma-separated)</label>
+            <input id="pf-tags" class="input" data-i18n-attr="placeholder:pr.f.tagsPlaceholder">
           </div>
         </div>
         <div>
-          <label for="pf-body" class="mb-1 block text-xs font-medium text-ink-muted">Prompt <span class="text-danger">*</span></label>
+          <label for="pf-body" class="mb-1 block text-xs font-medium text-ink-muted"><span data-i18n="pr.f.body">Prompt</span> <span class="text-danger">*</span></label>
           <textarea id="pf-body" class="input min-h-[140px] resize-y font-mono text-xs" required
-            placeholder="Use {{Variable Name}} for fill-in placeholders."></textarea>
-          <p class="mt-1 text-xs text-ink-muted">Double-brace variables like <code>{{Topic}}</code> become directly editable placeholders on the card.</p>
+            data-i18n-attr="placeholder:pr.f.bodyPlaceholder"></textarea>
+          <p class="mt-1 text-xs text-ink-muted"><span data-i18n="common.varsHintPre">Double-brace variables like </span><code data-i18n="pr.f.varSample">{{Topic}}</code><span data-i18n="common.varsHintPost"> become directly editable placeholders on the card.</span></p>
         </div>
         <div>
           <label for="pf-why" class="mb-1 block text-xs font-medium text-ink-muted">
-            Why this works <span class="font-normal opacity-70">· Markdown supported</span>
+            <span data-i18n="pr.why">Why this works</span> <span class="font-normal opacity-70" data-i18n="common.markdownSupported">· Markdown supported</span>
           </label>
-          <textarea id="pf-why" class="input min-h-[80px] resize-y" placeholder="The reasoning behind this prompt's structure…"></textarea>
+          <textarea id="pf-why" class="input min-h-[80px] resize-y" data-i18n-attr="placeholder:pr.f.whyPlaceholder"></textarea>
         </div>
         <p id="pf-error" class="hidden text-xs text-danger" role="alert"></p>
       </div>
       <div class="flex justify-end gap-2 border-t border-edge px-5 py-3">
-        <button type="button" class="btn" data-close-dialog>Cancel</button>
-        <button type="submit" class="btn btn-primary">Save Prompt</button>
+        <button type="button" class="btn" data-close-dialog data-i18n="common.cancel">Cancel</button>
+        <button type="submit" class="btn btn-primary" data-i18n="pr.f.save">Save Prompt</button>
       </div>
     </form>
   </dialog>
@@ -713,49 +735,49 @@
   <dialog id="dlg-snippet" class="modal-wide" aria-labelledby="dlg-snippet-title">
     <form id="snippet-form" class="flex max-h-[85dvh] flex-col" novalidate>
       <div class="flex items-center justify-between border-b border-edge px-5 py-3">
-        <h2 id="dlg-snippet-title" class="text-base font-semibold">New Snippet</h2>
-        <button type="button" class="icon-btn btn-ghost" data-close-dialog aria-label="Close snippet editor">
+        <h2 id="dlg-snippet-title" class="text-base font-semibold" data-i18n="sn.dlg.new">New Snippet</h2>
+        <button type="button" class="icon-btn btn-ghost" data-close-dialog data-i18n-attr="aria-label:sn.dlg.close">
           <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
         </button>
       </div>
       <div class="flex flex-col gap-3 overflow-y-auto p-5 text-sm">
         <div>
-          <label for="sf-title" class="mb-1 block text-xs font-medium text-ink-muted">Title <span class="text-danger">*</span></label>
+          <label for="sf-title" class="mb-1 block text-xs font-medium text-ink-muted"><span data-i18n="sn.f.title">Title</span> <span class="text-danger">*</span></label>
           <input id="sf-title" class="input" required maxlength="300">
         </div>
         <div class="grid grid-cols-2 gap-2">
           <div>
-            <label for="sf-category" class="mb-1 block text-xs font-medium text-ink-muted">Language / Tool</label>
-            <input id="sf-category" class="input uppercase" placeholder="BASH" maxlength="64">
+            <label for="sf-category" class="mb-1 block text-xs font-medium text-ink-muted" data-i18n="sn.f.category">Language / Tool</label>
+            <input id="sf-category" class="input uppercase" data-i18n-attr="placeholder:sn.f.categoryPlaceholder" maxlength="64">
           </div>
           <div>
-            <label for="sf-tags" class="mb-1 block text-xs font-medium text-ink-muted">Tags (comma-separated)</label>
-            <input id="sf-tags" class="input" placeholder="ssh, remote">
+            <label for="sf-tags" class="mb-1 block text-xs font-medium text-ink-muted" data-i18n="sn.f.tags">Tags (comma-separated)</label>
+            <input id="sf-tags" class="input" data-i18n-attr="placeholder:sn.f.tagsPlaceholder">
           </div>
         </div>
         <div>
-          <label for="sf-body" class="mb-1 block text-xs font-medium text-ink-muted">Command <span class="text-danger">*</span></label>
+          <label for="sf-body" class="mb-1 block text-xs font-medium text-ink-muted"><span data-i18n="sn.f.body">Command</span> <span class="text-danger">*</span></label>
           <textarea id="sf-body" class="input min-h-[140px] resize-y font-mono text-xs" required
-            placeholder="curl -v {{URL Link}}"></textarea>
-          <p class="mt-1 text-xs text-ink-muted">Double-brace variables like <code>{{File Name}}</code> become directly editable placeholders on the card.</p>
+            data-i18n-attr="placeholder:sn.f.bodyPlaceholder"></textarea>
+          <p class="mt-1 text-xs text-ink-muted"><span data-i18n="common.varsHintPre">Double-brace variables like </span><code data-i18n="sn.f.varSample">{{File Name}}</code><span data-i18n="common.varsHintPost"> become directly editable placeholders on the card.</span></p>
         </div>
         <div>
           <label for="sf-notes" class="mb-1 block text-xs font-medium text-ink-muted">
-            Notes <span class="font-normal opacity-70">· Markdown supported</span>
+            <span data-i18n="sn.f.notes">Notes</span> <span class="font-normal opacity-70" data-i18n="common.markdownSupported">· Markdown supported</span>
           </label>
-          <textarea id="sf-notes" class="input min-h-[80px] resize-y" placeholder="Flags, platform differences, gotchas…"></textarea>
+          <textarea id="sf-notes" class="input min-h-[80px] resize-y" data-i18n-attr="placeholder:sn.f.notesPlaceholder"></textarea>
         </div>
         <p id="sf-error" class="hidden text-xs text-danger" role="alert"></p>
       </div>
       <div class="flex justify-end gap-2 border-t border-edge px-5 py-3">
-        <button type="button" class="btn" data-close-dialog>Cancel</button>
-        <button type="submit" class="btn btn-primary">Save Snippet</button>
+        <button type="button" class="btn" data-close-dialog data-i18n="common.cancel">Cancel</button>
+        <button type="submit" class="btn btn-primary" data-i18n="sn.f.save">Save Snippet</button>
       </div>
     </form>
   </dialog>
 
   <!-- Mobile sidebar drawer -->
-  <dialog id="dlg-drawer" aria-label="Entries" class="!m-0 h-dvh !max-h-none w-80 !max-w-[85vw] !rounded-none border-0 border-r border-edge">
+  <dialog id="dlg-drawer" data-i18n-attr="aria-label:lb.drawer" class="!m-0 h-dvh !max-h-none w-80 !max-w-[85vw] !rounded-none border-0 border-r border-edge">
     <div id="drawer-content" class="flex h-full flex-col"></div>
   </dialog>
 
