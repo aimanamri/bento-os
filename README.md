@@ -13,10 +13,16 @@ and reachable from anywhere over Tailscale.
 > guarantees, reachable from anywhere.
 <!-- /variant -->
 
-<!-- Screenshots live in docs/images/ and are shared by both branches — the UI
-     is identical on each. Uncomment as they land:
 ![Bento OS — the LogBook in reading mode](docs/images/hero-logbook.png)
--->
+
+<!-- Screenshots live in docs/images/ and are shared by both branches — the UI
+     is identical on each. -->
+<table>
+<tr>
+<td width="50%"><img src="docs/images/hero-prompt_library.png" alt="Bento OS — the Prompt Library"></td>
+<td width="50%"><img src="docs/images/hero-code_snippet.png" alt="Bento OS — Code Snippets"></td>
+</tr>
+</table>
 
 ---
 
