@@ -5,6 +5,7 @@
 /* global markdownit, DOMPurify, katex, renderMathInElement, mermaid */
 
 import { copyText } from './clipboard.js';
+import { t } from './i18n.js';
 import { announce } from './ui.js';
 import { highlightInto } from './highlight.js';
 
@@ -144,11 +145,13 @@ const LEGACY_ALERT_KINDS = [
 // `[!NOTE]` / `[!TIP]` / `[!IMPORTANT]` / `[!WARNING]` / `[!CAUTION]`
 // becomes a colored, icon-labeled callout — the ribbon inserts this syntax.
 const GFM_ALERT_KINDS = {
-  NOTE: { cls: 'alert-note', icon: 'ℹ️', label: 'Note' },
-  TIP: { cls: 'alert-tip', icon: '💡', label: 'Tip' },
-  IMPORTANT: { cls: 'alert-important', icon: '❗', label: 'Important' },
-  WARNING: { cls: 'alert-warning', icon: '⚠️', label: 'Warning' },
-  CAUTION: { cls: 'alert-caution', icon: '🛑', label: 'Caution' },
+  // The `[!TYPE]` marker in the source is syntax and stays English; the
+  // heading the reader actually sees is looked up when the block is built.
+  NOTE: { cls: 'alert-note', icon: 'ℹ️', key: 'alert.NOTE' },
+  TIP: { cls: 'alert-tip', icon: '💡', key: 'alert.TIP' },
+  IMPORTANT: { cls: 'alert-important', icon: '❗', key: 'alert.IMPORTANT' },
+  WARNING: { cls: 'alert-warning', icon: '⚠️', key: 'alert.WARNING' },
+  CAUTION: { cls: 'alert-caution', icon: '🛑', key: 'alert.CAUTION' },
 };
 const GFM_MARKER_RE = /^\s*\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\n?/;
 
@@ -166,7 +169,7 @@ function transformAlerts(host) {
       if (node) node.nodeValue = node.nodeValue.replace(GFM_MARKER_RE, '');
       const header = document.createElement('div');
       header.className = 'alert-title';
-      header.textContent = `${kind.icon} ${kind.label}`;
+      header.textContent = `${kind.icon} ${t(kind.key)}`;
       bq.insertBefore(header, bq.firstChild);
       continue;
     }
@@ -647,7 +650,7 @@ export async function renderMarkdown(source) {
       collapseForeignObjectLabels(wrap);
       pre.replaceWith(wrap);
     } catch (e) {
-      pre.replaceWith(errorChip('Mermaid error', src, e && e.message));
+      pre.replaceWith(errorChip(t('render.mermaidError'), src, e && e.message));
     } finally {
       // strict mode can leave a temp error element in the body — suppress it
       document.getElementById('d' + id)?.remove();
@@ -691,8 +694,8 @@ async function copyCodeBlock(btn, code) {
 
   btn.classList.add('is-copied');
   btn.innerHTML = ICON_DONE;
-  btn.setAttribute('aria-label', 'Code copied');
-  announce('Code copied');
+  btn.setAttribute('aria-label', t('render.codeCopied'));
+  announce(t('render.codeCopied'));
   clearTimeout(Number(btn.dataset.resetTimer));
   btn.dataset.resetTimer = String(setTimeout(() => {
     btn.classList.remove('is-copied');
@@ -716,7 +719,7 @@ function addCopyButtons(root) {
   for (const code of root.querySelectorAll('pre > code')) {
     const pre = code.parentElement;
     const lang = [...code.classList].find((c) => c.startsWith('language-'))?.slice(9);
-    const label = lang ? `Copy ${lang} code` : 'Copy code';
+    const label = lang ? t('render.copyLangCode', { lang }) : t('render.copyCode');
 
     const wrap = document.createElement('div');
     wrap.className = 'code-block';

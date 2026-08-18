@@ -2,6 +2,7 @@
 // Code Snippets tabs (EDGE-CASES §5 grammar).
 
 import { highlightInto } from './highlight.js';
+import { t } from './i18n.js';
 
 // Single scan, non-greedy, no nesting: {{ Name }} — §5 grammar.
 const VAR_RE = /\{\{\s*([^{}]+?)\s*\}\}/g;
@@ -76,7 +77,7 @@ export function buildEditableBody(container, body, values, language = null) {
     span.contentEditable = 'true';
     span.spellcheck = false;
     span.setAttribute('role', 'textbox');
-    span.setAttribute('aria-label', `Value for ${name}`);
+    span.setAttribute('aria-label', t('vars.valueFor', { name }));
     span.setAttribute('aria-multiline', 'false');
     span.dataset.varName = name;
     span.textContent = stored && stored.trim() ? stored : placeholder;

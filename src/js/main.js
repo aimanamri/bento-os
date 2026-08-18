@@ -6,6 +6,7 @@ import { emit, on } from './bus.js';
 import { toast, announce } from './ui.js';
 import { initAuth } from './auth.js';
 import { initTheme } from './theme.js';
+import { initI18n, t } from './i18n.js';
 import { initLogbook } from './logbook.js';
 import { initPrompts } from './prompts.js';
 import { initSnippets } from './snippets.js';
@@ -13,10 +14,12 @@ import { initFaceCard } from './face-card.js';
 import { initPwa } from './pwa.js';
 
 const frame = document.getElementById('frame');
+// `name` is a getter, not a string: the dock pill and every announcement read
+// it long after boot, and the display language can have changed since.
 const TOOLS = {
-  logbook: { tab: document.getElementById('tab-logbook'), view: document.getElementById('view-logbook'), name: 'Docs LogBook' },
-  prompts: { tab: document.getElementById('tab-prompts'), view: document.getElementById('view-prompts'), name: 'Prompt Library' },
-  snippets: { tab: document.getElementById('tab-snippets'), view: document.getElementById('view-snippets'), name: 'Code Snippets' },
+  logbook: { tab: document.getElementById('tab-logbook'), view: document.getElementById('view-logbook'), get name() { return t('nav.tab.logbook'); } },
+  prompts: { tab: document.getElementById('tab-prompts'), view: document.getElementById('view-prompts'), get name() { return t('nav.tab.prompts'); } },
+  snippets: { tab: document.getElementById('tab-snippets'), view: document.getElementById('view-snippets'), get name() { return t('nav.tab.snippets'); } },
 };
 
 /* ── tabs (roving tablist; tabs hide, never unmount — §1.4) ─── */
@@ -135,8 +138,11 @@ function minimizeToDock(id) {
   const pill = document.createElement('button');
   pill.className = 'dock-pill';
   pill.dataset.tool = id;
-  pill.textContent = tool.name;
-  pill.setAttribute('aria-label', `Restore ${tool.name}`);
+  const label = document.createElement('span');
+  label.dataset.i18n = `nav.tab.${id}`; // relabelled in place on a language switch
+  label.textContent = tool.name;
+  pill.appendChild(label);
+  pill.setAttribute('aria-label', t('main.restore', { name: tool.name }));
   const dot = document.createElement('span');
   dot.className = 'ml-1 hidden h-1.5 w-1.5 rounded-full bg-warn-hue';
   dot.dataset.dirtyDot = id;
@@ -145,18 +151,21 @@ function minimizeToDock(id) {
     restoreFromDock(id);
     activateTab(id);
   });
+  on('locale:changed', () => {
+    if (pill.isConnected) pill.setAttribute('aria-label', t('main.restore', { name: tool.name }));
+  });
   dock.appendChild(pill);
 
   // Land somewhere sensible: the other tool if it's open (macOS metaphor)
   const other = Object.keys(TOOLS).find((k) => k !== id && !minimized.has(k));
   if (other) activateTab(other);
-  announce(`${tool.name} minimized to dock`);
+  announce(t('main.minimized', { name: tool.name }));
 }
 
 function restoreFromDock(id) {
   minimized.delete(id);
   dock.querySelector(`[data-tool="${id}"]`)?.remove();
-  announce(`${TOOLS[id].name} restored`);
+  announce(t('main.restored', { name: TOOLS[id].name }));
 }
 
 function initTrafficLights() {
@@ -169,7 +178,7 @@ function initTrafficLights() {
     const onNow = frame.dataset.focusmode !== 'true';
     frame.dataset.focusmode = String(onNow);
     yellow.setAttribute('aria-pressed', String(onNow));
-    announce(onNow ? 'Focus mode on' : 'Focus mode off');
+    announce(onNow ? t('main.focusOn') : t('main.focusOff'));
   };
   yellow.addEventListener('click', toggleFocus);
   document.addEventListener('keydown', (e) => {
@@ -186,14 +195,14 @@ function initTrafficLights() {
       if (document.fullscreenElement) await document.exitFullscreen();
       else await document.documentElement.requestFullscreen();
     } catch (e) {
-      toast('Fullscreen is not supported here');
+      toast(t('main.noFullscreen'));
     }
   });
   document.addEventListener('fullscreenchange', () => {
     green.setAttribute('aria-pressed', String(!!document.fullscreenElement));
   });
   if (!document.documentElement.requestFullscreen) {
-    green.addEventListener('click', () => toast('Fullscreen is not supported here'), { once: false });
+    green.addEventListener('click', () => toast(t('main.noFullscreen')), { once: false });
   }
 }
 
@@ -226,7 +235,7 @@ async function healthCheck() {
     const known = localStorage.getItem('bento.schema');
     if (known && Number(known) !== schema) {
       localStorage.setItem('bento.schema', String(schema));
-      toast('Bento OS was updated — reloading', 'info', 2000);
+      toast(t('main.updated'), 'info', 2000);
       setTimeout(() => location.reload(), 1500);
       return;
     }
@@ -237,6 +246,10 @@ async function healthCheck() {
 }
 
 /* ── boot ───────────────────────────────────────────────────── */
+
+// First, before anything renders: the lock screen is the first thing a visitor
+// sees, and it should already be in their language rather than flipping.
+initI18n();
 
 initTheme(); // wires both toggles: the title bar's and the lock screen's
 

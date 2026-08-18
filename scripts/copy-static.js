@@ -17,6 +17,10 @@ fs.copyFileSync(path.join(src, 'index.html'), path.join(dist, 'index.html'));
 // PWA: the manifest and the apple-touch icon are referenced from the document
 // head, so they have to sit at the paths index.html names.
 fs.copyFileSync(path.join(src, 'manifest.webmanifest'), path.join(dist, 'manifest.webmanifest'));
+// One manifest per language: the install prompt, the launcher name and the
+// long-press shortcuts are OS chrome, fixed at install time, so they cannot
+// follow the in-app toggle. i18n.js repoints <link rel="manifest"> instead.
+fs.copyFileSync(path.join(src, 'manifest.ja.webmanifest'), path.join(dist, 'manifest.ja.webmanifest'));
 
 // Icons and any other authored asset. Merges into dist/assets alongside the
 // Tailwind output (build:css runs first and writes app.css there).

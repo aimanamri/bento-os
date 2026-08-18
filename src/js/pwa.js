@@ -5,6 +5,7 @@
 // full app — offline support is an enhancement, never a boot dependency.
 
 import { toast } from './ui.js';
+import { t } from './i18n.js';
 
 const SW_URL = '/sw.js';
 
@@ -36,7 +37,7 @@ function wireInstallPrompt() {
   window.addEventListener('appinstalled', () => {
     deferredPrompt = null;
     item.classList.add('hidden');
-    toast('Bento OS installed — it now opens in its own window', 'ok');
+    toast(t('pwa.installed'), 'ok');
   });
 }
 
@@ -51,7 +52,7 @@ async function register() {
         // `controller` is null on the very first install — that one is not an
         // update and needs no announcement.
         if (incoming.state === 'installed' && navigator.serviceWorker.controller) {
-          toast('Update ready — it applies next time you open Bento OS', 'info', 6000);
+          toast(t('pwa.updateReady'), 'info', 6000);
         }
       });
     });

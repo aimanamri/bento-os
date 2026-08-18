@@ -9,6 +9,8 @@ import { api, ApiError, setAuthErrorHandler } from './api.js';
 import { toast, confirmModal, announce } from './ui.js';
 import { initFaceCard } from './face-card.js';
 import { initTour } from './tour.js';
+import { t, localeTag } from './i18n.js';
+import { on } from './bus.js';
 
 const PASSWORD_MIN = 8;
 const DEFAULT_PASSWORD = 'bentoos';
@@ -47,8 +49,8 @@ function flinch() {
 
 let clockTimer = null;
 
-// Follows the device: local time, and the device's own 12/24-hour and date
-// format (no locale is passed).
+// Follows the device: local time, and the display language's own 12/24-hour
+// and date format.
 function startClock() {
   const time = document.getElementById('auth-clock-time');
   const date = document.getElementById('auth-clock-date');
@@ -56,8 +58,8 @@ function startClock() {
 
   const tick = () => {
     const now = new Date();
-    time.textContent = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-    date.textContent = now.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' });
+    time.textContent = now.toLocaleTimeString(localeTag(), { hour: 'numeric', minute: '2-digit' });
+    date.textContent = now.toLocaleDateString(localeTag(), { weekday: 'long', day: 'numeric', month: 'long' });
   };
   // Wake on the minute boundary rather than polling every second.
   const schedule = () => {
@@ -99,7 +101,7 @@ function showAuthScreen(view, { forced = false } = {}) {
   cpForm.classList.toggle('flex', !isLogin);
   // The change-password view shares this sheet, so it gets the same greeter —
   // it just isn't a greeting at that point.
-  authSub.textContent = isLogin ? 'Sign in to your workspace' : 'One more step';
+  authSub.textContent = t(isLogin ? 'auth.signInSub' : 'auth.oneMoreStep');
   greeter?.release();
   startClock();
   location.hash = isLogin ? '#/login' : '#/change-password';
@@ -132,7 +134,8 @@ function renderNavbar() {
   const u = state.user;
   document.getElementById('nav-username').textContent = u.username;
   const badge = document.getElementById('nav-role-badge');
-  badge.textContent = u.role === 'global_admin' ? 'global admin' : u.role === 'admin' ? 'admin' : '';
+  badge.textContent =
+    u.role === 'global_admin' ? t('admin.role.global_admin') : u.role === 'admin' ? t('admin.role.admin') : '';
   badge.classList.toggle('hidden', u.role === 'user');
   document.getElementById('menu-admin').classList.toggle('hidden', u.role === 'user');
   document.getElementById('menu-delete').classList.toggle('hidden', u.role === 'global_admin');
@@ -151,12 +154,12 @@ async function finishLogin(user) {
   // workspace takes over. A restored session has no lock screen to hold.
   if (lockVisible()) {
     greeter?.setState('ok');
-    authSub.textContent = `Welcome back, ${user.username}`;
+    authSub.textContent = t('auth.welcomeBack', { name: user.username });
     await new Promise((resolve) => setTimeout(resolve, SUCCESS_HOLD_MS));
   }
   renderNavbar();
   showApp();
-  announce(`Signed in as ${user.username}`);
+  announce(t('auth.signedInAs', { name: user.username }));
   resolveReady?.();
 }
 
@@ -170,8 +173,8 @@ function wireLoginForm() {
 
   modeToggle.addEventListener('click', () => {
     signupMode = !signupMode;
-    submitBtn.textContent = signupMode ? 'Create account' : 'Sign in';
-    modeToggle.textContent = signupMode ? 'I already have an account' : 'Create an account';
+    submitBtn.textContent = t(signupMode ? 'auth.createAccountSubmit' : 'auth.signIn');
+    modeToggle.textContent = t(signupMode ? 'auth.haveAccount' : 'auth.createAccountLink');
     setError(loginError, '');
   });
 
@@ -180,10 +183,10 @@ function wireLoginForm() {
     setError(loginError, '');
     const username = document.getElementById('auth-username').value.trim();
     const password = document.getElementById('auth-password').value;
-    if (!username) return rejectAuth(loginError, 'User ID is required');
-    if (!password) return rejectAuth(loginError, 'Password is required');
+    if (!username) return rejectAuth(loginError, t('auth.err.usernameRequired'));
+    if (!password) return rejectAuth(loginError, t('auth.err.passwordRequired'));
     if (signupMode && password.length < PASSWORD_MIN) {
-      return rejectAuth(loginError, `Password needs at least ${PASSWORD_MIN} characters`);
+      return rejectAuth(loginError, t('auth.err.shortPassword', { n: PASSWORD_MIN }));
     }
 
     submitBtn.disabled = true;
@@ -193,7 +196,7 @@ function wireLoginForm() {
       loginForm.reset();
       await finishLogin(user);
     } catch (err) {
-      rejectAuth(loginError, err instanceof ApiError ? err.message : 'Sign-in failed');
+      rejectAuth(loginError, err instanceof ApiError ? err.message : t('auth.err.failed'));
     } finally {
       submitBtn.disabled = false;
     }
@@ -217,10 +220,10 @@ function wireChangePasswordForm() {
     const next = document.getElementById('cp-new').value;
     const confirm = document.getElementById('cp-confirm').value;
 
-    if (next === DEFAULT_PASSWORD) return rejectAuth(cpError, 'The default password cannot be reused');
-    if (next.length < PASSWORD_MIN) return rejectAuth(cpError, `Password needs at least ${PASSWORD_MIN} characters`);
-    if (next !== confirm) return rejectAuth(cpError, 'Passwords do not match');
-    if (!cpForced && !current) return rejectAuth(cpError, 'Enter your current password');
+    if (next === DEFAULT_PASSWORD) return rejectAuth(cpError, t('auth.err.defaultReuse'));
+    if (next.length < PASSWORD_MIN) return rejectAuth(cpError, t('auth.err.shortPassword', { n: PASSWORD_MIN }));
+    if (next !== confirm) return rejectAuth(cpError, t('auth.err.mismatch'));
+    if (!cpForced && !current) return rejectAuth(cpError, t('auth.err.currentPasswordRequired'));
 
     const btn = document.getElementById('cp-submit');
     btn.disabled = true;
@@ -228,10 +231,10 @@ function wireChangePasswordForm() {
       const body = cpForced ? { new_password: next } : { new_password: next, current_password: current };
       const { user } = await api('/api/auth/change-password', { method: 'POST', body });
       cpForm.reset();
-      toast('Password updated', 'info');
+      toast(t('auth.toast.pwUpdated'), 'info');
       await finishLogin(user);
     } catch (err) {
-      rejectAuth(cpError, err instanceof ApiError ? err.message : 'Could not change password');
+      rejectAuth(cpError, err instanceof ApiError ? err.message : t('auth.err.changePasswordFailed'));
     } finally {
       btn.disabled = false;
     }
@@ -276,19 +279,19 @@ function wireUserMenu() {
   document.getElementById('menu-delete').addEventListener('click', async () => {
     closeMenu();
     const choice = await confirmModal({
-      title: 'Delete your account?',
-      body: 'This permanently erases your account, every LogBook entry and every prompt. There is no undo (GDPR/PDPA hard delete).',
+      title: t('auth.delete.title'),
+      body: t('auth.delete.bodyLocal'),
       actions: [
-        { label: 'Cancel', value: 'cancel' },
-        { label: 'Delete everything', value: 'delete', style: 'danger' },
+        { label: t('common.cancel'), value: 'cancel' },
+        { label: t('auth.delete.confirm'), value: 'delete', style: 'danger' },
       ],
     });
     if (choice !== 'delete') return;
     try {
       await api('/api/users/me', { method: 'DELETE' });
-      toast('Account deleted');
+      toast(t('auth.delete.done'));
     } catch (err) {
-      return toast('Account deletion failed', 'err');
+      return toast(t('auth.delete.failedLocal'), 'err');
     }
     location.reload();
   });
@@ -303,9 +306,11 @@ function wireUserMenu() {
 // enough that scanning it is work; below this a flat list reads faster.
 const GROUP_AT = 8;
 
-const ROLE_LABEL = { global_admin: 'global admin', admin: 'admin', user: 'user' };
+// Role keys are the database's, not the reader's — the display strings hang
+// off them so a language switch redraws the list without touching the model.
+const ROLE_LABEL = (role) => t(`admin.role.${role}`);
 const ROLE_ORDER = ['global_admin', 'admin', 'user'];
-const ROLE_SECTION = { global_admin: 'Global admin', admin: 'Admins', user: 'Users' };
+const ROLE_SECTION = (role) => t(`admin.section.${role}`);
 
 const adminState = { users: [], filter: '', openId: null };
 
@@ -321,13 +326,13 @@ async function openAdminPanel() {
 
 async function loadAdminUsers() {
   const list = document.getElementById('admin-user-list');
-  list.textContent = 'Loading…';
+  list.textContent = t('admin.loading');
 
   try {
     // created_at is a UNIX-ms integer here, which new Date() takes directly.
     ({ users: adminState.users } = await api('/api/users'));
   } catch {
-    list.textContent = 'Could not load users.';
+    list.textContent = t('admin.loadFailed');
     return;
   }
   renderAdminList();
@@ -343,7 +348,7 @@ function joinedLabel(value) {
   if (!value) return '';
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
+  return d.toLocaleDateString(localeTag(), { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 /**
@@ -360,34 +365,34 @@ function actionsFor(u) {
   // Any admin, but only on normal users, and never on themselves.
   if (u.role === 'user' && !isSelf) {
     actions.push({
-      label: 'Reset password',
-      button: 'Reset',
-      description: `Sets their password back to the default and forces a change at their next sign-in.`,
+      label: t('admin.action.reset.label'),
+      button: t('admin.action.reset.button'),
+      description: t('admin.action.reset.desc'),
       run: (btn) => resetPassword(u, btn),
     });
   }
   if (isGlobalAdmin && u.role === 'user') {
     actions.push({
-      label: 'Make admin',
-      button: 'Promote',
-      description: 'Lets them create users and reset passwords. They still cannot read anyone else\'s notes.',
+      label: t('admin.action.promote.label'),
+      button: t('admin.action.promote.button'),
+      description: t('admin.action.promote.desc'),
       run: (btn) => changeRole(u, 'promote', btn),
     });
   }
   if (isGlobalAdmin && u.role === 'admin') {
     actions.push({
-      label: 'Remove admin',
-      button: 'Demote',
-      description: 'Returns them to a normal user. Their own entries and prompts are untouched.',
+      label: t('admin.action.demote.label'),
+      button: t('admin.action.demote.button'),
+      description: t('admin.action.demote.desc'),
       run: (btn) => changeRole(u, 'demote', btn),
     });
   }
   if (isGlobalAdmin && u.role !== 'global_admin' && !isSelf) {
     actions.push({
       danger: true,
-      label: 'Delete account',
-      button: 'Delete…',
-      description: 'Erases the account and every entry, prompt and snippet they own. This cannot be undone.',
+      label: t('admin.action.delete.label'),
+      button: t('admin.action.delete.button'),
+      description: t('admin.action.delete.desc'),
       run: () => deleteUser(u),
     });
   }
@@ -401,12 +406,12 @@ function renderAdminList() {
 
   const visible = visibleAdminUsers();
   const total = adminState.users.length;
-  count.textContent = total ? `${total} ${total === 1 ? 'person' : 'people'}` : '';
+  count.textContent = total ? t('admin.count', { n: total }) : '';
 
   if (visible.length === 0) {
     const empty = document.createElement('p');
     empty.className = 'py-6 text-center text-sm text-ink-muted';
-    empty.textContent = total === 0 ? 'No users yet.' : `Nothing matches “${adminState.filter.trim()}”.`;
+    empty.textContent = total === 0 ? t('admin.noUsers') : t('common.noMatchQuery', { q: adminState.filter.trim() });
     list.appendChild(empty);
     return;
   }
@@ -423,7 +428,7 @@ function renderAdminList() {
 
     const heading = document.createElement('div');
     heading.className = 'flex items-center gap-2 pt-1 text-[11px] uppercase tracking-wider text-ink-muted';
-    heading.append(ROLE_SECTION[role]);
+    heading.append(ROLE_SECTION(role));
     const badge = document.createElement('span');
     badge.className = 'rounded-full border border-edge px-1.5';
     badge.textContent = String(members.length);
@@ -444,7 +449,7 @@ function rolePill(role) {
     : role === 'admin' ? 'border-accent/55 text-accent'
     : 'border-edge text-ink-muted';
   pill.className = `rounded-full border px-2 py-0.5 text-[11px] ${tone}`;
-  pill.textContent = ROLE_LABEL[role] || role;
+  pill.textContent = ROLE_LABEL(role) || role;
   return pill;
 }
 
@@ -486,18 +491,18 @@ function renderAdminRow(u) {
   if (u.id === state.user.id) {
     const you = document.createElement('span');
     you.className = 'rounded-full border border-ok-hue/50 px-2 py-0.5 text-[11px] text-ok-hue';
-    you.textContent = 'you';
+    you.textContent = t('admin.you');
     // Half the actions are withheld on your own row; say so rather than
     // leaving an admin to wonder why it does nothing.
-    you.title = 'You cannot change your own role or delete your own account here';
+    you.title = t('admin.youTitle');
     head.appendChild(you);
   }
 
   if (u.requires_password_change) {
     const flag = document.createElement('span');
     flag.className = 'rounded-full border border-warn-hue/55 px-2 py-0.5 text-[11px] text-warn-hue';
-    flag.title = 'Must change password at next sign-in';
-    flag.textContent = 'reset pending';
+    flag.title = t('admin.resetPendingTitle');
+    flag.textContent = t('admin.resetPending');
     head.appendChild(flag);
   }
 
@@ -505,7 +510,7 @@ function renderAdminRow(u) {
   if (joined) {
     const when = document.createElement('span');
     when.className = 'whitespace-nowrap text-[11px] tabular-nums text-ink-muted';
-    when.title = 'Account created';
+    when.title = t('admin.accountCreated');
     when.textContent = joined;
     head.appendChild(when);
   }
@@ -565,22 +570,22 @@ async function changeRole(u, direction, btn) {
     await api(`/api/users/${u.id}/${promote ? 'promote' : 'demote'}`, { method: 'POST' });
   } catch (err) {
     btn.disabled = false;
-    const fallback = promote ? 'Promotion failed' : 'Demotion failed';
+    const fallback = t(promote ? 'admin.promoteFailed' : 'admin.demoteFailed');
     return toast(err instanceof ApiError ? err.message : fallback, 'err');
   }
   u.role = promote ? 'admin' : 'user';
   // The permitted actions change with the role, so re-render rather than patch.
   renderAdminList();
-  toast(promote ? `${u.username} is now an admin` : `${u.username} is a normal user again`);
+  toast(t(promote ? 'admin.nowAdmin' : 'admin.nowUser', { name: u.username }));
 }
 
 async function resetPassword(user, btn) {
   const choice = await confirmModal({
-    title: `Reset ${user.username}'s password?`,
-    body: `Their password returns to the default ("${DEFAULT_PASSWORD}") and they must choose a new one at next login.`,
+    title: t('admin.reset.title', { name: user.username }),
+    body: t('admin.reset.body', { pw: DEFAULT_PASSWORD }),
     actions: [
-      { label: 'Cancel', value: 'cancel' },
-      { label: 'Reset password', value: 'reset', style: 'primary' },
+      { label: t('common.cancel'), value: 'cancel' },
+      { label: t('admin.reset.confirm'), value: 'reset', style: 'primary' },
     ],
   });
   if (choice !== 'reset') return;
@@ -589,32 +594,32 @@ async function resetPassword(user, btn) {
     await api(`/api/users/${user.id}/reset-password`, { method: 'POST' });
   } catch (err) {
     btn.disabled = false;
-    return toast(err instanceof ApiError ? err.message : 'Reset failed', 'err');
+    return toast(err instanceof ApiError ? err.message : t('admin.reset.failedLocal'), 'err');
   }
   user.requires_password_change = true;
   renderAdminList();
-  toast(`${user.username}'s password was reset to the default`);
+  toast(t('admin.reset.done', { name: user.username }));
 }
 
 async function deleteUser(user) {
   const choice = await confirmModal({
-    title: `Delete ${user.username}?`,
-    body: 'This permanently erases their account and every LogBook entry, prompt and snippet they own. There is no undo.',
+    title: t('admin.delete.title', { name: user.username }),
+    body: t('admin.delete.body'),
     actions: [
-      { label: 'Cancel', value: 'cancel' },
-      { label: 'Delete everything', value: 'delete', style: 'danger' },
+      { label: t('common.cancel'), value: 'cancel' },
+      { label: t('admin.delete.confirm'), value: 'delete', style: 'danger' },
     ],
   });
   if (choice !== 'delete') return;
   try {
     await api(`/api/users/${user.id}`, { method: 'DELETE' });
   } catch (err) {
-    return toast(err instanceof ApiError ? err.message : 'Deletion failed', 'err');
+    return toast(err instanceof ApiError ? err.message : t('admin.delete.failedLocal'), 'err');
   }
   adminState.users = adminState.users.filter((u) => u.id !== user.id);
   if (adminState.openId === user.id) adminState.openId = null;
   renderAdminList();
-  toast(`${user.username} was deleted`);
+  toast(t('admin.delete.done', { name: user.username }));
 }
 
 async function createUser(username) {
@@ -632,11 +637,11 @@ async function createUser(username) {
     adminState.users.push(created);
     adminState.users.sort((a, b) => a.username.localeCompare(b.username));
     renderAdminList();
-    toast(`${created.username} created — default password is "${DEFAULT_PASSWORD}"`);
+    toast(t('admin.create.done', { name: created.username, pw: DEFAULT_PASSWORD }));
   } catch (err) {
     const message = err instanceof ApiError && err.code === 'USERNAME_TAKEN'
-      ? 'That User ID is taken'
-      : (err.message || 'Account creation failed');
+      ? t('auth.err.taken')
+      : (err.message || t('admin.create.failed'));
     toast(message, 'err');
   }
 }
@@ -675,7 +680,7 @@ function wireAdminPanel() {
     const input = document.getElementById('admin-create-username');
     const username = input.value.trim().toLowerCase();
     if (!USERNAME_RE.test(username)) {
-      return toast('User ID: 2–32 letters, digits, dot, dash or underscore', 'err');
+      return toast(t('auth.err.badUsername'), 'err');
     }
     const btn = e.target.querySelector('button[type="submit"]');
     btn.disabled = true;
@@ -716,6 +721,12 @@ export async function initAuth() {
     // but call it explicitly in case the request failed some other way.
     showAuthScreen('login');
   }
+
+  // Drawn from JS, so out of the DOM walker's reach.
+  on('locale:changed', () => {
+    if (state.user) renderNavbar();
+    if (document.getElementById('dlg-admin').open) renderAdminList();
+  });
 
   await ready;
   return state;

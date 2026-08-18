@@ -48,6 +48,44 @@
     overscroll-behavior: none;
   }
 
+  /* ── Japanese ──────────────────────────────────────────────
+     The system stack above ends at `sans-serif`, which on a Japanese macOS or
+     Windows resolves to something usable but arbitrary. Naming the local UI
+     faces first keeps the app looking like the OS it runs on, and ships no
+     webfont — a CJK face is megabytes, and the CSP forbids a CDN anyway.
+
+     The rest is what Japanese text needs and Latin text does not: more room
+     between lines, because kanji fill their em box and set much denser than
+     Latin at the same size; `line-break: strict` and `word-break: normal`, so
+     the browser breaks on real kinsoku rules rather than mid-word; and no
+     synthetic italics, which Japanese typography does not use and which
+     simply skew the glyphs into something ugly. */
+  :lang(ja) {
+    font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Kaku Gothic ProN',
+      'Hiragino Sans', 'Yu Gothic UI', 'Yu Gothic', 'Noto Sans JP',
+      'Meiryo', sans-serif;
+    line-height: 1.8;
+    line-break: strict;
+    word-break: normal;
+    overflow-wrap: anywhere;
+    font-feature-settings: 'palt' 1; /* proportional kana — tightens the gaps */
+  }
+
+  /* Code keeps the mono stack and its own metrics: a command is a command. */
+  :lang(ja) code,
+  :lang(ja) pre,
+  :lang(ja) .font-mono {
+    font-feature-settings: normal;
+    line-height: 1.6;
+  }
+
+  /* Japanese has no italic tradition; browsers fake one by slanting. */
+  :lang(ja) em,
+  :lang(ja) i {
+    font-style: normal;
+    font-weight: 600;
+  }
+
   /* Visible focus everywhere; never outline:none without replacement */
   :focus-visible {
     outline: 2px solid rgb(var(--c-accent));
@@ -608,11 +646,17 @@
 .auth-link:hover { @apply decoration-accent; }
 
 /* Sits above the grid layer, clear of the clock and the sheet below it. */
-#auth-theme-toggle {
+/* The lock screen carries its own theme and language controls, since the title
+   bar that normally holds them is hidden until sign-in. They share one pinned
+   cluster so the language menu drops from the button rather than the corner. */
+#auth-controls {
   position: absolute;
   top: max(0.75rem, env(safe-area-inset-top));
   right: max(0.75rem, env(safe-area-inset-right));
   z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
 }
 
 #auth-dock { padding-bottom: max(0.5rem, env(safe-area-inset-bottom)); }
