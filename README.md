@@ -1,8 +1,16 @@
 # Bento OS 🍱
 
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![Node](https://img.shields.io/badge/node-22-339933?logo=node.js&logoColor=white)](Dockerfile)
+[![Languages](https://img.shields.io/badge/languages-English%20%7C%20日本語-informational)](#-display-language)
+[![GitHub stars](https://img.shields.io/github/stars/aimanamri/bento-os)](https://github.com/aimanamri/bento-os/stargazers)
+[![Last commit](https://img.shields.io/github/last-commit/aimanamri/bento-os)](https://github.com/aimanamri/bento-os/commits)
+[![Repo size](https://img.shields.io/github/repo-size/aimanamri/bento-os)](https://github.com/aimanamri/bento-os)
+
 A personal knowledge base, prompt library and code-snippet vault in one
-macOS-style window. Vanilla JS + Tailwind, no framework, installable as an app
-and reachable from anywhere over Tailscale.
+macOS-style window. Vanilla JS + Tailwind, no framework, installable as an app,
+available in **English and 日本語**, and reachable from anywhere over
+Tailscale — or run entirely offline against your own PostgreSQL in Docker.
 
 <!-- variant:supabase -->
 > [!NOTE]
@@ -69,6 +77,18 @@ whether you got the password right. Dark-first, with a light variant and a
 toggle that follows your device until you choose otherwise; everything honours
 `prefers-reduced-motion`.
 
+### 🌐 Display language
+
+**English and 日本語**, switchable live from a globe icon in the title bar (and
+on the lock screen, before you've signed in) — no reload, no lost draft. The
+choice is remembered per device. Japanese gets its own type stack (Hiragino /
+Yu Gothic / Noto Sans JP), proper line-breaking rules, and natural
+です・ます / 体言止め phrasing rather than a literal translation.
+
+Everything is covered: the app chrome, dialogs, toasts, the pre-sign-in tour,
+and the Markdown guide. See **[Adding a language](#adding-a-language)** below
+to add your own.
+
 ---
 
 <!-- variant:supabase -->
@@ -86,8 +106,11 @@ machine trivial.
 
 ## Quick start
 
-**Prerequisites:** Node 20, a Supabase project, and the
-[Supabase CLI](https://supabase.com/docs/guides/cli).
+**Prerequisites:** Node 22+, a Supabase project, and the
+[Supabase CLI](https://supabase.com/docs/guides/cli). Node 22 is a hard floor,
+not a suggestion — `@supabase/supabase-js` needs a native `WebSocket`, and on
+Node 20 `npm run setup:admin` dies with *"Node.js detected but native
+WebSocket not found."*
 
 1. **Create the backend.** Follow
    [docs/SUPABASE-MIGRATION.md](docs/SUPABASE-MIGRATION.md): create the project,
@@ -133,18 +156,32 @@ machine trivial.
 
 ## Running with Docker
 
-The container is **stateless** — no volumes, no database, nothing to migrate
-between machines:
+`docker compose up -d` runs Bento OS **entirely on your own machine** — no
+cloud account, no network egress. PostgreSQL and the whole Supabase API
+surface (GoTrue auth, PostgREST, an Edge Functions runtime, an nginx gateway)
+run as containers next to the app:
 
 ```bash
-docker compose up -d      # → http://127.0.0.1:8481
+git clone https://github.com/aimanamri/bento-os.git && cd bento-os
+docker compose up -d                              # pulls 5 images, builds the app
+docker compose --profile setup run --rm setup-admin   # seeds admin / bentoos
 ```
 
-The production image is non-root, read-only, `cap_drop: ALL`, with a
-healthcheck. Because `supabase-config.js` is compiled into `dist/` at build
-time, pointing a deployment at a different project needs
-`docker compose up -d --build`, not just a restart. Full details in
-[DOCKER.md](DOCKER.md).
+Open **http://localhost:8481** and sign in — you'll be forced to change the
+password before the workspace loads. Postgres itself is reachable straight
+from the host at `127.0.0.1:54322` (`psql`, TablePlus, DBeaver — see
+[DOCKER.md](DOCKER.md) for credentials).
+
+> [!WARNING]
+> Unlike the cloud path above, this stack is **stateful**: your data lives in
+> the `db-data` Docker volume on this machine. `docker compose down` keeps it;
+> `docker compose down -v` deletes it permanently.
+
+This is a separate, self-contained backend — it never touches your Supabase
+Cloud project, `src/js/supabase-config.js` stays untouched, and `git status`
+stays clean while it runs. Same frontend, same schema, same RLS policies, same
+Edge Functions as the cloud path. Full step-by-step, port table, backup/restore
+and troubleshooting in **[DOCKER.md](DOCKER.md)**.
 <!-- /variant -->
 
 ---
@@ -197,6 +234,22 @@ secure contexts (there's a manual-copy fallback otherwise).
 See [docs/DATABASE.md](docs/DATABASE.md) for the ER diagram, RLS matrix and
 full-text-search weights.
 
+## Tech stack
+
+| Layer | What |
+|---|---|
+| **Frontend** | Vanilla JavaScript (ES modules), Tailwind CSS — no framework, no bundler-required dev loop |
+| **Rendering** | markdown-it → KaTeX (math) → Mermaid (diagrams) → Prism (syntax highlighting) → DOMPurify (sanitize), one choke point in [render.js](src/js/render.js) |
+| **i18n** | Hand-rolled catalogue system ([i18n.js](src/js/i18n.js)) — English + 日本語 today, `localStorage`-backed, no reload to switch |
+| **Backend (cloud)** | [Supabase](https://supabase.com) — PostgreSQL, Auth (GoTrue), PostgREST, Edge Functions, Row-Level Security |
+| **Backend (self-hosted)** | The same stack, Dockerized: `supabase/postgres`, `supabase/gotrue`, `postgrest/postgrest`, `supabase/edge-runtime`, fronted by nginx |
+| **Backend (offline dev)** | SQLite (WAL mode) + Express, on the [`dev-local-auth`](../../tree/dev-local-auth) branch |
+| **Server** | Express — serves `dist/` and sets CSP headers; **no data layer** of its own against Supabase |
+| **Build** | esbuild (bundling), Tailwind CLI, `javascript-obfuscator` (string-table obfuscation, not a security control) |
+| **PWA** | A manifest per language + a service worker precaching the app shell for offline launch |
+| **Container** | Docker / Docker Compose — non-root, read-only, `cap_drop: ALL`, with healthchecks |
+| **Runtime** | Node **22+** (a hard floor — `@supabase/supabase-js` needs a native `WebSocket`) |
+
 ## Repository layout
 
 ```
@@ -206,6 +259,8 @@ src/             Frontend source
   index.html       The whole window: lock screen, tabs, dialogs, ribbon
   css/input.css    Tailwind entry + design tokens
   js/              ES modules — see below
+    locales/         Language catalogues (en.js, ja.js) + language.js.template
+  manifest*.webmanifest   One per language — PWA name, description, shortcuts
   sw.js            Service worker (app-shell precache)
 scripts/         Build helpers, admin bootstrap, SQLite→Supabase migration
 dist/            Build output (generated; served by Express)
@@ -243,23 +298,101 @@ normalised), [logbook.js](src/js/logbook.js), [prompts.js](src/js/prompts.js),
 [snippets.js](src/js/snippets.js), [render.js](src/js/render.js) (the single
 XSS-safe render choke point), [vars.js](src/js/vars.js) (the `{{Variable}}`
 engine), [auth.js](src/js/auth.js) (lock screen, RBAC, admin panel),
-[theme.js](src/js/theme.js), [tour.js](src/js/tour.js), [bus.js](src/js/bus.js).
+[theme.js](src/js/theme.js), [tour.js](src/js/tour.js), [bus.js](src/js/bus.js),
+[i18n.js](src/js/i18n.js) (display language — catalogue lookup, the switcher,
+live locale change) with its catalogues in [src/js/locales/](src/js/locales/).
 
 ---
 
-## Two backends, one frontend
+## Adding a language
 
-| | Branch | Backend |
-|---|---|---|
-| **Default / production** | `main` | Supabase (PostgreSQL + Auth), reached from the browser |
-| **Offline dev / testing** | `dev-local-auth` | Local SQLite (WAL) + Express REST API |
+Every piece of UI text — app chrome, dialogs, toasts, the pre-sign-in tour,
+the Markdown guide — is looked up from a per-language catalogue at
+`src/js/locales/<code>.js`. Adding a language is: copy a template, translate
+every value, register two lines. No other file changes, and nothing needs to
+be built or rebuilt by hand for the change to take effect in a dev server.
 
-Both share the same frontend, RBAC model and GDPR guarantees. The two designs
-are documented side by side in
+1. **Copy the template.**
+
+   ```bash
+   cp src/js/locales/language.js.template src/js/locales/<code>.js
+   ```
+
+   `<code>` is the language's two-letter [ISO 639-1](https://en.wikipedia.org/wiki/List_of_ISO_639_language_codes)
+   code — `fr`, `de`, `ko`, and so on. The template is generated from the
+   English catalogue, so it starts with the same 405 keys, the same section
+   comments, and every value wrapped in a `TR(...)` marker.
+
+2. **Translate every `TR(...)`.** Open the new file and replace the argument
+   of each `TR(...)` with your translation, leaving `TR` and the key itself
+   (`'nav.tab.logbook'`, `'lb.save'`, …) untouched — the app looks phrases up
+   by key, so renaming one breaks that string for your language. A few keys
+   are functions instead of plain strings —
+   `'main.restore': ({ name }) => TR(\`Restore ${name}\`)` — because the
+   English phrase bends around a number or a name; keep the `({ ... }) =>`
+   part and translate inside `TR()`, restructuring the sentence around the
+   variable however your language actually needs to (there's no plural-rule
+   system imposed on you — write the sentence the way it reads).
+
+   Track progress with:
+
+   ```bash
+   grep -c "TR(" src/js/locales/<code>.js   # how many are left untranslated
+   ```
+
+   Nothing breaks if you stop partway — [i18n.js](src/js/i18n.js) falls back
+   to the English string for any key it can't find, so a partial translation
+   ships safely and just shows English for what's missing.
+
+3. **Register it in [i18n.js](src/js/i18n.js).** Two edits, both near the top
+   of the file:
+
+   ```js
+   import fr from './locales/fr.js';
+   const CATALOGS = { en, ja, fr };
+
+   export const LOCALES = [
+     { code: 'en', label: 'English',  short: 'EN', tag: 'en',    manifest: '/manifest.webmanifest' },
+     { code: 'ja', label: '日本語',    short: 'JA', tag: 'ja-JP', manifest: '/manifest.ja.webmanifest' },
+     { code: 'fr', label: 'Français', short: 'FR', tag: 'fr',    manifest: '/manifest.fr.webmanifest' },
+   ];
+   ```
+
+   `label` is the language's **own name for itself** (not its English name) —
+   it's what shows in the switcher menu. `tag` is the BCP-47 tag used for
+   `<html lang>` and every `Intl` date/number format in the app.
+
+4. **Add a PWA manifest.** Copy `src/manifest.ja.webmanifest` to
+   `src/manifest.<code>.webmanifest`, translate `description` and the three
+   `shortcuts` names, set `"lang"` to your code, then register the file in
+   [scripts/copy-static.js](scripts/copy-static.js) next to the existing
+   `manifest.ja.webmanifest` line so the build ships it.
+
+5. **Try it.** `npm run dev`, then use the 🌐 switcher (title bar, or the
+   lock screen before signing in) — no rebuild needed for text changes; the
+   catalogue is read at runtime. If your language needs its own font stack or
+   line-height (CJK scripts especially), add a `:lang(<code>) { … }` block in
+   [src/css/input.css](src/css/input.css) next to the existing `:lang(ja)`
+   one, and `npm run build:css`.
+
+---
+
+## Three ways to run it, one frontend
+
+| | Branch | Backend | Data lives |
+|---|---|---|---|
+| **Cloud / production** | `main` | Supabase Cloud (PostgreSQL + Auth), reached from the browser | Your hosted project |
+| **Self-hosted, Dockerized** | `main` — `docker compose up -d` | PostgreSQL + GoTrue + PostgREST in containers | The `db-data` Docker volume, this machine |
+| **Offline dev / testing** | `dev-local-auth` | Local SQLite (WAL) + Express REST API | `data/bento.db`, this machine |
+
+All three share the same frontend, RBAC model and GDPR guarantees. The cloud
+and local-SQLite designs are documented side by side in
 [IMPLEMENTATION-SUPABASE.md](docs/IMPLEMENTATION-SUPABASE.md) /
 [DATABASE-SUPABASE.md](docs/DATABASE-SUPABASE.md) and
 [IMPLEMENTATION-LOCAL.md](docs/IMPLEMENTATION-LOCAL.md) /
-[DATABASE-LOCAL.md](docs/DATABASE-LOCAL.md).
+[DATABASE-LOCAL.md](docs/DATABASE-LOCAL.md); the self-hosted Docker stack —
+same schema and RLS, PostgreSQL instead of Supabase Cloud — is documented in
+[DOCKER.md](DOCKER.md).
 
 <!-- variant:supabase -->
 ## Documentation map
