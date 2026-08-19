@@ -2,15 +2,16 @@
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![Node](https://img.shields.io/badge/node-22-339933?logo=node.js&logoColor=white)](Dockerfile)
-[![Languages](https://img.shields.io/badge/languages-English%20%7C%20日本語-informational)](#-display-language)
+[![Languages](https://img.shields.io/badge/languages-English%20%7C%20日本語%20%7C%20Bahasa%20Melayu-informational)](#-display-language)
 [![GitHub stars](https://img.shields.io/github/stars/aimanamri/bento-os)](https://github.com/aimanamri/bento-os/stargazers)
 [![Last commit](https://img.shields.io/github/last-commit/aimanamri/bento-os)](https://github.com/aimanamri/bento-os/commits)
 [![Repo size](https://img.shields.io/github/repo-size/aimanamri/bento-os)](https://github.com/aimanamri/bento-os)
 
 A personal knowledge base, prompt library and code-snippet vault in one
 macOS-style window. Vanilla JS + Tailwind, no framework, installable as an app,
-available in **English and 日本語**, and reachable from anywhere over
-Tailscale — or run entirely offline against your own PostgreSQL in Docker.
+available in **English, 日本語 and Bahasa Melayu**, and reachable from anywhere
+over Tailscale — or run entirely offline against your own PostgreSQL in
+Docker.
 
 <!-- variant:supabase -->
 > [!NOTE]
@@ -249,7 +250,7 @@ full-text-search weights.
 |---|---|
 | **Frontend** | Vanilla JavaScript (ES modules), Tailwind CSS — no framework, no bundler-required dev loop |
 | **Rendering** | markdown-it → KaTeX (math) → Mermaid (diagrams) → Prism (syntax highlighting) → DOMPurify (sanitize), one choke point in [render.js](src/js/render.js) |
-| **i18n** | Hand-rolled catalogue system ([i18n.js](src/js/i18n.js)) — English + 日本語 today, `localStorage`-backed, no reload to switch |
+| **i18n** | Hand-rolled catalogue system ([i18n.js](src/js/i18n.js)) — English + 日本語 + Bahasa Melayu today, `localStorage`-backed, no reload to switch |
 | **Backend (cloud)** | [Supabase](https://supabase.com) — PostgreSQL, Auth (GoTrue), PostgREST, Edge Functions, Row-Level Security |
 | **Backend (self-hosted)** | The same stack, Dockerized: `supabase/postgres`, `supabase/gotrue`, `postgrest/postgrest`, `supabase/edge-runtime`, fronted by nginx |
 | **Backend (offline dev)** | SQLite (WAL mode) + Express, on the [`dev-local-auth`](../../tree/dev-local-auth) branch |
