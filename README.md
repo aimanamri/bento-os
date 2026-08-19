@@ -85,11 +85,14 @@ toggle that follows your device until you choose otherwise; everything honours
 
 ### 🌐 Display language
 
-**English and 日本語**, switchable live from a globe icon in the title bar (and
-on the lock screen, before you've signed in) — no reload, no lost draft. The
-choice is remembered per device. Japanese gets its own type stack (Hiragino /
-Yu Gothic / Noto Sans JP), proper line-breaking rules, and natural
-です・ます / 体言止め phrasing rather than a literal translation.
+**English, 日本語 and Bahasa Melayu**, switchable live from a globe icon in the
+title bar (and on the lock screen, before you've signed in) — no reload, no
+lost draft. The choice is remembered per device. Japanese gets its own type
+stack (Hiragino / Yu Gothic / Noto Sans JP), proper line-breaking rules, and
+natural です・ます / 体言止め phrasing rather than a literal translation; Malay
+is written the way a Malaysian product actually talks to its users, keeping
+established tech loanwords (Markdown, prompt, metadata) instead of forcing
+native equivalents.
 
 Everything is covered: the app chrome, dialogs, toasts, the pre-sign-in tour,
 and the Markdown guide. See **[Adding a language](#adding-a-language)** below
@@ -265,7 +268,7 @@ src/             Frontend source
   index.html       The whole window: lock screen, tabs, dialogs, ribbon
   css/input.css    Tailwind entry + design tokens
   js/              ES modules — see below
-    locales/         Language catalogues (en.js, ja.js) + language.js.template
+    locales/         Language catalogues (en.js, ja.js, ms.js) + language.js.template
   manifest*.webmanifest   One per language — PWA name, description, shortcuts
   sw.js            Service worker (app-shell precache)
 scripts/         Build helpers, admin bootstrap, SQLite→Supabase migration

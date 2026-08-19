@@ -14,8 +14,9 @@
 import { emit } from './bus.js';
 import en from './locales/en.js';
 import ja from './locales/ja.js';
+import ms from './locales/ms.js';
 
-const CATALOGS = { en, ja };
+const CATALOGS = { en, ja, ms };
 const FALLBACK = 'en';
 const STORAGE_KEY = 'bento.locale';
 
@@ -23,6 +24,7 @@ const STORAGE_KEY = 'bento.locale';
 export const LOCALES = [
   { code: 'en', label: 'English', short: 'EN', tag: 'en', manifest: '/manifest.webmanifest' },
   { code: 'ja', label: '日本語', short: 'JA', tag: 'ja-JP', manifest: '/manifest.ja.webmanifest' },
+  { code: 'ms', label: 'Bahasa Melayu', short: 'MS', tag: 'ms', manifest: '/manifest.ms.webmanifest' },
 ];
 
 let current = FALLBACK;

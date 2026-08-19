@@ -21,6 +21,7 @@ fs.copyFileSync(path.join(src, 'manifest.webmanifest'), path.join(dist, 'manifes
 // long-press shortcuts are OS chrome, fixed at install time, so they cannot
 // follow the in-app toggle. i18n.js repoints <link rel="manifest"> instead.
 fs.copyFileSync(path.join(src, 'manifest.ja.webmanifest'), path.join(dist, 'manifest.ja.webmanifest'));
+fs.copyFileSync(path.join(src, 'manifest.ms.webmanifest'), path.join(dist, 'manifest.ms.webmanifest'));
 
 // Icons and any other authored asset. Merges into dist/assets alongside the
 // Tailwind output (build:css runs first and writes app.css there).
