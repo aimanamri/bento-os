@@ -27,15 +27,15 @@ export default {
   'app.title': 'Bento OS',
 
   'nav.tools': 'Alat',
-  'nav.tab.logbook': 'Buku Log Dokumen',
-  'nav.tab.logbook.short': 'Buku Log',
-  'nav.tab.prompts': 'Pustaka Prompt',
+  'nav.tab.logbook': 'Docs LogBook',
+  'nav.tab.logbook.short': 'logbook',
+  'nav.tab.prompts': 'Prompt Library',
   'nav.tab.prompts.short': 'Prompt',
-  'nav.tab.snippets': 'Coretan Kod',
-  'nav.tab.snippets.short': 'Coretan',
+  'nav.tab.snippets': 'Code Snippets',
+  'nav.tab.snippets.short': 'Snippets',
   'nav.minimize': 'Kecilkan alat semasa ke dok',
-  'nav.focus': 'Togol mod fokus',
-  'nav.fullscreen': 'Togol skrin penuh',
+  'nav.focus': 'Tukar mod fokus',
+  'nav.fullscreen': 'Tukar skrin penuh',
   'nav.unsaved': 'Perubahan belum disimpan',
   'nav.offline': 'luar talian',
   'nav.hostUnreachable': 'Hos tidak dapat dihubungi',
@@ -49,7 +49,7 @@ export default {
   'menu.delete': 'Padam akaun saya…',
   'menu.signout': 'Log keluar',
 
-  'theme.toggle': 'Togol tema terang atau gelap',
+  'theme.toggle': 'Tukar tema terang atau gelap',
   'lang.toggle': 'Tukar bahasa paparan',
   'lang.label': 'Bahasa',
 
@@ -288,7 +288,7 @@ export default {
   'sn.toast.loadFailed': 'Gagal memuatkan coretan',
 
   /* ── lock screen ───────────────────────────────────────────── */
-  'auth.signInSub': 'Log masuk ke ruang kerja anda',
+  'auth.signInSub': 'Log masuk ke workspace anda',
   'auth.oneMoreStep': 'Satu langkah lagi',
   'auth.welcomeBack': ({ name }) => `Selamat kembali, ${name}`,
   'auth.signedInAs': ({ name }) => `Log masuk sebagai ${name}`,
@@ -306,9 +306,9 @@ export default {
   'auth.backToApp': 'Kembali ke aplikasi',
   'auth.newHere': 'Baharu di sini?',
   'auth.seeWhat': 'Lihat apa yang Bento OS boleh buat',
-  'auth.dock.logbook': 'Tentang Buku Log Dokumen',
-  'auth.dock.prompts': 'Tentang Pustaka Prompt',
-  'auth.dock.snippets': 'Tentang Coretan Kod',
+  'auth.dock.logbook': 'Tentang Docs LogBook',
+  'auth.dock.prompts': 'Tentang Prompt Library',
+  'auth.dock.snippets': 'Tentang Code Snippets',
   'auth.err.badUsername': 'ID Pengguna: 2–32 huruf, angka, titik, sengkang atau garis bawah',
   'auth.err.shortPassword': ({ n }) => `Kata laluan memerlukan sekurang-kurangnya ${n} aksara`,
   'auth.err.defaultReuse': 'Kata laluan lalai tidak boleh diguna semula',
@@ -339,11 +339,11 @@ export default {
   'admin.loadFailed': 'Tidak dapat memuatkan pengguna.',
   'admin.count': ({ n }) => `${n} orang`,
   'admin.noUsers': 'Belum ada pengguna.',
-  'admin.role.global_admin': 'pentadbir global',
-  'admin.role.admin': 'pentadbir',
+  'admin.role.global_admin': 'global admin',
+  'admin.role.admin': 'admin',
   'admin.role.user': 'pengguna',
-  'admin.section.global_admin': 'Pentadbir global',
-  'admin.section.admin': 'Pentadbir',
+  'admin.section.global_admin': 'Global admin',
+  'admin.section.admin': 'Admin',
   'admin.section.user': 'Pengguna',
   'admin.you': 'anda',
   'admin.youTitle': 'Anda tidak boleh menukar peranan sendiri atau memadam akaun sendiri di sini',
@@ -354,11 +354,11 @@ export default {
   'admin.action.reset.button': 'Set semula',
   'admin.action.reset.desc':
     'Menetapkan semula kata laluan mereka kepada lalai dan memaksa penukaran pada log masuk seterusnya.',
-  'admin.action.promote.label': 'Jadikan pentadbir',
+  'admin.action.promote.label': 'Jadikan admin',
   'admin.action.promote.button': 'Naik taraf',
   'admin.action.promote.desc':
     'Membenarkan mereka mencipta pengguna dan menetapkan semula kata laluan. Mereka masih tidak boleh membaca nota orang lain.',
-  'admin.action.demote.label': 'Buang status pentadbir',
+  'admin.action.demote.label': 'Buang status admin',
   'admin.action.demote.button': 'Turun taraf',
   'admin.action.demote.desc':
     'Mengembalikan mereka kepada pengguna biasa. Entri dan prompt milik mereka sendiri tidak terjejas.',
@@ -368,7 +368,7 @@ export default {
     'Memadam akaun serta setiap entri, prompt dan coretan yang mereka miliki. Ini tidak boleh dibatalkan.',
   'admin.promoteFailed': 'Naik taraf gagal',
   'admin.demoteFailed': 'Turun taraf gagal',
-  'admin.nowAdmin': ({ name }) => `${name} kini seorang pentadbir`,
+  'admin.nowAdmin': ({ name }) => `${name} kini seorang admin`,
   'admin.nowUser': ({ name }) => `${name} kembali menjadi pengguna biasa`,
   'admin.reset.title': ({ name }) => `Set semula kata laluan ${name}?`,
   'admin.reset.body': ({ pw }) =>
@@ -387,7 +387,7 @@ export default {
 
   /* ── pre-auth tour ─────────────────────────────────────────── */
   'tour.title': 'Apa yang Bento OS boleh buat',
-  'tour.footer': 'Segala yang anda simpan adalah milik akaun anda sahaja — termasuk pentadbir.',
+  'tour.footer': 'Segala yang anda simpan adalah milik akaun anda sahaja — termasuk admin.',
   'tour.mini.search': 'cari',
   'tour.demoCap.blanks': 'Cuba sendiri — taip pada ruang kosong yang ditonjolkan',
 
