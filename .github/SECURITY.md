@@ -7,7 +7,7 @@ time — please be patient with response times.
 
 For the full technical security architecture (threat model, render-pipeline
 internals, every control listed below in detail) see
-[docs/SECURITY.md](../docs/SECURITY.md). This page is only about reporting
+[docs/SECURITY.md](https://github.com/aimanamri/bento-os/tree/main/docs). This page is only about reporting
 a vulnerability, plus a summary of that architecture so a reporter can
 quickly tell whether something is a real gap or already-mitigated.
 
@@ -81,7 +81,7 @@ images and setup scripts in this repository.
   scope here.
 - The security of a user's own self-hosted deployment (weak passwords,
   exposed ports, unmanaged Tailscale ACLs, outdated Docker images they
-  haven't pulled). See [docs/SECURITY.md](../docs/SECURITY.md) for
+  haven't pulled). See [docs/SECURITY.md](https://github.com/aimanamri/bento-os/tree/main/docs) for
   deployment hardening guidance.
 - Social engineering, physical access, or denial-of-service against a
   single self-hosted, single/few-user instance.
