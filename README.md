@@ -409,7 +409,7 @@ same schema and RLS, PostgreSQL instead of Supabase Cloud — is documented in
 
 | Document | Read it for |
 |---|---|
-| [PROJECT-BRIEF.md](PROJECT-BRIEF.md) | The original vision and feature spec |
+| [PROJECT-BRIEF.md](PROJECT-BRIEF.md) | Current product vision and feature spec |
 | [docs/IMPLEMENTATION-PLAN.md](docs/IMPLEMENTATION-PLAN.md) | Architecture overview, runtime design, build history |
 | [docs/UX-SPEC.md](docs/UX-SPEC.md) | Design tokens, layouts, accessibility acceptance criteria |
 | [docs/DATABASE.md](docs/DATABASE.md) | ER diagram, RLS policies, FTS, triggers |
