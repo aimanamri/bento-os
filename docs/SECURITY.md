@@ -2,32 +2,47 @@
 
 > Companion documents: [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md) · [EDGE-CASES.md](EDGE-CASES.md) · [UX-SPEC.md](UX-SPEC.md)
 >
-> **Status: describes the shipped, currently-running security posture**,
-> including two real bugs found in production and how they were fixed
-> (§ 2) — read those before touching the render pipeline, since both are
-> the kind of mistake that's easy to reintroduce by "simplifying" the code.
+> **Status: describes the shipped, currently-running security posture on
+> `main`** (Supabase/Postgres backend), including two real bugs found in
+> production and how they were fixed (§ 2) — read those before touching
+> the render pipeline, since both are the kind of mistake that's easy to
+> reintroduce by "simplifying" the code.
+>
+> **Two backends, one doc.** `main` migrated off the SQLite/Express API to
+> Supabase (Postgres + Auth + RLS) — `server/index.js` is now a static
+> file host only, and `server/validate.js` / `server/db.js` no longer
+> exist on this branch. The
+> [`dev-local-auth`](../../tree/dev-local-auth) branch still runs the
+> original SQLite/Express variant with real ownership of that code; where
+> this doc describes SQLite/`better-sqlite3` specifics, that's the branch
+> they apply to, called out explicitly. Everything about the render
+> pipeline (§ 2) is identical on both, since it's pure client-side code
+> shared by both variants.
 
 ---
 
 ## 1. Threat Model
 
-Single trusted user, but the app renders rich untrusted-shaped content
-(markdown → HTML/SVG/MathML) and is reachable from multiple devices over a
-tailnet. Ranked risks:
+Single trusted user (multi-account, but every account only ever sees its
+own data), but the app renders rich untrusted-shaped content
+(markdown → HTML/SVG/MathML) and is reachable from multiple devices —
+either over a private tailnet/LAN (self-hosted, both variants) or via a
+managed Supabase Cloud project (`main` only). Ranked risks:
 
 | # | Threat | Vector | Likelihood | Impact | Primary control |
 |---|---|---|---|---|---|
-| 1 | **Stored XSS** | Imported `.md` files (pasted from the web), or own notes containing copied snippets, executing script on render | Medium | High (session on every tailnet device that opens the note) | DOMPurify choke point (§ 2) |
+| 1 | **Stored XSS** | Imported `.md` files (pasted from the web), or own notes containing copied snippets, executing script on render | Medium | High (session-token theft — the Supabase JWT lives in `localStorage`, readable by any script that executes in-page, on every device that opens the note; see § 4) | DOMPurify choke point (§ 2) |
 | 2 | **Mermaid/SVG injection** | `foreignObject`, `<script>` inside SVG, `javascript:` links in click bindings | Medium | High | Forbid-list + hand-rolled label extraction (§ 2) |
-| 3 | **SQL / FTS5 injection** | Search box, tag filters, any string reaching SQL | Low (parameterized) | High | Prepared statements + FTS quoting (§ 3) |
-| 4 | **Dynamic-fields injection** | Metadata field names/values crafted to smuggle structured data | Low | Low (plain-text-only storage; see § 3) | Server-side type coercion, rejects nested objects (§ 3) |
-| 5 | **Compromised tailnet device** | Stolen phone/laptop already inside the tailnet | Low | High | Tailscale ACLs, device expiry, no public bind (§ 4) |
-| 6 | **Data loss / corruption** | Crash mid-write, disk failure, bad migration | Medium | High | WAL + backups (§ 5) |
-| 7 | **Malicious import file** | Oversized/binary/path-crafted upload | Low | Medium | Import validation (§ 4) |
+| 3 | **SQL / injection via the data API** | Search box, tag filters, any string reaching Postgres | Low (parameterized) | High | supabase-js parameterized calls + RLS (§ 3); prepared statements + FTS5 quoting on `dev-local-auth` |
+| 4 | **Dynamic-fields injection** | Metadata field names/values crafted to smuggle structured data | Low | Low (plain-text-only by convention; see § 3) | Client-side type coercion rejects nested objects (§ 3) — note this is a UX guard, not a DB-enforced one, on `main` |
+| 5 | **Compromised device / stolen session** | Stolen phone/laptop already on the tailnet or LAN, or a stolen `localStorage` JWT | Low | High | Tailscale ACLs, device expiry, no public bind by default (§ 4); Supabase session expiry on the cloud variant |
+| 6 | **Data loss / corruption** | Crash mid-write, disk failure, bad migration | Medium | High | Postgres backups — managed (Supabase Cloud) or `pg_dump`/volume (self-hosted Docker) on `main`; WAL + `.backup` on `dev-local-auth` (§ 5) |
+| 7 | **Malicious import file** | Oversized/binary/path-crafted upload | Low | Medium | Import validation, now client-side (§ 4) |
 
-Explicit non-goals: multi-user auth, rate limiting for abuse (single user
-behind tailnet), CSRF tokens (no cookies/sessions — see § 4 on why the API
-still isn't callable cross-origin).
+Explicit non-goals: rate limiting for abuse beyond Edge Function limits
+(§ 4), CSRF tokens (no cookies — the JWT rides in an `Authorization`
+header the browser never attaches automatically, so there's nothing for
+a forged cross-origin request to ride).
 
 ---
 
@@ -226,7 +241,60 @@ permitting `fetch`/exfiltration to *any* Supabase project — the tightest
 
 ---
 
-## 3. SQL, FTS5, and Dynamic-Fields Injection Prevention
+## 3. Injection Prevention
+
+### `main` (Supabase / Postgres)
+
+There is no server-side SQL layer any more — `server/index.js` only
+serves static files (§ 2's CSP note). The browser talks to Postgres
+exclusively through `supabase-js` (`src/js/api.js`), which:
+
+- Builds every query with the SDK's fluent filter API
+  (`.eq()`, `.textSearch()`, …), which parameterizes internally — there is
+  no path in this codebase that string-concatenates user input into SQL.
+- **Row-Level Security is the real trust boundary, not this file.** Every
+  policy in `supabase/migrations/20260714000001_init.sql` scopes
+  `entries`/`prompts`/`snippets` to `user_id = auth.uid()` with **no**
+  admin-read policy (`entries_select`, `prompts_select`, etc.) — so even a
+  bug in `api.js` that leaked a raw filter can only ever touch the
+  signed-in user's own rows; Postgres enforces this independent of
+  anything the client sends.
+- **Full-text search** uses Postgres `.textSearch('search', q, { type:
+  'websearch', config: 'english' })` — `websearch` mode already parses
+  its input as a restricted query language (quotes, `-`, `OR`) rather
+  than raw `tsquery` syntax, so there's no `AND`/`NEAR`-style operator
+  injection surface to begin with. `ftsClean()` in `src/js/api.js` still
+  strips C0 control characters before the term reaches `.textSearch()`
+  (most importantly the NUL byte, which cannot exist in a Postgres `text`
+  value and would abort the request) — ported directly from the
+  SQLite-era fix below, since the same NUL-crash class applies to
+  Postgres.
+- **`tags`/`urls`/`fields` are jsonb columns** — `api.js` passes real
+  JS objects/arrays to supabase-js, which serializes them as parameters;
+  the DB never receives a client-crafted raw JSON *string* to parse.
+- **Dynamic fields specifically** (`normalizeFields()`, now in
+  `src/js/normalize.js`): the `fields` value must be a plain object (an
+  array is rejected, not coerced); a value that is itself an object or
+  array is rejected with a `ValidationError` before the request is ever
+  sent — so the UI can't smuggle a nested structure into what's meant to
+  be flat plain-text metadata. Names are case-insensitive deduplicated
+  (first occurrence wins) and capped at 64 fields per entry, values
+  capped at 2000 characters.
+  **Caveat, unlike the old server-side version of this check:** this now
+  runs entirely in the browser, and unlike `title`/`body_md` (which carry
+  a Postgres `check (length(btrim(...)) > 0)` constraint), the `fields`
+  column has **no DB-level shape constraint** — it's a bare
+  `jsonb not null default '{}'`. A request that bypasses `api.js` (e.g. a
+  direct PostgREST call with a valid session) could write a nested value.
+  This is a data-hygiene gap, not an injection one: the only place
+  `fields` values reach the DOM is `logbook.js`'s
+  `valueEl.value = value` (an `<input>` element's `.value` property),
+  which coerces non-strings to their `String()` form rather than ever
+  interpreting them as markup. Still, if `fields` gains a rendering path
+  that assumes a string without coercion, revisit whether a DB `check`
+  constraint (mirroring the client-side shape rule) is worth adding.
+
+### `dev-local-auth` (SQLite / Express) — historical, kept for that branch
 
 - All statements are prepared once with `better-sqlite3` and executed with
   bound parameters: `db.prepare('SELECT … WHERE id = ?').get(id)`. String
@@ -245,12 +313,10 @@ permitting `fetch`/exfiltration to *any* Supabase project — the tightest
   surfacing as an HTTP 500 on `GET /api/{entries,prompts,snippets}?q=…`.
   This was never injection — the value is bound as a parameter, so tables
   and per-user scoping were never at risk — but any user could crash their
-  own search. `ftsQuery()` now maps every C0 control character
-  (`\u0000`–`\u001f`) to a space *before* tokenizing, so they behave as
-  delimiters and never reach the `MATCH` expression. The Supabase variant
-  applies the identical guard in `ftsClean()` (`src/js/api.js`) before
-  `.textSearch()`, since a NUL likewise cannot exist in a Postgres `text`
-  value and would abort the request. Found via penetration testing.
+  own search. `ftsQuery()` now maps every C0 control character to a space
+  *before* tokenizing, so they behave as delimiters and never reach the
+  `MATCH` expression. Found via penetration testing; the same fix was
+  ported to `main`'s `ftsClean()` above.
 - Dynamic bits of SQL that cannot be parameters (sort column, direction)
   come from a hardcoded allowlist, never from the request.
 - **`tags`/`urls`/`fields`/prompt `tags` are all written via
@@ -264,21 +330,24 @@ permitting `fetch`/exfiltration to *any* Supabase project — the tightest
   meant to be flat plain-text metadata. Every surviving value is coerced
   through `String(value ?? '')` and trimmed before storage. Names are
   case-insensitive deduplicated (first occurrence wins) and capped at 64
-  fields per entry.
+  fields per entry. Unlike `main`, this check runs server-side, so it's a
+  real enforcement boundary, not just a UX guard.
 
 ## 4. Server & Transport Hardening
 
+`server/index.js` on `main` is a static file host only — no request body
+is ever parsed server-side, since there's no `/api` to parse one for.
+
 | Control | Setting |
 |---|---|
-| Bind address | `app.listen(3000, '127.0.0.1')` — hard-coded, not env-overridable to `0.0.0.0` |
-| Exposure | `tailscale serve` only (HTTPS w/ valid cert). No funnel. No router port-forward. |
-| Body limits | `express.json({ limit: '2mb' })` |
-| Import validation | Extension allowlist (`.md`, `.markdown`) **and** content sniff (reject NUL bytes / mostly-binary content via a replacement-char ratio check); filename discarded as an entry source — the title comes from the H1 or a sanitized/truncated filename string, never a filesystem path; content is held in a request-body string and never written to disk |
-| Headers | CSP (§ 2), `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `Permissions-Policy: camera=(), microphone=(), geolocation=()` |
-| Static serving | `express.static(dist)` with `dotfiles: 'deny'`; no directory listing; API and DB files (`data/`) live outside `dist/` |
-| Cross-origin | No CORS headers at all → browsers block cross-origin reads; API is same-origin-only by default. No cookies → nothing for CSRF to ride. |
-| Dependencies | Lockfile committed; `npm audit --omit=dev` script available; the runtime lib files (markdown-it, DOMPurify, KaTeX + its auto-render addon, Mermaid, Prism) vendored at pinned versions into `dist/vendor/` (CSP forbids CDNs anyway) |
-| Tailscale hygiene | Key expiry left enabled; app host tagged; ACL restricting the serve port to the owner's devices; Tailnet lock optional |
+| Bind address | `app.listen(PORT, HOST)` — `HOST` defaults to `127.0.0.1` but reads `BENTO_HOST` (Docker sets it to `0.0.0.0` *inside* the container so port-forwarding works; `docker-compose.yml`'s `${BENTO_BIND:-127.0.0.1}` still gates what's actually published on the host). `PORT` likewise defaults to `3000`, overridable via `BENTO_PORT`. **This is env-overridable by design now** — a self-hosted deploy that wants LAN/remote reach sets `BENTO_BIND=0.0.0.0` explicitly (see `DOCKER.md` § Exposing it); the safe default (loopback-only) is what a fresh checkout gets. |
+| Exposure | Two supported paths: `tailscale serve` in front of the loopback-bound port (HTTPS w/ valid cert, no funnel, no router port-forward), or a plain LAN/`BENTO_BIND` exposure the operator opts into. Either way, the frontend itself carries no secrets — the real access boundary is Supabase Auth + RLS (§ 3), not network reachability. |
+| Import validation | Runs **client-side only** now, in `parseMarkdownImport()` (`src/js/normalize.js`): extension allowlist (`.md`, `.markdown`), 2 MB size cap, NUL-byte rejection, and a replacement-char ratio check to reject mostly-binary content. This is a UX guard, not a trust boundary — there's no server in the loop to enforce it against a client that skips the UI; the actual defenses against a malicious imported file are the render pipeline (§ 2, which treats *all* content as untrusted regardless of source) and RLS (which still confines the write to the importing user's own rows). |
+| Headers | CSP (§ 2), `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `Permissions-Policy: camera=(), microphone=(), geolocation=()` — set unconditionally by middleware ahead of `express.static`, so they're present on error responses too |
+| Static serving | `express.static(dist)` with `dotfiles: 'deny'`; no directory listing; nothing sensitive lives under `dist/` (no DB file, no service-role key — those live in the Supabase project / edge function env, never shipped to the browser) |
+| Cross-origin | This server sends no CORS headers → browsers block cross-origin reads of it. The session JWT lives in `localStorage` (not a cookie), so nothing rides automatically on a cross-origin request — there's no ambient credential for CSRF to exploit. (The Supabase project's own REST/Auth endpoints and Edge Functions set their own CORS policy — see § 4b.) |
+| Dependencies | Lockfile committed; `npm run audit:deps` (`npm audit`) available; the runtime lib files (markdown-it, DOMPurify, KaTeX + its auto-render addon, Mermaid, Prism) vendored at pinned versions into `dist/vendor/` (CSP forbids CDNs anyway) |
+| Tailscale hygiene | Applies to the self-hosted/Tailscale exposure path: key expiry left enabled; app host tagged; ACL restricting the serve port to the owner's devices; Tailnet lock optional |
 
 ## 4a. Service Worker & Offline Cache
 
@@ -301,7 +370,61 @@ nothing user-identifying in CacheStorage. The existing localStorage draft
 buffer (§5) remains the only client-side store of user content, and its
 rules are unchanged.
 
+## 4b. Privileged Server-Side Actions — Supabase Edge Functions
+
+RLS (§ 3) covers ordinary CRUD, but four actions need to bypass it by
+design (creating a user, resetting another user's password, deleting a
+user, deleting your own account) and so run as Deno Edge Functions under
+the **service-role key**, in `supabase/functions/`:
+`admin-create-user`, `admin-reset-password`, `admin-delete-user`,
+`delete-account`.
+
+- **Every function authenticates the caller itself** — `getCaller()`
+  (`supabase/functions/_shared/mod.ts`) takes the `Authorization: Bearer`
+  header, resolves it to a user via `auth.getUser(token)` (using the
+  service client, so this check cannot be spoofed by a client-supplied
+  claim), then loads that user's row from `user_roles`. A missing/invalid
+  token or missing role row → `401`.
+- **Role checks happen in the function, not the client.** `admin-delete-
+  user` requires `caller.role === 'global_admin'` and separately blocks
+  targeting yourself or another `global_admin` (RBAC §2 in the README:
+  exactly one `global_admin`, enforced as a singleton at the DB level
+  too) — a `403` either way, checked server-side where a client can't
+  patch around it.
+- **Per-caller rate limiting**: `withinRateLimit()` backs a fixed-window
+  counter in `public.rate_limits` (service-role table), e.g.
+  `admin-delete-user` caps deletes per admin per hour — bounds the blast
+  radius of a compromised admin session.
+- **CORS is `Access-Control-Allow-Origin: '*'`** on these functions —
+  intentionally: authorization here is a bearer token the browser never
+  attaches automatically (unlike a cookie), so a third-party origin
+  can't ride an ambient credential; a wildcard doesn't hand out anything
+  a caller couldn't already send directly with a token it had to obtain
+  some other way (e.g. via XSS, which § 2 is the actual defense against).
+- The service-role key itself never reaches the browser — it's an Edge
+  Function/container environment variable only (README's "used only by
+  those one-off admin scripts from your shell" note applies to the
+  bootstrap script, not these functions, which run entirely server-side).
+
 ## 5. Data Safety
+
+**On `main` (Supabase/Postgres), backup responsibility depends on which
+of the two supported deployments you're running:**
+
+- **Self-hosted Docker Postgres** (`docker-compose.yml`'s `db` service):
+  **there is no managed backup** — the entire database is the `db-data`
+  named volume on the host machine (`docker compose down -v` deletes it
+  permanently; plain `down` keeps it). Take one with
+  `docker compose exec db pg_dump -U supabase_admin -d postgres --clean
+  --if-exists > bento-backup-$(date +%F).sql` and restore with `psql …
+  < backup.sql` (see `DOCKER.md` § Backup & restore). No rotation is
+  scheduled — that's a manual/cron responsibility, same as the SQLite
+  variant always was.
+- **Supabase Cloud**: backups are the hosted project's responsibility
+  (point-in-time recovery / daily backups per your plan tier) — nothing
+  in this repo manages that.
+
+**On `dev-local-auth` (SQLite), unchanged from the original design:**
 
 - **WAL specifics**: `synchronous=NORMAL` is safe under WAL (worst crash
   case = last transaction lost, no corruption). Passive checkpoints are
@@ -312,7 +435,10 @@ rules are unchanged.
   — `.backup` is safe against a live WAL database; a plain file copy is not
   (torn reads across `-wal`). No automatic rotation is scheduled yet — this
   is a manual/cron responsibility, not something the app does itself.
-- **Migrations**: append-only numbered SQL files in `server/migrations/`;
+
+**Migrations (applies to both variants, mechanism differs):**
+
+- Append-only numbered SQL files in `server/migrations/` (`dev-local-auth`);
   the runner in `db.js` records applied versions in `schema_migrations` and
   runs each migration inside a transaction. **Back up before running a new
   migration** — migration 002 was a destructive one (it dropped columns
@@ -340,15 +466,16 @@ rules are unchanged.
 ## 6. Audit Checklist (run this after any change to the render/data layer)
 
 - [ ] `grep -rn "innerHTML\|insertAdjacentHTML" src/js` finds no user-content assignment outside `render.js`
-- [ ] `grep` finds no template-literal string interpolation inside any `db.prepare(...)` call
+- [ ] On `dev-local-auth` only: `grep` finds no template-literal string interpolation inside any `db.prepare(...)` call
 - [ ] CSP present on every response incl. error responses; the app still functions fully under it (no inline-script fallback snuck in)
 - [ ] DOMPurify config has **no** custom `ALLOWED_URI_REGEXP` (see § 2 lesson #1) and still matches this doc otherwise
 - [ ] Fixtures neutralized end-to-end in a real browser (not just unit-tested): `<img onerror>`, `<svg><foreignObject><script>`, `javascript:`/`data:` links, a `<sup onclick=…>` (must render as literal text, not a stripped element), a Mermaid node label containing `<img onerror=…>` (must render as either escaped text or nothing — never execute)
 - [ ] A bare `<sup>2</sup>`/`<sub>2</sub>` still renders as a real element (regression check for lesson #2's sibling risk — over-tightening the sup/sub rule)
 - [ ] A real Mermaid diagram with 2+ nodes renders with **visible label text**, not just shapes (regression check for lesson #2)
-- [ ] FTS smoke: search for `" OR 1=1 --`, `title:x`, `a AND`, and a query containing a NUL byte (`U+0000`) each returns results or an empty set, never a 500 (regression check for the FTS control-byte fix, § 3)
-- [ ] `POST /api/entries` with `fields: {"a": {"nested": 1}}` → 400; with `fields: ["not","an","object"]` → 400
-- [ ] Import: 3 MB file → 413; NUL-byte content renamed `.md` → 400; huge single-line md → renders or degrades, no hang
-- [ ] Server unreachable via LAN IP; reachable via `ts.net` HTTPS; Clipboard API works there
-- [ ] Restore-from-backup drill performed at least once
+- [ ] FTS smoke: search for `" OR 1=1 --`, `title:x`, `a AND`, and a query containing a NUL byte (`U+0000`) each returns results or an empty set, never a 500/crash — via `.textSearch()` on `main`, via SQLite `MATCH` on `dev-local-auth` (regression check for the control-byte fix, § 3)
+- [ ] `main`: calling `normalizeEntry({ fields: { a: { nested: 1 } } })` (`src/js/normalize.js`) throws `ValidationError`; same for `fields: ["not","an","object"]`. `dev-local-auth`: the equivalent `POST /api/entries` returns 400 for both.
+- [ ] Import: `main` — a 3 MB `.md` file is rejected client-side with a toast (no network round-trip); a NUL-byte file renamed `.md` is rejected the same way; a huge single-line md renders or degrades without hanging the tab. `dev-local-auth` — same cases, but enforced server-side (3 MB → HTTP 413, NUL byte → 400).
+- [ ] Server unreachable via LAN IP with default config; reachable via `ts.net` HTTPS, or via LAN if `BENTO_BIND` was deliberately set — confirm it matches what was actually intended for this deploy; Clipboard API works there
+- [ ] Edge Functions (§ 4b): `admin-delete-user`/`admin-reset-password`/`admin-create-user` each 401 with no/garbage token, 403 for a non-`global_admin` caller, and the delete/self/other-`global_admin` guards still hold
+- [ ] Restore-from-backup drill performed at least once (`pg_dump`/`psql` on `main`'s self-hosted Docker Postgres, `.backup` on `dev-local-auth`)
 - [ ] After a build, DevTools → Application → Cache Storage contains **only** `bento-shell-<build>`/`bento-runtime-<build>`, and no entry under either is a Supabase URL (regression check for § 4a)
