@@ -309,6 +309,8 @@ export default {
   'auth.dock.logbook': 'Tentang Docs LogBook',
   'auth.dock.prompts': 'Tentang Prompt Library',
   'auth.dock.snippets': 'Tentang Code Snippets',
+  'auth.github': 'GitHub',
+  'auth.github.aria': 'Lihat sumber kod kat Github',
   'auth.err.badUsername': 'ID Pengguna: 2–32 huruf, angka, titik, sengkang atau garis bawah',
   'auth.err.shortPassword': ({ n }) => `Kata laluan memerlukan sekurang-kurangnya ${n} aksara`,
   'auth.err.defaultReuse': 'Kata laluan lalai tidak boleh diguna semula',

@@ -297,6 +297,8 @@ export default {
   'auth.dock.logbook': 'About the Docs LogBook',
   'auth.dock.prompts': 'About the Prompt Library',
   'auth.dock.snippets': 'About Code Snippets',
+  'auth.github': 'GitHub',
+  'auth.github.aria': 'View source on GitHub',
   'auth.err.badUsername': 'User ID: 2–32 letters, digits, dot, dash or underscore',
   'auth.err.shortPassword': ({ n }) => `Password needs at least ${n} characters`,
   'auth.err.defaultReuse': 'The default password cannot be reused',

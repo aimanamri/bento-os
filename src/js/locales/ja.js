@@ -304,6 +304,8 @@ export default {
   'auth.dock.logbook': 'ドキュメント記録帳について',
   'auth.dock.prompts': 'プロンプトライブラリについて',
   'auth.dock.snippets': 'コードスニペットについて',
+  'auth.github': 'GitHub',
+  'auth.github.aria': 'GitHub でソースコードを見る',
   'auth.err.badUsername': 'ユーザー ID：英数字・ドット・ハイフン・アンダースコアで 2〜32 文字',
   'auth.err.shortPassword': ({ n }) => `パスワードは ${n} 文字以上にしてください`,
   'auth.err.defaultReuse': '初期パスワードは再利用できません',
