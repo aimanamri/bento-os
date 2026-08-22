@@ -86,42 +86,56 @@ and [DATABASE-LOCAL.md](DATABASE-LOCAL.md).
 
 ### Repository layout (actual, flat — not nested by feature)
 
+`main` carries the **Supabase (default/production)** variant; the local
+SQLite + Express auth stack described in § 8.8 lives on `dev-local-auth` and
+is not shown here. Both keep the same flat, one-file-per-concern shape.
+
 ```
 BentoOS/
-├── PROJECT-BRIEF.md
-├── docs/                     # This planning/spec set
+├── PROJECT-BRIEF.md, PROJECT-BRIEF-updated.md, README.md, LICENSE, DOCKER.md
+├── docs/                     # This planning/spec set (+ SUPABASE-MIGRATION.md, DATABASE.md)
 ├── server/
-│   ├── index.js              # Express bootstrap, CSP/security headers, static serving, error handler
-│   ├── db.js                 # better-sqlite3 init, PRAGMAs, migration runner, dev seeds
-│   ├── validate.js           # All request-body normalization/validation (shared by every route)
-│   ├── errors.js             # sendError() — uniform { error: { code, message } } envelope
-│   ├── migrations/
-│   │   ├── 001-init.sql      # entries, prompts, *_fts virtual tables + sync triggers
-│   │   └── 002-dynamic-fields.sql  # adds entries.fields, drops platform/is_valid, rebuilds entries_fts
-│   └── routes/
-│       ├── entries.js        # Docs LogBook CRUD + FTS search
-│       ├── prompts.js        # Prompt Library CRUD + FTS search
-│       └── import.js         # Markdown file import (title extraction, BOM/CRLF normalization)
+│   └── index.js               # Express: static dist/ + CSP/security headers only — owns no data
+├── supabase/
+│   ├── migrations/            # Numbered SQL: init, snippets, seeds, RLS (see DATABASE-SUPABASE.md)
+│   └── functions/             # Edge Functions: admin-create-user, admin-delete-user,
+│                               #   admin-reset-password, delete-account (+ _shared/mod.ts)
+├── docker/                    # Compose services for the self-hosted stack (§ 8.15, DOCKER.md)
 ├── src/                      # Frontend source (flat — no feature subfolders)
 │   ├── index.html
+│   ├── assets/                # PWA icons, og-image.png (§ 8.17)
 │   ├── css/input.css         # Tailwind directives + design tokens + all component/utility CSS
 │   └── js/
 │       ├── main.js           # App bootstrap: theme, tabs, traffic lights, dock, health check
-│       ├── bus.js             # Shared EventTarget — 4 events total, see § 4
-│       ├── api.js             # fetch wrapper: 10s timeout, ApiError with server's error envelope
+│       ├── bus.js             # Shared EventTarget — 5 events total, see § 4
+│       ├── api.js             # Supabase adapter: dispatches api() calls to supabase-js
+│       ├── supabase.js, supabase-config.js  # Client init; project URL + anon key (safe to ship)
+│       ├── auth.js             # Sign-in/lock-screen flow, session state, admin user management
 │       ├── ui.js               # Modal/banner/toast/announce — the shared feedback vocabulary
-│       ├── render.js           # THE render pipeline (markdown-it → KaTeX → Mermaid → DOMPurify)
+│       ├── render.js           # THE render pipeline (markdown-it → KaTeX → Mermaid → Prism → DOMPurify)
+│       ├── highlight.js        # Prism.tokenize wiring for render.js (§ 8.10)
 │       ├── clipboard.js        # copyText(): Clipboard API → execCommand → manual-copy modal
 │       ├── ribbon.js           # LogBook formatting ribbon + 💡 bulb menu + Markdown Guide content
 │       ├── logbook.js          # Docs LogBook: sidebar, editor, metadata, autosave, sync, guards
-│       └── prompts.js          # Prompt Library: cards, filters, inline variable-editing engine
+│       ├── prompts.js          # Prompt Library: cards, filters, inline variable-editing engine
+│       ├── snippets.js         # Code Snippets: cards, filters, same variable-editing engine (§ 8.9)
+│       ├── vars.js             # Shared {{Variable}} parse/compose engine (prompts.js + snippets.js)
+│       ├── normalize.js        # Row shape normalization for entries/prompts/snippets
+│       ├── face-card.js        # initFaceCard(hostId): the mascot face, parameterized per instance
+│       ├── theme.js            # Theme toggle, [data-theme-toggle]-driven, defaults to prefers-color-scheme
+│       ├── i18n.js             # Display-language switcher — t(), locale:changed (§ 8.16)
+│       ├── locales/            # en.js, ja.js, ms.js catalogues + language.js.template for new locales
+│       ├── tour.js             # Per-tab pre-auth tour dialogs (§ 8.11)
+│       └── pwa.js              # Service-worker registration
 ├── scripts/
-│   ├── copy-static.js        # Copies src/index.html + PWA assets into dist/ (not src/js/)
-│   ├── copy-vendor.js        # Vendors the 5 runtime lib files into dist/vendor/ (CSP forbids CDNs)
-│   └── build-js.js           # Bundles src/js/ into one obfuscated dist/js/app.js
+│   ├── copy-static.js        # Copies src/index.html + PWA assets (incl. per-locale manifests) into dist/
+│   ├── copy-vendor.js        # Vendors the runtime libs into dist/vendor/ (CSP forbids CDNs)
+│   ├── build-js.js           # Bundles src/js/ into one obfuscated dist/js/app.js
+│   ├── build-sw.js           # Builds the service worker
+│   ├── pin-supabase-config.js  # Docker image build only: rewrites supabase-config.js to the local stack
+│   ├── migrate-sqlite-to-supabase.js, setup-supabase-admin.js, reset-user-password.js, gen-local-keys.js, make-icons.js
 ├── dist/                     # Build output (gitignored)
-├── data/                     # bento.db + -wal/-shm (gitignored)
-├── backups/                  # .backup snapshots (gitignored)
+├── data/, backups/           # Local/testing-variant artifacts (gitignored)
 ├── tailwind.config.js
 └── package.json
 ```
@@ -139,10 +153,13 @@ deployed app is not its own source listing.
 > **Default (Supabase/Postgres):** the canonical data model is in
 > [DATABASE-SUPABASE.md](DATABASE-SUPABASE.md) — UUID keys, per-user
 > ownership under RLS, a generated `tsvector` search column, and the
-> `profiles` / `user_roles` RBAC tables. The two content domains (`entries`,
-> `prompts`) carry the same columns described below; the differences are
-> engine-level (UUID vs INTEGER keys, `jsonb` vs JSON-in-TEXT, RLS vs
-> route-layer scoping).
+> `profiles` / `user_roles` RBAC tables. There are now **three content
+> domains** — `entries`, `prompts`, and `snippets` (§ 8.9) — carrying the
+> same columns described below; the differences are engine-level (UUID vs
+> INTEGER keys, `jsonb` vs JSON-in-TEXT, RLS vs route-layer scoping).
+> `snippets` mirrors `prompts` structurally (title/category/body/tags plus a
+> `notes` column in place of `why_this_works`), sharing its `{{Variable}}`
+> fill-in engine (now `src/js/vars.js`, § 4) rather than duplicating it.
 >
 > The section below documents the **testing backend's SQLite schema**
 > (see also [DATABASE-LOCAL.md](DATABASE-LOCAL.md) for the auth tables). Both
@@ -275,6 +292,7 @@ endpoints differ per backend (Supabase Auth + Edge Functions vs the local
 | `PUT /api/entries/:id` | Update | Requires `expected_updated_at`; **409 Conflict** if the row is newer. Body may include `updated_at` to set Modified explicitly (manual override); omitted → server auto-bumps to "now". `created_at` is never accepted in the body — it cannot be set or changed via the API |
 | `DELETE /api/entries/:id` | Delete | Client confirms first |
 | `GET/POST/PUT/DELETE /api/prompts[...]` | Same CRUD shape as entries | No `fields`, no editable timestamps — see § 2 |
+| `GET/POST/PUT/DELETE /api/snippets[...]` | Same CRUD shape as prompts | `category` doubles as the language/tool label and Prism highlight hint; `notes` replaces `why_this_works` — see § 2, § 8.9 |
 | `POST /api/import` | Markdown file → new entry | `.md`/`.markdown` only, ≤ 2 MB; title from first `# H1` or filename; see SECURITY.md § 4 |
 
 Error envelope (uniform, from `server/errors.js`):
@@ -300,7 +318,7 @@ status — the frontend switches on `code`, not the message string.
 
 ### Event bus (`bus.js`)
 
-A single `new EventTarget()`. **Only 4 events actually exist** — this is
+A single `new EventTarget()`. **5 events actually exist** — this is
 intentionally minimal; most cross-concern communication is direct function
 calls (e.g. `logbook.js` calls its own `renderList()`, `setMode()`, etc.
 directly — it does not round-trip through the bus for its own internal
@@ -310,7 +328,10 @@ state):
 entry:dirty      { isDirty }   — logbook.js emits; main.js listens (tab dirty-dot)
 entry:saved      { id, updated_at } — logbook.js emits; currently no listener (reserved for future cross-tab use)
 tab:activate     { tabId }     — main.js emits on tab switch; currently no listener
-theme:changed    { dark }      — main.js emits on theme toggle; logbook.js listens (re-themes Mermaid + re-renders preview)
+theme:changed    { dark }      — theme.js emits on toggle; logbook.js listens (re-themes Mermaid + re-renders preview)
+locale:changed   { }           — i18n.js emits on language switch; auth.js, main.js, prompts.js,
+                                  logbook.js, snippets.js and ribbon.js each re-render their own
+                                  static copy in place — no reload, so an unsaved draft survives
 ```
 
 If you're extending this app with a third tab/tool, prefer this same
@@ -326,7 +347,10 @@ raw markdown
       (see § below and SECURITY.md § 2 — this is NOT the ^text^/~text~
       markdown-it extension syntax)
   → transformTaskLists()      "- [ ] x" / "- [x] x" → disabled <input type=checkbox>
-  → transformAlerts()          blockquotes starting with ✅/ℹ️/⚠️ get .alert-* classes
+  → transformAlerts()          blockquotes starting with ✅/ℹ️/⚠️, and GFM
+                                `[!NOTE]` / `[!TIP]` / `[!IMPORTANT]` /
+                                `[!WARNING]` / `[!CAUTION]` blockquotes, get
+                                .alert-* classes
   → KaTeX renderMathInElement  ($…$, $$…$$; ignores <pre>/<code>; per-call try/catch)
   → Mermaid render (per-fence async, try/catch → localized error chip on failure)
     → collapseForeignObjectLabels()  strips Mermaid's <foreignObject> labels,
@@ -335,6 +359,11 @@ raw markdown
        foreignObject for labels; DOMPurify correctly refuses to sanitize
        inside one, so this hand-rolled, provably-inert extraction is what
        makes diagram text visible at all)
+  → highlightCodeBlocks()      Prism.tokenize per fence, keyed by infostring
+                                (LogBook) or the snippet's `category` (Snippets
+                                tab); runs after Mermaid so a ```mermaid fence
+                                is already a diagram and never reaches the
+                                highlighter — see § 8.10
   → DOMPurify.sanitize(host.innerHTML, PURIFY_CONFIG)   LAST — sees final HTML
   → mount (renderInto(el, source) sets el.innerHTML to the sanitized string)
 ```
@@ -375,6 +404,12 @@ value input, Add button). Client state is a `Map` (insertion-ordered);
 Server-side normalization: `server/validate.js` → `normalizeFields()`
 (limits in § 3 table above).
 
+The panel is collapsible at every width, not just below `xl` (§ 8.10) — one
+toggle beside the Reading/Editor button drives the same `data-hidden`
+collapse rule the sidebar already uses, so it works identically as a
+collapsing desktop column, a tablet column, and the phone sheet's
+open/close switch.
+
 ### Prompt variable engine (`prompts.js`) — inline editing, no toggle
 
 Variables are `{{Name}}` placeholders, grammar
@@ -405,6 +440,66 @@ directly inside the monospace prompt body:
 
 This whole engine has no dependency on the editor/reading-mode split above —
 Prompt Library is a separate tab with its own always-editable cards.
+
+The parse/compose functions (`parseVars`, `composeBody`, `buildEditableBody`)
+now live in `src/js/vars.js`, extracted out of `prompts.js` so the **Code
+Snippets** tab (§ 8.9) can reuse the identical engine instead of forking it —
+`snippets.js` is a thin sibling of `prompts.js` with the same card/filter/
+inline-edit shape, `category` standing in as the language/tool label instead
+of a prompt category.
+
+Both card backs — Prompt Library's "Why this works" and Snippets' "Notes" —
+render their prose through the same `renderMarkdown` / `renderInto` pipeline
+as the LogBook (§ 8.13) rather than `textContent`, so no second `innerHTML`
+call exists anywhere in the codebase. Rendering is deferred to first flip,
+since the pipeline (KaTeX/Mermaid/Prism/DOMPurify) is not free and most cards
+in a filtered list are never opened.
+
+### Theme and display language (`theme.js`, `i18n.js`, `locales/`)
+
+`theme.js` (extracted from `main.js`) owns light/dark for every
+`[data-theme-toggle]` element — one mechanism now drives both the title bar's
+toggle and the lock screen's — and its initial value comes from
+`prefers-color-scheme`, not a hardcoded default (§ 8.11).
+
+`i18n.js` is the same shape: `LOCALES` lists `en` / `ja` / `ms`, each a
+catalogue module under `src/js/locales/`, with `en` as fallback. With no
+stored choice the app follows `navigator.languages`; once the user picks a
+language in the switcher (title bar and lock screen), that choice sticks in
+`localStorage`. Switching re-walks `data-i18n` / `data-i18n-attr` markup and
+emits `locale:changed` (see the bus table above) rather than reloading, so an
+in-progress draft is never lost. Static copy lives in `index.html`;
+runtime-built copy asks for it through `t()`. `language.js.template` — the
+English catalogue with every value wrapped in a `TR()` marker — is the
+starting point for adding a language. Product names (Docs LogBook, Prompt
+Library, Code Snippets) and admin role names stay in English in every
+catalogue, deliberately unlocalized so they read as one consistent product
+name across locales (§ 8.16). Each locale also registers its own
+`manifest.<code>.webmanifest` for the installed PWA's name/shortcuts.
+
+### Lock screen, pre-auth tour, and admin user management
+
+Sign-in is a **lock screen**, not a bare card: the same bento-grid
+wallpaper/dock/glass-sheet chrome as the signed-in app, with the face card
+(`face-card.js`, now `initFaceCard(hostId)` so lock-screen and in-app
+instances run independently) fronting the sheet and answering to auth events
+— a rejected sign-in pins the danger expression and shakes the sheet, a
+successful one pins `ok` before the workspace takes over (§ 8.11).
+
+Each dock pill opens a **per-tab tour** dialog (`tour.js`) instead of one
+shared summary — two claims and a small preview per pane, plus one live demo
+built from the app's own code (`renderInto` for the LogBook box, the shared
+`{{Variable}}` engine for Prompt/Snippet cards) rather than a screenshot or
+description (§ 8.11).
+
+Admin user management (`auth.js`) is **expanding rows**: a row is quiet until
+opened, and only then shows the actions its role permits, the destructive one
+last and in the danger hue. `actionsFor()` is the single source of truth for
+what an admin may do to a given row, so a row that permits nothing renders
+visibly empty rather than silently missing a button (§ 8.12). New rows also
+stamp `created_at` client-side at creation time, since neither create path
+echoes it back and a fresh account would otherwise show a blank join date
+until the panel next reopens.
 
 ### Autosave (`logbook.js`)
 
@@ -454,6 +549,18 @@ increment, not a plan.
    browser → Supabase under RLS.
 3. Config lives in `src/js/supabase-config.js` (project URL + anon key — safe
    to ship; RLS is the guard). The service-role key is never in `src/`.
+
+### Self-hosted — Docker Compose (offline/on-prem Supabase-API-compatible stack)
+
+A 7-service `docker/` compose stack — PostgreSQL, GoTrue, PostgREST, an Edge
+Functions runtime, an nginx gateway, and one-shot role/migration runners —
+lets Bento OS run on entirely local infrastructure with no Supabase Cloud
+account, using the same `supabase/migrations/` and Edge Functions as the
+cloud path (§ 8.15; full runbook: [DOCKER.md](../DOCKER.md)). The backend
+swap happens only inside the Docker image build: an esbuild plugin swaps the
+config module in memory, and `scripts/pin-supabase-config.js` rewrites the
+one runtime config file — a plain `npm run build` still targets Supabase
+Cloud unchanged, so this path adds no branching to the normal build.
 
 ### Testing — local SQLite over Tailscale (offline dev)
 
@@ -594,3 +701,128 @@ matched set: [IMPLEMENTATION-SUPABASE.md](IMPLEMENTATION-SUPABASE.md) /
 [DATABASE-LOCAL.md](DATABASE-LOCAL.md) (testing). Branch layout: the Supabase
 variant lives on `main` (and `dev-supabase`); the local-auth variant on
 `dev-local-auth`.
+
+### 8.9 Code Snippets tab — a third content domain
+
+A **Code Snippets** tab joined Docs LogBook and Prompt Library: reusable
+terminal/CLI command templates (curl, bash/PowerShell/cmd, Maven, git)
+sharing the Prompt Library's `{{Variable}}` fill-in engine rather than
+forking it. `public.snippets` mirrors `prompts` structurally with two
+renames — `category` doubles as the language/tool label (also the Prism
+highlight hint, § 8.10) and `notes` replaces `why_this_works` — same UUID
+PK, owner-only RLS, `ON DELETE CASCADE` to `auth.users` (so the GDPR
+delete-account Edge Function cascades here for free), and a weighted
+`tsvector` (title > tags/category > body; `notes` deliberately unindexed,
+matching `prompts`' omission of `why_this_works`). New accounts are seeded
+with one example snippet, the same idempotent-seed pattern as the Welcome
+LogBook entry and example prompt.
+
+Shipping it without duplicating client code meant extracting the variable
+engine to `src/js/vars.js` (§ 4) and parameterizing `initFaceCard(hostId)`
+so the LogBook, Prompt Library, and Snippets cards can each run their own
+face-card instance. The Supabase variant landed on `main`/`dev-supabase`;
+the equivalent local-SQLite-backend tab exists on `dev-local-auth` only.
+
+### 8.10 Syntax highlighting, click-to-copy code blocks, collapsible metadata panel
+
+Fenced code blocks in the LogBook preview and Snippets bodies now colour by
+language — LogBook fences by their infostring, Snippets by `category` (no
+schema change needed, since `category` already carries the language/tool
+label). Prism is vendored like the other render libs, but reached through
+`Prism.tokenize` rather than `Prism.highlight`: `highlightInto` walks the
+token tree with `createElement`/`textContent`, so no HTML string is ever
+built from a note or snippet's code — preserving the "`innerHTML` only in
+`render.js`" invariant (SECURITY.md § 6). Every fence in a rendered preview
+(and the Markdown Guide) also gets a copy button in its corner, attached
+after DOMPurify has run and built with DOM APIs, so a note can't ship its
+own button and `PURIFY_CONFIG` never has to allow `<button>`.
+
+Separately, the entry metadata panel (§ 4, "Dynamic metadata fields") picked
+up the sidebar's Hide/Show vocabulary so it collapses at every width, not
+just below `xl` — previously it was a permanent 288px slice of the frame on
+desktop with no way to reclaim it.
+
+### 8.11 Pre-auth experience rebuild: lock screen, per-tab tour, theme default
+
+Sign-in was a bare 384px card on an empty background; it's now a **lock
+screen** carrying the app's own identity — bento-grid wallpaper, dock, glass
+sheet, and the face card fronting it like an avatar, now reacting to auth
+outcomes (danger expression + shake on a rejected sign-in, a held `ok` on
+success) via a parameterized `initFaceCard()` instance (see § 8.9).
+
+The three dock pills previously all opened the same generic summary dialog;
+each now opens its own **tour** (`tour.js`) with a small live demo built from
+the app's real rendering code rather than a screenshot.
+
+The only theme control lived in the (post-sign-in) title bar, so the lock
+screen — the first thing anyone sees — couldn't be switched at all. Theming
+moved into `theme.js`, driving any `[data-theme-toggle]` element so the
+title-bar and lock-screen toggles are the same mechanism; the initial value
+now comes from `prefers-color-scheme` (as UX-SPEC § 1 always specified)
+rather than a hardcoded dark default.
+
+### 8.12 Admin user management rebuilt as expanding rows
+
+Every row action (including a permanent hard delete) previously sat at equal
+visual weight, so a destructive action looked identical to a routine
+password reset, and a busy row's five controls wrapped badly. Rows are now
+quiet until opened; the actions a role permits render inside, each with a
+one-line explanation, the destructive action last and in the danger hue.
+`actionsFor()` in `auth.js` is the single source of truth for what an admin
+may do to a given account. A newly created row also stamps its join date
+client-side, since neither create path echoes `created_at` back.
+
+### 8.13 Markdown-enabled "Why this works" / "Notes" card backs
+
+Both card backs previously assigned their field to `textContent`, collapsing
+every paragraph break into one run of unformatted prose. They now render
+through the same `renderMarkdown`/`renderInto` pipeline as the LogBook
+(§ 4), the codebase's one `DOMPurify.sanitize` call, deferred until the card
+is first flipped so a long filtered list doesn't pay the render cost for
+cards nobody opens.
+
+### 8.14 MIT license + third-party notices shipped with dist/
+
+The repo previously had no `LICENSE` and no `license` field — meaning all
+rights reserved, which blocked anyone from legally forking or contributing
+despite a README written to onboard them. MIT was chosen for compatibility
+with every dependency. Shipping it also closed a real compliance gap: four
+of the seven libraries vendored into `dist/vendor/` (KaTeX, its
+`auto-render` addon, Mermaid, `supabase-js`) carry no license banner in
+their upstream minified builds, and `copy-vendor.js` copies them verbatim —
+MIT requires the notice travel with the copy, so third-party notices now
+ship alongside `dist/` (including the Docker image, which bakes `dist/` in).
+
+### 8.15 Self-hosted Docker stack
+
+See § 6, "Self-hosted — Docker Compose." Adds a `docker/` compose stack
+(PostgreSQL, GoTrue, PostgREST, an Edge Functions runtime, an nginx gateway,
+one-shot role/migration runners) so Bento OS can run entirely on local
+infrastructure, reusing the same `supabase/migrations/` and Edge Functions
+as the Supabase Cloud path — no separate schema or backend logic to
+maintain per deployment target.
+
+### 8.16 Multi-language display — Japanese and Bahasa Melayu
+
+See § 4, "Theme and display language." A catalogue-based i18n system
+(`i18n.js` + `src/js/locales/`) shipped alongside English: a globe switcher
+in the title bar and lock screen, no reload, no lost draft, covering the
+full app — chrome, dialogs, toasts, the pre-sign-in tour, and the Markdown
+Guide. Japanese got its own type stack and line-breaking rules in
+`input.css` and natural です・ます/体言止め phrasing rather than literal
+translation; Bahasa Melayu kept established tech loanwords (Markdown,
+prompt, metadata) as-is rather than forcing native equivalents, and needs no
+plural marking. Each locale registers its own install-time PWA manifest
+(name, shortcuts). A follow-up fix kept the three tool names (Docs LogBook,
+Prompt Library, Code Snippets) and admin/global-admin role names untranslated
+in both catalogues — consistent product naming beats a literal translation
+that would otherwise differ per locale.
+
+### 8.17 Open Graph / Twitter Card tags, GitHub links
+
+`index.html` gained link-preview meta tags (Slack/Discord/iMessage/social) —
+a real 1200×630 crop of the LogBook screenshot as the card image, root-
+relative (no fixed `og:url`, since each deployment is self-hosted with no
+canonical domain). The lock screen footer and SECURITY.md also gained direct
+GitHub links (repo, and a GitHub-tree link for the security policy),
+collapsing to icon-only under 640px like the existing dock pills.
