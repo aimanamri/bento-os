@@ -92,7 +92,7 @@ is not shown here. Both keep the same flat, one-file-per-concern shape.
 
 ```
 BentoOS/
-├── PROJECT-BRIEF.md, PROJECT-BRIEF-updated.md, README.md, LICENSE, DOCKER.md
+├── PROJECT-BRIEF.md, README.md, LICENSE, DOCKER.md
 ├── docs/                     # This planning/spec set (+ SUPABASE-MIGRATION.md, DATABASE.md)
 ├── server/
 │   └── index.js               # Express: static dist/ + CSP/security headers only — owns no data
@@ -611,17 +611,16 @@ See § 2 and § 4 above for the resulting shape.
 
 ### 8.2 Prompt variable engine rework (removed the "Fill In and Copy" toggle)
 
-PROJECT-BRIEF.md originally specified: *"Toggling 'Fill In and Copy'
-dynamically generates temporary inline input text fields matching those
-variables directly on the card."* That was built, then replaced: the user
-wanted to edit placeholders **directly in place** in the prompt text rather
-than via a toggle + separate input list. See § 4's "Prompt variable engine"
-above for the current (and only) behavior. If reproducing this project from
-the brief alone, build the version described in this doc, not the literal
-brief text — this doc supersedes it here. A revised brief that matches the
-current build exists at [../PROJECT-BRIEF-updated.md](../PROJECT-BRIEF-updated.md);
-the original [../PROJECT-BRIEF.md](../PROJECT-BRIEF.md) is kept as-is for
-history.
+The original brief specified: *"Toggling 'Fill In and Copy' dynamically
+generates temporary inline input text fields matching those variables
+directly on the card."* That was built, then replaced: the user wanted to
+edit placeholders **directly in place** in the prompt text rather than via a
+toggle + separate input list. See § 4's "Prompt variable engine" above for
+the current (and only) behavior. [../PROJECT-BRIEF.md](../PROJECT-BRIEF.md)
+has since been revised to describe this in-place behavior directly rather
+than preserving the superseded toggle wording — if reproducing this project,
+build the version described in this doc and the current brief, not the
+quoted sentence above.
 
 ### 8.3 Editable Modified time
 

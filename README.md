@@ -251,7 +251,7 @@ are documented side by side in
 
 | Document | Read it for |
 |---|---|
-| [PROJECT-BRIEF.md](PROJECT-BRIEF.md) | The original vision and feature spec |
+| [PROJECT-BRIEF.md](PROJECT-BRIEF.md) | Current product vision and feature spec |
 | [docs/IMPLEMENTATION-PLAN.md](docs/IMPLEMENTATION-PLAN.md) | Architecture overview, runtime design, build history |
 | [docs/IMPLEMENTATION-LOCAL.md](docs/IMPLEMENTATION-LOCAL.md) | This backend: REST contract, auth, RBAC middleware |
 | [docs/UX-SPEC.md](docs/UX-SPEC.md) | Design tokens, layouts, accessibility acceptance criteria |
