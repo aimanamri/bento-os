@@ -660,9 +660,16 @@
 }
 
 #auth-dock { padding-bottom: max(0.5rem, env(safe-area-inset-bottom)); }
+.auth-github-link {
+  position: absolute;
+  right: max(0.75rem, env(safe-area-inset-right));
+  top: 50%;
+  transform: translateY(-50%);
+}
 @media (max-width: 639px) {
   /* Three labelled pills won't fit a phone; the glyphs still say enough */
   .auth-dock-label { display: none; }
+  .auth-github-label { display: none; }
 }
 
 /* ── Pre-auth tour (#dlg-tour) ──

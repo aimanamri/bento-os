@@ -302,6 +302,8 @@ export default {
   'auth.dock.logbook': 'About the Docs LogBook',
   'auth.dock.prompts': 'About the Prompt Library',
   'auth.dock.snippets': 'About Code Snippets',
+  'auth.github': 'GitHub',
+  'auth.github.aria': 'View source on GitHub',
   // Local-auth only: the local backend validates username/password presence
   // and the change-password form's current-password field client-side
   // before ever calling the API; Supabase Auth handles the equivalent cases

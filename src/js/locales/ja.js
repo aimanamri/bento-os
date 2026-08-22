@@ -308,6 +308,8 @@ export default {
   'auth.dock.logbook': 'ドキュメント記録帳について',
   'auth.dock.prompts': 'プロンプトライブラリについて',
   'auth.dock.snippets': 'コードスニペットについて',
+  'auth.github': 'GitHub',
+  'auth.github.aria': 'GitHub でソースコードを見る',
   // ローカル認証専用: ローカルバックエンドはユーザー ID・パスワードの入力と、
   // パスワード変更フォームの「現在のパスワード」欄をクライアント側で先に
   // 検証する。Supabase 版は validUsername() と独自のエラー応答で相当する。
