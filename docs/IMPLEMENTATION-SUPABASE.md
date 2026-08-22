@@ -1,6 +1,6 @@
 # Bento OS — Implementation Plan (Supabase / cloud auth variant)
 
-> Companion documents: [DATABASE-SUPABASE.md](DATABASE-SUPABASE.md) · [IMPLEMENTATION-LOCAL.md](IMPLEMENTATION-LOCAL.md) · [SECURITY.md](SECURITY.md) · [EDGE-CASES.md](EDGE-CASES.md)
+> Companion documents: [DATABASE-SUPABASE.md](DATABASE-SUPABASE.md) · [IMPLEMENTATION-LOCAL.md](IMPLEMENTATION-LOCAL.md) · [SECURITY.md](SECURITY.md) · [EDGE-CASES.md](EDGE-CASES.md) · [DOCKER.md](../DOCKER.md) (self-hosted alternative to §2)
 > Base app (single-user, pre-auth): [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md)
 >
 > **Status: built** on the `main` / `dev-supabase` line. This document is the
@@ -33,6 +33,13 @@ Browser (SPA, dist/)
   (`detectSessionInUrl: false`).
 
 ## 2. One-time project setup
+
+> **Self-hosted alternative:** steps 1–6 below provision Supabase Cloud. To
+> run the same API surface (Postgres + GoTrue + PostgREST + Edge Functions)
+> entirely on local infrastructure instead, use the `docker/` compose stack
+> and skip to its runbook: [DOCKER.md](../DOCKER.md). It applies the same
+> `supabase/migrations/` and deploys the same Edge Functions, so nothing
+> below this note is Cloud-specific.
 
 1. Create a project at [supabase.com](https://supabase.com) (or
    `supabase init && supabase start` for local development).
