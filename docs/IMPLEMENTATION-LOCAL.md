@@ -3,12 +3,17 @@
 > Companion documents: [DATABASE-LOCAL.md](DATABASE-LOCAL.md) · [IMPLEMENTATION-SUPABASE.md](IMPLEMENTATION-SUPABASE.md) · [SECURITY.md](SECURITY.md) · [EDGE-CASES.md](EDGE-CASES.md) · [UX-SPEC.md](UX-SPEC.md)
 > Base app (single-user, pre-auth): [IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md)
 >
-> **Status: this document is a build plan**, not yet-built code. It specifies
-> how to add the same login + user-management feature set the Supabase variant
-> has ([IMPLEMENTATION-SUPABASE.md](IMPLEMENTATION-SUPABASE.md)) **while keeping
+> **Status: built**, on the `dev-local-auth` line (not `main`, which carries
+> only the Supabase variant — see IMPLEMENTATION-PLAN.md § 8.8). It specifies
+> the same login + user-management feature set the Supabase variant has
+> ([IMPLEMENTATION-SUPABASE.md](IMPLEMENTATION-SUPABASE.md)) **while keeping
 > the database local** — a single SQLite file owned by Express. Everything in
 > the base app ([IMPLEMENTATION-PLAN.md](IMPLEMENTATION-PLAN.md)) stays; this
-> layers auth, RBAC, and per-user data isolation on top.
+> layers auth, RBAC, and per-user data isolation on top. `dev-local-auth` has
+> also picked up the Code Snippets tab and the pre-auth/theme/admin rebuilds
+> described in IMPLEMENTATION-PLAN.md § 8.9–§ 8.14, and a partial i18n port
+> (English + Japanese only — Bahasa Melayu, main-only so far, has not been
+> ported here).
 
 ---
 
